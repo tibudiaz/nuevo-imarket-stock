@@ -51,10 +51,10 @@ const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = fa
       {...props}
     >
       <Icon className="h-5 w-5 shrink-0" />
-      <span className="ml-4 flex-1 text-left opacity-0 transition-opacity delay-100 duration-200 group-hover:opacity-100 whitespace-nowrap">
-        {label}
-      </span>
-      {children}
+      <div className="ml-4 flex flex-1 items-center justify-between max-w-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:max-w-full group-hover:opacity-100">
+        <span className="whitespace-nowrap">{label}</span>
+        {children}
+      </div>
     </div>
   );
 
@@ -196,7 +196,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               
               <Collapsible open={isInventoryOpen} onOpenChange={setIsInventoryOpen} className="w-full">
                 <NavItem icon={Package} label="Inventario" active={pathname.startsWith("/dashboard/inventory")} isCollapsible>
-                    <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform opacity-0 group-hover:opacity-100", isInventoryOpen && "rotate-180")}/>
+                  <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", isInventoryOpen && "rotate-180")}/>
                 </NavItem>
                 <CollapsibleContent className="space-y-1 pt-1 hidden group-hover:block">
                   <Link href="/dashboard/inventory" className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", pathname === "/dashboard/inventory" && !currentCategory && "bg-slate-200 font-semibold")}>Todos</Link>
