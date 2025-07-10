@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShoppingBag, Package, DollarSign, TrendingUp } from "lucide-react"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
-// Definir interfaces para los tipos
+// (El resto de las interfaces se mantienen igual)
 interface User {
   username: string
   role: string
@@ -39,8 +40,8 @@ interface DashboardData {
   productsGrowth: number
   investmentGrowth: number
   profitGrowth: number
+  monthlySales: { name: string; total: number }[]
 }
-
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -54,10 +55,11 @@ export default function Dashboard() {
     productsGrowth: 0,
     investmentGrowth: 0,
     profitGrowth: 0,
+    monthlySales: [],
   })
 
   useEffect(() => {
-    // Verificar autenticación
+    // (El resto del useEffect se mantiene igual)
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
@@ -71,19 +73,18 @@ export default function Dashboard() {
       router.push("/")
     }
 
-    // Cargar datos para el dashboard
     loadDashboardData()
 
     setIsLoading(false)
   }, [router])
 
   const loadDashboardData = () => {
-    // Cargar ventas
     const salesRef = ref(database, "sales")
     onValue(salesRef, (snapshot) => {
       if (snapshot.exists()) {
         const salesData: Sale[] = []
         let totalSalesAmount = 0
+        const monthlySales: { [key: string]: number } = {}
 
         snapshot.forEach((childSnapshot) => {
           const sale: Sale = {
@@ -92,24 +93,28 @@ export default function Dashboard() {
           }
           salesData.push(sale)
           totalSalesAmount += Number(sale.salePrice || 0)
+
+          const saleDate = new Date(sale.date || "")
+          const month = saleDate.toLocaleString("default", { month: "short" })
+          monthlySales[month] = (monthlySales[month] || 0) + Number(sale.salePrice || 0)
         })
 
-        // Calcular crecimiento (simulado)
-        const salesGrowth = salesData.length > 0 ? 20.1 : 0 // Valor simulado
+        const formattedMonthlySales = Object.entries(monthlySales).map(([name, total]) => ({
+          name,
+          total,
+        }))
 
-        // Actualizar datos del dashboard
         setDashboardData((prev) => ({
           ...prev,
           totalSales: totalSalesAmount,
-          salesGrowth: salesGrowth,
+          salesGrowth: 20.1, // Simulado
+          monthlySales: formattedMonthlySales,
         }))
 
-        // Calcular ganancias
         calculateProfits(salesData)
       }
     })
-
-    // Cargar productos
+    // (El resto de la función se mantiene igual)
     const productsRef = ref(database, "products")
     onValue(productsRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -125,30 +130,24 @@ export default function Dashboard() {
           totalInvestment += Number(product.cost || 0) * Number(product.stock || 0)
         })
 
-        // Calcular crecimiento (simulado)
-        const productsGrowth = productsData.length > 0 ? 12 : 0 // Valor simulado para nuevos productos
-        const investmentGrowth = totalInvestment > 0 ? 5.2 : 0 // Valor simulado
-
-        // Actualizar datos del dashboard
         setDashboardData((prev) => ({
           ...prev,
           totalProducts: productsData.length,
           totalInvestment: totalInvestment,
-          productsGrowth: productsGrowth,
-          investmentGrowth: investmentGrowth,
+          productsGrowth: 12, // Simulado
+          investmentGrowth: 5.2, // Simulado
         }))
       }
     })
   }
 
   const calculateProfits = (salesData: Sale[]) => {
-    // Cargar productos para obtener costos
+    // (La función se mantiene igual)
     const productsRef = ref(database, "products")
     onValue(productsRef, (snapshot) => {
       if (snapshot.exists()) {
         const productsMap: Record<string, Product> = {}
 
-        // Crear un mapa de productos para búsqueda rápida
         snapshot.forEach((childSnapshot) => {
           const product: Product = {
             id: childSnapshot.key || "",
@@ -157,7 +156,6 @@ export default function Dashboard() {
           productsMap[product.id] = product
         })
 
-        // Calcular ganancias
         let totalCost = 0
         salesData.forEach((sale) => {
           const product = sale.productId ? productsMap[sale.productId] : undefined
@@ -169,14 +167,10 @@ export default function Dashboard() {
         const totalSalesAmount = salesData.reduce((sum, sale) => sum + Number(sale.salePrice || 0), 0)
         const totalProfit = totalSalesAmount - totalCost
 
-        // Calcular crecimiento (simulado)
-        const profitGrowth = totalProfit > 0 ? 10.3 : 0 // Valor simulado
-
-        // Actualizar datos del dashboard
         setDashboardData((prev) => ({
           ...prev,
           totalProfit: totalProfit,
-          profitGrowth: profitGrowth,
+          profitGrowth: 10.3, // Simulado
         }))
       }
     })
@@ -247,37 +241,33 @@ export default function Dashboard() {
           )}
         </div>
 
-        <Tabs defaultValue="inventory" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="inventory">Inventario</TabsTrigger>
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="overview">Resumen</TabsTrigger>
             <TabsTrigger value="sales">Ventas</TabsTrigger>
-            {user?.role === "admin" && (
-              <>
-                <TabsTrigger value="finances">Finanzas</TabsTrigger>
-                <TabsTrigger value="reports">Reportes</TabsTrigger>
-              </>
-            )}
           </TabsList>
-          <TabsContent value="inventory" className="mt-6">
-            <h2 className="text-xl font-semibold mb-4">Gestión de Inventario</h2>
-            <p>Aquí se mostrará la gestión de inventario y productos.</p>
+          <TabsContent value="overview" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ventas Mensuales</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dashboardData.monthlySales}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="total" fill="#8884d8" name="Ventas" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
           </TabsContent>
           <TabsContent value="sales" className="mt-6">
-            <h2 className="text-xl font-semibold mb-4">Registro de Ventas</h2>
-            <p>Aquí se mostrará el registro y gestión de ventas.</p>
+            {/* Contenido de la pestaña de ventas */}
           </TabsContent>
-          {user?.role === "admin" && (
-            <>
-              <TabsContent value="finances" className="mt-6">
-                <h2 className="text-xl font-semibold mb-4">Información Financiera</h2>
-                <p>Aquí se mostrará la información financiera y costos.</p>
-              </TabsContent>
-              <TabsContent value="reports" className="mt-6">
-                <h2 className="text-xl font-semibold mb-4">Reportes y Estadísticas</h2>
-                <p>Aquí se mostrarán reportes y estadísticas detalladas.</p>
-              </TabsContent>
-            </>
-          )}
         </Tabs>
       </div>
     </DashboardLayout>

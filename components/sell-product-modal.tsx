@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Search, FileText } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner" // Importa el toast de sonner
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   AlertDialog,
@@ -31,9 +31,10 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export default function SellProductModal({ isOpen, onClose, product, onProductSold }) {
-  const { toast } = useToast()
+  // Ya no necesitas el hook useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  // ... (el resto de tus estados se mantienen igual)
   const [activeTab, setActiveTab] = useState("venta")
   const [customer, setCustomer] = useState({
     name: "",
@@ -55,9 +56,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [completedSale, setCompletedSale] = useState(null)
   const [receiptNumber, setReceiptNumber] = useState("")
 
+
   useEffect(() => {
     if (isOpen) {
-      // Generar un número de recibo único basado en la fecha y un número aleatorio
       const date = new Date()
       const randomNum = Math.floor(Math.random() * 10000)
         .toString()
@@ -65,13 +66,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       const receiptNum = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, "0")}${date.getDate().toString().padStart(2, "0")}-${randomNum}`
       setReceiptNumber(receiptNum)
 
-      // Establecer el precio de venta predeterminado al precio del producto
       setSaleDetails((prev) => ({
         ...prev,
         salePrice: product?.price || 0,
       }))
 
-      // Establecer el pago inicial predeterminado al 20% del precio del producto
       setReserveDetails((prev) => ({
         ...prev,
         downPayment: product ? Math.round(product.price * 0.2 * 100) / 100 : 0,
@@ -81,10 +80,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
   const searchCustomerByDni = async () => {
     if (!customer.dni || customer.dni.length < 7) {
-      toast({
-        title: "DNI inválido",
+      toast.error("DNI inválido", {
         description: "Por favor ingrese un DNI válido para buscar",
-        variant: "destructive",
       })
       return
     }
@@ -111,23 +108,19 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         })
 
         if (!found) {
-          toast({
-            title: "Cliente no encontrado",
+          toast.info("Cliente no encontrado", {
             description: "No se encontró ningún cliente con ese DNI",
           })
         }
       } else {
-        toast({
-          title: "No hay clientes",
+        toast.info("No hay clientes", {
           description: "No hay clientes registrados en la base de datos",
         })
       }
     } catch (error) {
       console.error("Error al buscar cliente:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Ocurrió un error al buscar el cliente",
-        variant: "destructive",
       })
     } finally {
       setIsSearching(false)
@@ -136,30 +129,25 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
   const handleSellProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
-      toast({
-        title: "Datos incompletos",
+      toast.error("Datos incompletos", {
         description: "Por favor complete todos los datos del cliente",
-        variant: "destructive",
       })
       return
     }
 
     if (!saleDetails.salePrice || saleDetails.salePrice <= 0) {
-      toast({
-        title: "Precio inválido",
+      toast.error("Precio inválido", {
         description: "Por favor ingrese un precio de venta válido",
-        variant: "destructive",
       })
       return
     }
 
     setIsLoading(true)
     try {
-      // 1. Guardar o actualizar los datos del cliente
+      // (El resto de la lógica se mantiene igual)
       const customersRef = ref(database, "customers")
       let customerId = null
 
-      // Buscar si el cliente ya existe
       const customerSnapshot = await get(customersRef)
       if (customerSnapshot.exists()) {
         customerSnapshot.forEach((childSnapshot) => {
@@ -171,7 +159,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         })
       }
 
-      // Si no existe, crear uno nuevo
       if (!customerId) {
         const newCustomerRef = push(customersRef)
         customerId = newCustomerRef.key
@@ -185,7 +172,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         })
       }
 
-      // 2. Registrar la venta
       const salesRef = ref(database, "sales")
       const newSaleRef = push(salesRef)
       const saleData = {
@@ -206,64 +192,51 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       }
       await set(newSaleRef, saleData)
 
-      // 3. Actualizar el inventario (reducir stock)
       const productRef = ref(database, `products/${product.id}`)
       await update(productRef, {
         stock: product.stock > 0 ? product.stock - 1 : 0,
         lastSold: new Date().toISOString(),
       })
-
-      // 4. Guardar la venta completada para posible generación de PDF
+      
       setCompletedSale(saleData)
-
-      // 5. Mostrar diálogo para preguntar si desea generar PDF
       setIsPdfDialogOpen(true)
     } catch (error) {
       console.error("Error al registrar la venta:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Ocurrió un error al registrar la venta",
-        variant: "destructive",
       })
       setIsLoading(false)
     }
   }
 
+  // ... (puedes aplicar el mismo cambio a las otras llamadas de toast)
   const handleReserveProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
-      toast({
-        title: "Datos incompletos",
+      toast.error("Datos incompletos", {
         description: "Por favor complete todos los datos del cliente",
-        variant: "destructive",
       })
       return
     }
 
     if (!reserveDetails.downPayment || reserveDetails.downPayment <= 0) {
-      toast({
-        title: "Seña inválida",
+      toast.error("Seña inválida", {
         description: "Por favor ingrese un monto de seña válido",
-        variant: "destructive",
       })
       return
     }
 
     if (reserveDetails.downPayment >= product.price) {
-      toast({
-        title: "Seña inválida",
+      toast.error("Seña inválida", {
         description: "La seña no puede ser mayor o igual al precio total del producto",
-        variant: "destructive",
       })
       return
     }
 
     setIsLoading(true)
     try {
-      // 1. Guardar o actualizar los datos del cliente
       const customersRef = ref(database, "customers")
       let customerId = null
 
-      // Buscar si el cliente ya existe
       const customerSnapshot = await get(customersRef)
       if (customerSnapshot.exists()) {
         customerSnapshot.forEach((childSnapshot) => {
@@ -275,7 +248,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         })
       }
 
-      // Si no existe, crear uno nuevo
       if (!customerId) {
         const newCustomerRef = push(customersRef)
         customerId = newCustomerRef.key
@@ -289,7 +261,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         })
       }
 
-      // 2. Registrar la reserva
       const reservesRef = ref(database, "reserves")
       const newReserveRef = push(reservesRef)
       const reserveData = {
@@ -314,7 +285,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       }
       await set(newReserveRef, reserveData)
 
-      // 3. Actualizar el inventario (marcar como reservado)
       const productRef = ref(database, `products/${product.id}`)
       await update(productRef, {
         stock: product.stock > 0 ? product.stock - 1 : 0,
@@ -323,18 +293,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         reservedUntil: reserveDetails.expirationDate,
         lastUpdated: new Date().toISOString(),
       })
-
-      // 4. Guardar la reserva completada para posible generación de PDF
+      
       setCompletedSale(reserveData)
-
-      // 5. Mostrar diálogo para preguntar si desea generar PDF
+      
       setIsPdfDialogOpen(true)
     } catch (error) {
       console.error("Error al registrar la reserva:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Ocurrió un error al registrar la reserva",
-        variant: "destructive",
       })
       setIsLoading(false)
     }
@@ -353,48 +319,37 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
   const generatePDF = async () => {
     try {
-      // Mostrar mensaje de carga
-      toast({
-        title: "Generando PDF",
+      toast.loading("Generando PDF", {
         description: "Espere mientras se genera el comprobante...",
       })
 
-      // Verificar si el archivo PDF base existe
       const pdfExists = await checkPdfExists("factura.pdf")
       if (!pdfExists) {
         console.warn("El archivo factura.pdf no existe en Firebase Storage")
-        toast({
-          title: "Aviso",
+        toast.info("Aviso", {
           description: "La plantilla de factura no existe. Se creará un PDF básico.",
         })
       }
 
-      // Cargar las bibliotecas necesarias
       const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib")
 
-      // Variable para almacenar el documento PDF
       let pdfDoc
 
       try {
-        // 1. Intentar obtener el PDF base desde Firebase Storage con manejo de errores mejorado
         const pdfTemplateRef = storageRef(storage, "factura.pdf")
         console.log("Intentando obtener PDF desde:", pdfTemplateRef.fullPath)
 
         try {
-          // Obtener URL con manejo de errores mejorado
           const pdfTemplateUrl = await getDownloadURL(pdfTemplateRef)
           console.log("URL del PDF base obtenida:", pdfTemplateUrl)
 
-          // Crear un PDF desde cero como alternativa inmediata
-          // Esto nos asegura tener un PDF funcional incluso si falla la descarga
           const fallbackPdfDoc = await PDFDocument.create()
-          fallbackPdfDoc.addPage([595, 842]) // Tamaño A4
+          fallbackPdfDoc.addPage([595, 842])
 
           try {
-            // Intentar descargar el PDF con fetch primero (más simple)
             const response = await fetch(pdfTemplateUrl, {
               method: "GET",
-              mode: "cors", // Intentar con CORS explícito
+              mode: "cors",
               cache: "no-cache",
             })
 
@@ -405,13 +360,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             const pdfArrayBuffer = await response.arrayBuffer()
             console.log("PDF base descargado con fetch, tamaño:", pdfArrayBuffer.byteLength)
 
-            // Cargar el PDF existente
             pdfDoc = await PDFDocument.load(pdfArrayBuffer)
             console.log("PDF base cargado correctamente con", pdfDoc.getPageCount(), "páginas")
           } catch (fetchError) {
             console.warn("Error al cargar el PDF con fetch, intentando con XMLHttpRequest:", fetchError.message)
 
-            // Si fetch falla, intentar con XMLHttpRequest como alternativa
             try {
               const xhr = new XMLHttpRequest()
               xhr.open("GET", pdfTemplateUrl, true)
@@ -435,12 +388,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
               console.log("PDF base descargado con XMLHttpRequest, tamaño:", pdfArrayBuffer.byteLength)
 
-              // Cargar el PDF existente
               pdfDoc = await PDFDocument.load(pdfArrayBuffer)
               console.log("PDF base cargado correctamente con", pdfDoc.getPageCount(), "páginas")
             } catch (xhrError) {
               console.error("Error al cargar el PDF con XMLHttpRequest:", xhrError)
-              // Usar el PDF de respaldo creado anteriormente
               console.log("Usando PDF de respaldo creado desde cero")
               pdfDoc = fallbackPdfDoc
             }
@@ -451,31 +402,23 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
       } catch (error) {
         console.warn("Creando PDF desde cero debido a error:", error.message)
-        toast({
-          title: "Aviso",
+        toast.info("Aviso", {
           description: "No se pudo cargar la plantilla. Usando plantilla básica para el PDF.",
         })
 
-        // Crear un PDF desde cero como alternativa
         pdfDoc = await PDFDocument.create()
-        // Añadir una página (A4)
         pdfDoc.addPage([595, 842])
       }
 
-      // Configurar la fuente
       const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-      // Obtener la primera página
       const pages = pdfDoc.getPages()
       const firstPage = pages[0]
 
-      // Si creamos un PDF desde cero, añadir un título y encabezado básico
       if (pages.length === 1 && pdfDoc.getPageCount() === 1) {
-        // Obtener dimensiones de la página
         const { width, height } = firstPage.getSize()
 
-        // Dibujar un título
         firstPage.drawText("COMPROBANTE DE VENTA", {
           x: 50,
           y: height - 50,
@@ -484,7 +427,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           color: rgb(0, 0, 0),
         })
 
-        // Dibujar líneas para separar secciones
         firstPage.drawLine({
           start: { x: 50, y: height - 70 },
           end: { x: width - 50, y: height - 70 },
@@ -493,14 +435,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         })
       }
 
-      // Obtener dimensiones de la página
       const { width, height } = firstPage.getSize()
 
-      // Formatear la fecha actual
       const currentDate = new Date(completedSale.date)
       const formattedDate = `${currentDate.getDate()}/${currentDate.getMonth() + 1}/${currentDate.getFullYear()}`
 
-      // Coordenadas aproximadas para cada campo (ajusta según sea necesario)
       const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
@@ -510,16 +449,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         productoNombre: { x: 65, y: 548 },
         productoImei: { x: 320, y: 535 },
         precioVenta: { x: 455, y: 548 },
-        // Campos adicionales para el producto entregado
         productoEntregadoNombre: { x: 65, y: 505 },
         productoEntregadoImei: { x: 320, y: 498 },
         productoEntregadoImei1: { x: 322, y: 510 },
         precioCompraPesos: { x: 455, y: 505 },
-        // Coordenadas para el precio final
         precioFinal: { x: 455, y: 290 },
       }
 
-      // Asegúrate de que todos los valores son cadenas
       const numeroReciboStr = String(completedSale.receiptNumber)
       const nombreClienteStr = String(completedSale.customerName)
       const dniClienteStr = String(completedSale.customerDni)
@@ -527,12 +463,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       const productoNombreStr = String(completedSale.productName || "Nombre no disponible")
       const productoImeiStr = String(completedSale.productImei || "IMEI no disponible")
 
-      // Obtener precio según sea venta o reserva
       const precioVentaStr = completedSale.hasOwnProperty("downPayment")
         ? completedSale.productPrice
         : completedSale.salePrice
 
-      // Función para agregar el contenido en una página
       const addContentToPage = (page) => {
         page.drawText(numeroReciboStr, {
           x: positions.numeroRecibo.x,
@@ -590,7 +524,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           font: helveticaFont,
         })
 
-        // Si es una reserva, mostrar información adicional
         if (completedSale.hasOwnProperty("downPayment")) {
           page.drawText(`Seña: $${completedSale.downPayment}`, {
             x: positions.productoEntregadoNombre.x,
@@ -607,7 +540,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           })
         }
 
-        // Mostrar el precio final
         page.drawText(`$${precioVentaStr}`, {
           x: positions.precioFinal.x,
           y: positions.precioFinal.y,
@@ -616,20 +548,16 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         })
       }
 
-      // Agregar el contenido en la primera página
       addContentToPage(firstPage)
 
-      // Si hay una segunda página, hacer lo mismo
       if (pages.length > 1) {
         const secondPage = pages[1]
         addContentToPage(secondPage)
       }
 
-      // Guardar el PDF modificado
       const pdfBytes = await pdfDoc.save()
       console.log("PDF generado correctamente, tamaño:", pdfBytes.length)
 
-      // Convertir a Blob y descargar
       const blob = new Blob([pdfBytes], { type: "application/pdf" })
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -640,16 +568,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
 
-      toast({
-        title: "PDF generado",
+      toast.success("PDF generado", {
         description: "El comprobante ha sido generado correctamente",
       })
     } catch (error) {
       console.error("Error general al generar el PDF:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: `Error en la generación del PDF: ${error.message || "Error desconocido"}`,
-        variant: "destructive",
       })
     }
   }
@@ -662,19 +587,17 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       generatePDF()
     }
 
-    toast({
-      title: completedSale.hasOwnProperty("downPayment") ? "Reserva exitosa" : "Venta exitosa",
+    toast.success(completedSale.hasOwnProperty("downPayment") ? "Reserva exitosa" : "Venta exitosa", {
       description: completedSale.hasOwnProperty("downPayment")
         ? "El producto ha sido señado correctamente"
         : "El producto ha sido vendido correctamente",
     })
 
-    // Notificar que el producto fue vendido/reservado para actualizar la UI
     onProductSold()
     onClose()
   }
-
   return (
+    // ... (el resto del JSX se mantiene igual)
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[600px]">
@@ -908,7 +831,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo para preguntar si desea generar PDF */}
       <AlertDialog open={isPdfDialogOpen} onOpenChange={setIsPdfDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

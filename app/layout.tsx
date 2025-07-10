@@ -1,7 +1,7 @@
 import type React from "react"
 import "./globals.css"
 import { Inter } from "next/font/google"
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/sonner" // Importa el Toaster de sonner
 import FirebaseProvider from "@/components/firebase-provider"
 import type { Metadata } from "next"
 
@@ -22,7 +22,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <FirebaseProvider>
           {children}
-          <Toaster />
+          {/* Este es el Toaster de sonner */}
+          <Toaster position="top-right" richColors />
         </FirebaseProvider>
       </body>
     </html>

@@ -18,12 +18,12 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Search, Edit, Trash, ShoppingCart, Barcode } from "lucide-react"
-import { ref, onValue, set, push, remove } from "firebase/database"
+import { ref, onValue, set, push, remove, update } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner" // 1. Importamos el toast de sonner
 import SellProductModal from "@/components/sell-product-modal"
 
-// Definir interfaces para los tipos
+// (Las interfaces se mantienen igual)
 interface User {
   username: string
   role: string
@@ -57,12 +57,13 @@ interface NewProduct {
 
 export default function InventoryPage() {
   const router = useRouter()
-  const { toast } = useToast()
+  // 2. Ya no necesitamos el hook useToast()
   const [user, setUser] = useState<User | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isSellDialogOpen, setIsSellDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [newProduct, setNewProduct] = useState<NewProduct>({
@@ -76,15 +77,14 @@ export default function InventoryPage() {
     barcode: "",
     imei: "",
   })
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
   useEffect(() => {
-    // Verificar autenticación
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
       return
     }
-
     try {
       setUser(JSON.parse(storedUser))
     } catch (e) {
@@ -92,48 +92,31 @@ export default function InventoryPage() {
       router.push("/")
     }
 
-    // Cargar productos desde Firebase
     const productsRef = ref(database, "products")
-
-    try {
-      const unsubscribe = onValue(
-        productsRef,
-        (snapshot) => {
-          setIsLoading(false)
-          if (snapshot.exists()) {
-            const productsData: Product[] = []
-            snapshot.forEach((childSnapshot) => {
-              productsData.push({
-                id: childSnapshot.key || "",
-                ...childSnapshot.val(),
-              })
-            })
-            setProducts(productsData)
-          } else {
-            setProducts([])
-          }
-        },
-        (error) => {
-          console.error("Error al cargar productos:", error)
-          setIsLoading(false)
-          setProducts([])
-          toast({
-            title: "Error de conexión",
-            description: "No se pudieron cargar los productos. Verifica tu conexión a Firebase.",
-            variant: "destructive",
+    const unsubscribe = onValue(
+      productsRef,
+      (snapshot) => {
+        setIsLoading(false)
+        if (snapshot.exists()) {
+          const productsData: Product[] = []
+          snapshot.forEach((childSnapshot) => {
+            productsData.push({ id: childSnapshot.key || "", ...childSnapshot.val() })
           })
-        },
-      )
-
-      return () => {
-        unsubscribe()
-      }
-    } catch (error) {
-      console.error("Error general:", error)
-      setIsLoading(false)
-      setProducts([])
-    }
-  }, [router, toast])
+          setProducts(productsData)
+        } else {
+          setProducts([])
+        }
+      },
+      (error) => {
+        console.error("Error al cargar productos:", error)
+        setIsLoading(false)
+        toast.error("Error de conexión", {
+          description: "No se pudieron cargar los productos.",
+        })
+      },
+    )
+    return () => unsubscribe()
+  }, [router])
 
   const filteredProducts = products.filter(
     (product) =>
@@ -146,58 +129,44 @@ export default function InventoryPage() {
   )
 
   const handleAddProduct = async () => {
+    if (!newProduct.name || !newProduct.brand || !newProduct.model || !newProduct.category) {
+      toast.error("Campos incompletos", { description: "Por favor complete todos los campos requeridos" })
+      return
+    }
+    if (newProduct.price <= 0) {
+      toast.error("Precio inválido", { description: "El precio debe ser mayor que cero" })
+      return
+    }
+
     try {
-      // Validar campos
-      if (!newProduct.name || !newProduct.brand || !newProduct.model || !newProduct.category) {
-        toast({
-          title: "Campos incompletos",
-          description: "Por favor complete todos los campos requeridos",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (newProduct.price <= 0) {
-        toast({
-          title: "Precio inválido",
-          description: "El precio debe ser mayor que cero",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Agregar a Firebase
       const productsRef = ref(database, "products")
       const newProductRef = push(productsRef)
-      await set(newProductRef, {
-        ...newProduct,
-        createdAt: new Date().toISOString(),
-      })
-
-      setNewProduct({
-        name: "",
-        brand: "",
-        model: "",
-        price: 0,
-        cost: 0,
-        stock: 0,
-        category: "",
-        barcode: "",
-        imei: "",
-      })
+      await set(newProductRef, { ...newProduct, createdAt: new Date().toISOString() })
+      setNewProduct({ name: "", brand: "", model: "", price: 0, cost: 0, stock: 0, category: "", barcode: "", imei: "" })
       setIsAddDialogOpen(false)
-
-      toast({
-        title: "Producto agregado",
-        description: "El producto ha sido agregado correctamente",
-      })
+      toast.success("Producto agregado", { description: "El producto ha sido agregado correctamente" })
     } catch (error) {
       console.error("Error al agregar producto:", error)
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al agregar el producto",
-        variant: "destructive",
-      })
+      toast.error("Error", { description: "Ocurrió un error al agregar el producto" })
+    }
+  }
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct({ ...product })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return
+    try {
+      const productRef = ref(database, `products/${editingProduct.id}`)
+      await update(productRef, editingProduct)
+      setIsEditDialogOpen(false)
+      setEditingProduct(null)
+      toast.success("Producto actualizado", { description: "El producto ha sido actualizado correctamente" })
+    } catch (error) {
+      console.error("Error al actualizar producto:", error)
+      toast.error("Error", { description: "Ocurrió un error al actualizar el producto" })
     }
   }
 
@@ -205,18 +174,10 @@ export default function InventoryPage() {
     try {
       const productRef = ref(database, `products/${id}`)
       await remove(productRef)
-
-      toast({
-        title: "Producto eliminado",
-        description: "El producto ha sido eliminado correctamente",
-      })
+      toast.success("Producto eliminado", { description: "El producto ha sido eliminado correctamente" })
     } catch (error) {
       console.error("Error al eliminar producto:", error)
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al eliminar el producto",
-        variant: "destructive",
-      })
+      toast.error("Error", { description: "Ocurrió un error al eliminar el producto" })
     }
   }
 
@@ -226,13 +187,11 @@ export default function InventoryPage() {
   }
 
   const handleProductSold = () => {
-    toast({
-      title: "Venta exitosa",
-      description: "El producto ha sido vendido correctamente",
-    })
+    // La notificación ahora se maneja dentro del modal de venta
     setIsSellDialogOpen(false)
   }
-
+  
+  // (El resto del componente JSX se mantiene igual)
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -420,7 +379,7 @@ export default function InventoryPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleSellProduct(product)}>
                           <ShoppingCart className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(product.id)}>
@@ -436,7 +395,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Modal para vender producto */}
       {selectedProduct && (
         <SellProductModal
           isOpen={isSellDialogOpen}
@@ -444,6 +402,94 @@ export default function InventoryPage() {
           product={selectedProduct}
           onProductSold={handleProductSold}
         />
+      )}
+      
+      {editingProduct && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Producto</DialogTitle>
+              <DialogDescription>Actualice los detalles del producto.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Nombre</Label>
+                  <Input
+                    id="edit-name"
+                    value={editingProduct.name}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-brand">Marca</Label>
+                  <Input
+                    id="edit-brand"
+                    value={editingProduct.brand}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, brand: e.target.value })}
+                  />
+                </div>
+              </div>
+               <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="model">Modelo</Label>
+                      <Input
+                        id="model"
+                        value={editingProduct.model}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, model: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Categoría</Label>
+                      <Input
+                        id="category"
+                        value={editingProduct.category}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                      />
+                    </div>
+                  </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-price">Precio Venta</Label>
+                  <Input
+                    id="edit-price"
+                    type="number"
+                    value={editingProduct.price}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, price: Number.parseFloat(e.target.value) })
+                    }
+                  />
+                </div>
+                 <div className="space-y-2">
+                      <Label htmlFor="cost">Precio Costo</Label>
+                      <Input
+                        id="cost"
+                        type="number"
+                        value={editingProduct.cost}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, cost: Number.parseFloat(e.target.value) })}
+                      />
+                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-stock">Stock</Label>
+                  <Input
+                    id="edit-stock"
+                    type="number"
+                    value={editingProduct.stock}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, stock: Number.parseInt(e.target.value) })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdateProduct}>Actualizar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </DashboardLayout>
   )

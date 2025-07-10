@@ -1,8 +1,6 @@
 "use client"
 
-import React from "react"
-
-import { useEffect, useState } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,9 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner" // 1. Importamos el toast de sonner
 
-// Definir interfaces para los tipos
+// (Las interfaces se mantienen igual)
 interface User {
   username: string
   role: string
@@ -25,6 +23,7 @@ interface Sale {
   id: string
   date: string
   productId?: string
+  productName?: string;
   salePrice?: number | string
   [key: string]: any
 }
@@ -60,39 +59,27 @@ interface FinancialData {
   productProfitability: ProductProfitability[]
 }
 
+
 export default function FinancesPage() {
   const router = useRouter()
-  const { toast } = useToast()
+  // 2. Ya no necesitamos el hook useToast()
   const [user, setUser] = useState<User | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [timeRange, setTimeRange] = useState("month")
   const [isLoading, setIsLoading] = useState(true)
-  const [financialData, setFinancialData] = useState<FinancialData>({
-    totalIncome: 0,
-    totalCosts: 0,
-    profit: 0,
-    profitMargin: 0,
-    monthlySales: [],
-    productProfitability: [],
-  })
 
   useEffect(() => {
-    setIsLoading(true)
-
-    // Verificar autenticación y rol
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
       return
     }
-
     try {
       const parsedUser = JSON.parse(storedUser)
       setUser(parsedUser)
-
-      // Redirigir si no es administrador
       if (parsedUser.role !== "admin") {
+        toast.error("Acceso denegado", { description: "No tienes permiso para ver esta página." })
         router.push("/dashboard")
         return
       }
@@ -102,231 +89,132 @@ export default function FinancesPage() {
       return
     }
 
-    // Cargar ventas desde Firebase con manejo de errores
-    try {
-      const salesRef = ref(database, "sales")
-      const unsubscribeSales = onValue(
-        salesRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const salesData: Sale[] = []
-            snapshot.forEach((childSnapshot) => {
-              salesData.push({
-                id: childSnapshot.key || "",
-                ...childSnapshot.val(),
-              })
-            })
-            setSales(salesData)
-          } else {
-            setSales([])
-          }
-        },
-        (error) => {
-          console.error("Error al cargar ventas:", error)
-          toast({
-            title: "Error",
-            description: "No se pudieron cargar los datos de ventas",
-            variant: "destructive",
-          })
-          setSales([])
-        },
-      )
-
-      // Cargar productos desde Firebase con manejo de errores
-      const productsRef = ref(database, "products")
-      const unsubscribeProducts = onValue(
-        productsRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const productsData: Product[] = []
-            snapshot.forEach((childSnapshot) => {
-              productsData.push({
-                id: childSnapshot.key || "",
-                ...childSnapshot.val(),
-              })
-            })
-            setProducts(productsData)
-          } else {
-            setProducts([])
-          }
-        },
-        (error) => {
-          console.error("Error al cargar productos:", error)
-          toast({
-            title: "Error",
-            description: "No se pudieron cargar los datos de productos",
-            variant: "destructive",
-          })
-          setProducts([])
-        },
-      )
-
-      return () => {
-        unsubscribeSales && unsubscribeSales()
-        unsubscribeProducts && unsubscribeProducts()
+    const salesRef = ref(database, "sales")
+    const unsubscribeSales = onValue(salesRef, (snapshot) => {
+      const salesData: Sale[] = []
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          salesData.push({ id: child.key!, ...child.val() })
+        })
       }
-    } catch (error) {
-      console.error("Error general:", error)
-      toast({
-        title: "Error de conexión",
-        description: "No se pudo conectar con la base de datos",
-        variant: "destructive",
-      })
-    } finally {
+      setSales(salesData)
+    }, (error) => {
+      console.error("Error al cargar ventas:", error)
+      toast.error("Error de Ventas", { description: "No se pudieron cargar los datos de ventas." })
+    })
+
+    const productsRef = ref(database, "products")
+    const unsubscribeProducts = onValue(productsRef, (snapshot) => {
+      const productsData: Product[] = []
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          productsData.push({ id: child.key!, ...child.val() })
+        })
+      }
+      setProducts(productsData)
       setIsLoading(false)
+    }, (error) => {
+      console.error("Error al cargar productos:", error)
+      toast.error("Error de Productos", { description: "No se pudieron cargar los datos de productos." })
+      setIsLoading(false)
+    })
+
+    return () => {
+      unsubscribeSales()
+      unsubscribeProducts()
     }
-  }, [router, toast])
+  }, [router])
 
-  // Calcular datos financieros cuando cambian las ventas o el rango de tiempo
-  useEffect(() => {
-    calculateFinancialData()
-  }, [sales, products, timeRange])
-
-  const calculateFinancialData = () => {
+  const financialData = useMemo<FinancialData>(() => {
     if (sales.length === 0) {
-      setFinancialData({
-        totalIncome: 0,
-        totalCosts: 0,
-        profit: 0,
-        profitMargin: 0,
-        monthlySales: [],
-        productProfitability: [],
-      })
-      return
+      return { totalIncome: 0, totalCosts: 0, profit: 0, profitMargin: 0, monthlySales: [], productProfitability: [] }
     }
 
-    // Filtrar ventas según el rango de tiempo seleccionado
     const now = new Date()
     const filteredSales = sales.filter((sale) => {
       const saleDate = new Date(sale.date)
-      if (timeRange === "week") {
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - 7)
-        return saleDate >= weekStart
-      } else if (timeRange === "month") {
-        const monthStart = new Date(now)
-        monthStart.setMonth(now.getMonth() - 1)
-        return saleDate >= monthStart
-      } else if (timeRange === "quarter") {
-        const quarterStart = new Date(now)
-        quarterStart.setMonth(now.getMonth() - 3)
-        return saleDate >= quarterStart
-      } else if (timeRange === "year") {
-        const yearStart = new Date(now)
-        yearStart.setFullYear(now.getFullYear() - 1)
-        return saleDate >= yearStart
-      }
-      return true // Si no hay filtro, incluir todas
+      if (timeRange === "week") return saleDate >= new Date(now.setDate(now.getDate() - 7))
+      if (timeRange === "month") return saleDate >= new Date(now.setMonth(now.getMonth() - 1))
+      if (timeRange === "quarter") return saleDate >= new Date(now.setMonth(now.getMonth() - 3))
+      if (timeRange === "year") return saleDate >= new Date(now.setFullYear(now.getFullYear() - 1))
+      return true
     })
 
-    // Calcular ingresos totales
     const totalIncome = filteredSales.reduce((sum, sale) => sum + Number(sale.salePrice || 0), 0)
+    
+    const productMap = new Map(products.map(p => [p.id, p]));
 
-    // Calcular costos totales (basados en el costo de los productos vendidos)
-    let totalCosts = 0
-    filteredSales.forEach((sale) => {
-      const product = products.find((p) => p.id === sale.productId)
-      if (product) {
-        totalCosts += Number(product.cost || 0)
-      }
-    })
+    const totalCosts = filteredSales.reduce((sum, sale) => {
+        const product = sale.productId ? productMap.get(sale.productId) : undefined;
+        return sum + (product ? Number(product.cost || 0) : 0);
+    }, 0);
 
-    // Calcular ganancia y margen
     const profit = totalIncome - totalCosts
     const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0
 
-    // Simplificar el cálculo de ventas mensuales
-    const monthlySales: MonthSale[] = []
+    const salesByMonth: Record<string, { total: number }> = {}
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-
-    // Agrupar ventas por mes (versión simplificada)
-    const salesByMonth: Record<string, MonthSale> = {}
+    
     filteredSales.forEach((sale) => {
       const date = new Date(sale.date)
-      const monthKey = `${date.getFullYear()}-${date.getMonth()}`
+      const monthKey = `${date.getFullYear()}-${monthNames[date.getMonth()]}`
       if (!salesByMonth[monthKey]) {
-        salesByMonth[monthKey] = {
-          month: monthNames[date.getMonth()],
-          year: date.getFullYear(),
-          total: 0,
-        }
+        salesByMonth[monthKey] = { total: 0 }
       }
       salesByMonth[monthKey].total += Number(sale.salePrice || 0)
     })
 
-    // Convertir a array para gráficos
-    Object.values(salesByMonth).forEach((monthData) => {
-      monthlySales.push(monthData)
-    })
+    const monthlySales = Object.entries(salesByMonth).map(([key, value]) => {
+        const [year, month] = key.split('-');
+        return { month, year: parseInt(year), total: value.total };
+    });
 
-    // Simplificar el cálculo de rentabilidad por producto
-    const productProfitability: ProductProfitability[] = []
     const salesByProduct: Record<string, ProductProfitability> = {}
-
     filteredSales.forEach((sale) => {
-      if (!sale.productId) return
-
-      if (!salesByProduct[sale.productId]) {
-        salesByProduct[sale.productId] = {
-          productId: sale.productId,
-          productName: sale.productName || "Producto sin nombre",
-          totalSales: 0,
-          quantity: 0,
-          cost: 0,
-          profit: 0,
-          margin: 0,
+        if (!sale.productId) return;
+        if (!salesByProduct[sale.productId]) {
+            const product = productMap.get(sale.productId);
+            salesByProduct[sale.productId] = {
+                productId: sale.productId,
+                productName: sale.productName || product?.name || "Desconocido",
+                totalSales: 0,
+                quantity: 0,
+                cost: 0,
+                profit: 0,
+                margin: 0,
+            };
         }
-      }
+        const productData = salesByProduct[sale.productId];
+        const productCost = productMap.get(sale.productId)?.cost || 0;
+        productData.totalSales += Number(sale.salePrice || 0);
+        productData.quantity += 1;
+        productData.cost += productCost;
+    });
+    
+    const productProfitability = Object.values(salesByProduct).map(p => {
+        p.profit = p.totalSales - p.cost;
+        p.margin = p.totalSales > 0 ? (p.profit / p.totalSales) * 100 : 0;
+        return p;
+    }).sort((a, b) => b.profit - a.profit);
 
-      salesByProduct[sale.productId].totalSales += Number(sale.salePrice || 0)
-      salesByProduct[sale.productId].quantity += 1
-
-      const product = products.find((p) => p.id === sale.productId)
-      if (product) {
-        salesByProduct[sale.productId].cost += Number(product.cost || 0)
-      }
-    })
-
-    // Calcular ganancia y margen por producto
-    Object.values(salesByProduct).forEach((productData) => {
-      productData.profit = productData.totalSales - productData.cost
-      productData.margin = productData.totalSales > 0 ? (productData.profit / productData.totalSales) * 100 : 0
-      productProfitability.push(productData)
-    })
-
-    // Ordenar por ganancia (de mayor a menor)
-    productProfitability.sort((a, b) => b.profit - a.profit)
-
-    setFinancialData({
-      totalIncome,
-      totalCosts,
-      profit,
-      profitMargin,
-      monthlySales,
-      productProfitability,
-    })
-  }
+    return { totalIncome, totalCosts, profit, profitMargin, monthlySales, productProfitability }
+  }, [sales, products, timeRange])
 
   const handleExportData = () => {
     try {
-      // Crear un objeto con los datos a exportar
       const dataToExport = {
         summary: {
           totalIncome: financialData.totalIncome,
           totalCosts: financialData.totalCosts,
           profit: financialData.profit,
           profitMargin: financialData.profitMargin,
-          timeRange: timeRange,
+          timeRange,
         },
         monthlySales: financialData.monthlySales,
         productProfitability: financialData.productProfitability,
         exportDate: new Date().toISOString(),
       }
-
-      // Convertir a JSON
       const jsonData = JSON.stringify(dataToExport, null, 2)
-
-      // Crear un blob y descargar
       const blob = new Blob([jsonData], { type: "application/json" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -336,18 +224,10 @@ export default function FinancesPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-
-      toast({
-        title: "Datos exportados",
-        description: "Los datos financieros han sido exportados correctamente",
-      })
+      toast.success("Datos exportados", { description: "Los datos financieros han sido exportados correctamente" })
     } catch (error) {
       console.error("Error al exportar datos:", error)
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al exportar los datos",
-        variant: "destructive",
-      })
+      toast.error("Error", { description: "Ocurrió un error al exportar los datos" })
     }
   }
 
@@ -398,19 +278,6 @@ export default function FinancesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${financialData.totalIncome.toFixed(2)}</div>
-              <div className="flex items-center text-xs text-green-500">
-                <TrendingUp className="mr-1 h-3 w-3" />
-                <span>
-                  Período:{" "}
-                  {timeRange === "week"
-                    ? "Semanal"
-                    : timeRange === "month"
-                      ? "Mensual"
-                      : timeRange === "quarter"
-                        ? "Trimestral"
-                        : "Anual"}
-                </span>
-              </div>
             </CardContent>
           </Card>
           <Card>
@@ -420,10 +287,6 @@ export default function FinancesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${financialData.totalCosts.toFixed(2)}</div>
-              <div className="flex items-center text-xs text-red-500">
-                <TrendingDown className="mr-1 h-3 w-3" />
-                <span>Costos de productos vendidos</span>
-              </div>
             </CardContent>
           </Card>
           <Card>
@@ -433,10 +296,6 @@ export default function FinancesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${financialData.profit.toFixed(2)}</div>
-              <div className="flex items-center text-xs text-green-500">
-                <TrendingUp className="mr-1 h-3 w-3" />
-                <span>Ingresos - Costos</span>
-              </div>
             </CardContent>
           </Card>
           <Card>
@@ -446,10 +305,6 @@ export default function FinancesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{financialData.profitMargin.toFixed(2)}%</div>
-              <div className="flex items-center text-xs text-green-500">
-                <TrendingUp className="mr-1 h-3 w-3" />
-                <span>Porcentaje de ganancia</span>
-              </div>
             </CardContent>
           </Card>
         </div>
@@ -475,13 +330,10 @@ export default function FinancesPage() {
                     <CardContent className="h-[200px] flex items-center justify-center bg-muted/20">
                       {financialData.monthlySales.length > 0 ? (
                         <div className="w-full h-full">
-                          {/* Aquí iría un gráfico real, pero para simplificar mostramos datos */}
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             {financialData.monthlySales.map((monthData, index) => (
                               <div key={index} className="flex justify-between">
-                                <span>
-                                  {monthData.month} {monthData.year}
-                                </span>
+                                <span>{monthData.month} {monthData.year}</span>
                                 <span className="font-medium">${monthData.total.toFixed(2)}</span>
                               </div>
                             ))}
@@ -502,7 +354,6 @@ export default function FinancesPage() {
                     <CardContent className="h-[200px] flex items-center justify-center bg-muted/20">
                       {financialData.productProfitability.length > 0 ? (
                         <div className="w-full h-full">
-                          {/* Aquí iría un gráfico real, pero para simplificar mostramos datos */}
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             {financialData.productProfitability.slice(0, 5).map((product, index) => (
                               <div key={index} className="flex justify-between">

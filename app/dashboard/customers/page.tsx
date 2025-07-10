@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -60,11 +60,6 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithPurchases | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [customerStats, setCustomerStats] = useState<CustomerStats>({
-    total: 0,
-    active: 0,
-    newThisMonth: 0,
-  })
 
   useEffect(() => {
     // Verificar autenticación
@@ -93,14 +88,8 @@ export default function CustomersPage() {
           })
         })
         setCustomers(customersData)
-        calculateCustomerStats(customersData)
       } else {
         setCustomers([])
-        setCustomerStats({
-          total: 0,
-          active: 0,
-          newThisMonth: 0,
-        })
       }
     })
 
@@ -127,60 +116,54 @@ export default function CustomersPage() {
     }
   }, [router])
 
-  const calculateCustomerStats = (customersData: Customer[]) => {
+  const customerStats = useMemo<CustomerStats>(() => {
     const now = new Date()
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
     // Clientes nuevos este mes
-    const newCustomers = customersData.filter((customer) => {
+    const newCustomers = customers.filter((customer) => {
       if (!customer.createdAt) return false
       const createdDate = new Date(customer.createdAt)
       return createdDate >= thisMonth
     })
 
-    // Para este ejemplo, consideramos "activos" a todos los clientes
-    // En una implementación real, podría basarse en compras recientes
-    setCustomerStats({
-      total: customersData.length,
-      active: customersData.length,
-      newThisMonth: newCustomers.length || Math.floor(customersData.length * 0.2), // Simulación si no hay datos reales
-    })
-  }
-
-  const getCustomerPurchases = (customerId: string): Sale[] => {
-    return sales.filter((sale) => sale.customerId === customerId)
-  }
-
-  const getTotalSpent = (customerId: string): number => {
-    const customerPurchases = getCustomerPurchases(customerId)
-    return customerPurchases.reduce((total, sale) => total + Number(sale.salePrice || 0), 0)
-  }
-
-  const getLastPurchaseDate = (customerId: string): Date | null => {
-    const customerPurchases = getCustomerPurchases(customerId)
-    if (customerPurchases.length === 0) return null
-
-    const dates = customerPurchases.map((sale) => new Date(sale.date || ""))
-    return new Date(Math.max(...dates.map((date) => date.getTime())))
-  }
-
-  const handleViewCustomerDetail = (customer: Customer) => {
-    const customerWithPurchases: CustomerWithPurchases = {
-      ...customer,
-      purchases: getCustomerPurchases(customer.id),
-      totalSpent: getTotalSpent(customer.id),
-      lastPurchase: getLastPurchaseDate(customer.id),
+    return {
+      total: customers.length,
+      active: customers.length,
+      newThisMonth: newCustomers.length || Math.floor(customers.length * 0.2),
     }
-    setSelectedCustomer(customerWithPurchases)
+  }, [customers])
+
+  const customersWithPurchases = useMemo(() => {
+    return customers.map((customer) => {
+      const purchases = sales.filter((sale) => sale.customerId === customer.id)
+      const totalSpent = purchases.reduce((total, sale) => total + Number(sale.salePrice || 0), 0)
+      const lastPurchase =
+        purchases.length > 0
+          ? new Date(Math.max(...purchases.map((sale) => new Date(sale.date || "").getTime())))
+          : null
+      return {
+        ...customer,
+        purchases,
+        totalSpent,
+        lastPurchase,
+      }
+    })
+  }, [customers, sales])
+
+  const handleViewCustomerDetail = (customer: CustomerWithPurchases) => {
+    setSelectedCustomer(customer)
     setIsDetailModalOpen(true)
   }
 
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.dni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredCustomers = useMemo(() => {
+    return customersWithPurchases.filter(
+      (customer) =>
+        customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.dni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
+  }, [customersWithPurchases, searchTerm])
 
   return (
     <DashboardLayout>
@@ -255,34 +238,30 @@ export default function CustomersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomers.map((customer) => {
-                  const customerPurchases = getCustomerPurchases(customer.id)
-                  const totalSpent = getTotalSpent(customer.id)
-                  const lastPurchase = getLastPurchaseDate(customer.id)
-
-                  return (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell>{customer.dni}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          {customer.phone}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge>{customerPurchases.length}</Badge>
-                      </TableCell>
-                      <TableCell>${totalSpent.toFixed(2)}</TableCell>
-                      <TableCell>{lastPurchase ? lastPurchase.toLocaleDateString() : "Sin compras"}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetail(customer)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
+                filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell>{customer.dni}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Phone className="h-3 w-3 text-muted-foreground" />
+                        {customer.phone}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge>{customer.purchases.length}</Badge>
+                    </TableCell>
+                    <TableCell>${customer.totalSpent.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {customer.lastPurchase ? customer.lastPurchase.toLocaleDateString() : "Sin compras"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => handleViewCustomerDetail(customer)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
