@@ -1,68 +1,180 @@
 "use client"
 
 import * as React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Eye, MoreHorizontal } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Plus, Search, Eye } from "lucide-react"
+import { ref, onValue, push, set, update, get, query, orderByChild, equalTo, runTransaction } from "firebase/database"
+import { database } from "@/lib/firebase"
+import { toast } from "sonner"
 import AddRepairForm from "@/components/add-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
 
-// Interfaz para definir la estructura de una reparación
+// Interfaces para la estructura de datos
 interface Repair {
   id: string
   receiptNumber: string
   customerName: string
+  customerPhone: string
   productName: string
+  imei?: string
+  description: string
+  estimatedPrice: number
   status: 'pending' | 'in_progress' | 'completed' | 'delivered' | 'cancelled'
   entryDate: string
-  estimatedPrice: number
+  createdAt: number
+  customerEmail?: string
+  customerId?: string
+  deliveredAt?: number
+  finalPrice?: number
+  notes?: string
+  repairCost?: number
+  technicianNotes?: string
   [key: string]: any
 }
 
-// Datos de ejemplo
-const mockRepairs: Repair[] = [
-  { id: '1', receiptNumber: 'R-001', customerName: 'Ana García', productName: 'iPhone 12', status: 'in_progress', entryDate: new Date().toISOString(), estimatedPrice: 150 },
-  { id: '2', receiptNumber: 'R-002', customerName: 'Carlos Martinez', productName: 'Samsung S21', status: 'pending', entryDate: new Date().toISOString(), estimatedPrice: 200 },
-  { id: '3', receiptNumber: 'R-003', customerName: 'Laura Fernandez', productName: 'Xiaomi Note 10', status: 'completed', entryDate: new Date().toISOString(), estimatedPrice: 80 },
-  { id: '4', receiptNumber: 'R-004', customerName: 'Juan Perez', productName: 'Motorola G30', status: 'delivered', entryDate: new Date().toISOString(), estimatedPrice: 120 },
-];
+interface CustomerData {
+    id?: string;
+    name: string;
+    dni: string;
+    phone: string;
+    email: string;
+}
 
 export default function RepairsPage() {
-  const [repairs, setRepairs] = useState<Repair[]>(mockRepairs)
+  const [repairs, setRepairs] = useState<Repair[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    setIsLoading(true);
+    const repairsRef = ref(database, "repairs")
+    const unsubscribe = onValue(repairsRef, (snapshot) => {
+      const repairsData: Repair[] = []
+      if (snapshot.exists()) {
+        snapshot.forEach((childSnapshot) => {
+          repairsData.push({ id: childSnapshot.key!, ...childSnapshot.val() })
+        })
+        setRepairs(repairsData.sort((a, b) => b.createdAt - a.createdAt))
+      } else {
+        setRepairs([])
+      }
+      setIsLoading(false)
+    }, (error) => {
+      console.error(error)
+      toast.error("Error al cargar las reparaciones.")
+      setIsLoading(false)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  const handleAddRepair = useCallback(async (repairData: Omit<Repair, 'id'>, customerData: CustomerData) => {
+    try {
+      // 1. Buscar o crear cliente
+      const customersRef = ref(database, "customers");
+      const q = query(customersRef, orderByChild('dni'), equalTo(customerData.dni));
+      const customerSnapshot = await get(q);
+
+      let customerId: string;
+      if (customerSnapshot.exists()) {
+          // Cliente encontrado
+          const snapshotVal = customerSnapshot.val();
+          customerId = Object.keys(snapshotVal)[0];
+      } else {
+          // Cliente nuevo
+          const newCustomerRef = push(customersRef);
+          customerId = newCustomerRef.key!;
+          await set(newCustomerRef, { ...customerData, createdAt: new Date().toISOString() });
+          toast.info("Nuevo cliente creado.", { description: `Cliente ${customerData.name} ha sido guardado.` });
+      }
+
+      if (!customerId) throw new Error("No se pudo obtener el ID del cliente.");
+
+      // 2. Transacción para el número de recibo
+      const counterRef = ref(database, 'counters/repairNumber');
+      const transactionResult = await runTransaction(counterRef, (currentData) => {
+        if (currentData === null) {
+          return { value: 1, prefix: "R-", lastUpdated: new Date().toISOString() };
+        }
+        currentData.value++;
+        currentData.lastUpdated = new Date().toISOString();
+        return currentData;
+      });
+
+      if (!transactionResult.committed || !transactionResult.snapshot.exists()) {
+        throw new Error("No se pudo confirmar la transacción del contador de recibos.");
+      }
+
+      const newCounterData = transactionResult.snapshot.val();
+      const newReceiptNumber = `${newCounterData.prefix}${String(newCounterData.value).padStart(5, '0')}`;
+      
+      // 3. Crear la reparación
+      const newRepairRef = push(ref(database, "repairs"));
+      const newRepairId = newRepairRef.key;
+      if (!newRepairId) throw new Error("No se pudo generar el ID para la reparación.");
+
+      const finalRepairData: Repair = {
+          ...repairData,
+          id: newRepairId,
+          receiptNumber: newReceiptNumber,
+          customerId,
+          customerName: customerData.name,
+          customerPhone: customerData.phone,
+          customerEmail: customerData.email,
+          entryDate: new Date().toISOString(),
+          createdAt: Date.now(),
+          status: 'pending',
+      };
+      
+      await set(newRepairRef, finalRepairData);
+      toast.success("Reparación agregada correctamente.", { description: `Recibo N°: ${newReceiptNumber}` });
+      setIsAddModalOpen(false);
+
+    } catch (error) {
+      console.error("Error detallado al agregar reparación:", error);
+      toast.error("Error al agregar la reparación.", { description: (error as Error).message });
+    }
+  }, []);
+
+  const handleUpdateRepair = useCallback(async (repairId: string, updatedData: Partial<Repair>) => {
+    try {
+      const repairRef = ref(database, `repairs/${repairId}`)
+      await update(repairRef, updatedData)
+      toast.success("Reparación actualizada.")
+      setIsDetailModalOpen(false)
+    } catch (error) {
+      console.error(error)
+      toast.error("Error al actualizar la reparación.")
+    }
+  }, []);
 
   const handleViewDetails = (repair: Repair) => {
     setSelectedRepair(repair)
     setIsDetailModalOpen(true)
   }
-  
+
   const getStatusVariant = (status: Repair['status']) => {
     switch (status) {
       case 'pending': return 'destructive';
       case 'in_progress': return 'secondary';
       case 'completed': return 'default';
       case 'delivered': return 'outline';
+      case 'cancelled': return 'outline'
       default: return 'secondary';
     }
   }
 
-  const filteredRepairs = repairs.filter(r => 
-    r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.receiptNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredRepairs = repairs.filter(r =>
+    (r.customerName && r.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (r.productName && r.productName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (r.receiptNumber && r.receiptNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -96,20 +208,28 @@ export default function RepairsPage() {
               <TableHead>Equipo</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Fecha de Ingreso</TableHead>
+              <TableHead>Precio Estimado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredRepairs.length > 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                  Cargando reparaciones...
+                </TableCell>
+              </TableRow>
+            ) : filteredRepairs.length > 0 ? (
               filteredRepairs.map((repair) => (
                 <TableRow key={repair.id}>
-                  <TableCell className="font-medium">{repair.receiptNumber}</TableCell>
+                  <TableCell className="font-medium">{repair.receiptNumber || 'N/A'}</TableCell>
                   <TableCell>{repair.customerName}</TableCell>
                   <TableCell>{repair.productName}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusVariant(repair.status)}>{repair.status.replace('_', ' ')}</Badge>
+                    <Badge variant={getStatusVariant(repair.status)}>{repair.status.replace(/_/g, ' ')}</Badge>
                   </TableCell>
                   <TableCell>{new Date(repair.entryDate).toLocaleDateString()}</TableCell>
+                  <TableCell>${repair.estimatedPrice?.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => handleViewDetails(repair)}>
                       <Eye className="h-4 w-4" />
@@ -119,7 +239,7 @@ export default function RepairsPage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
                   No se encontraron reparaciones.
                 </TableCell>
               </TableRow>
@@ -128,9 +248,9 @@ export default function RepairsPage() {
         </Table>
       </div>
 
-      <AddRepairForm isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <AddRepairForm isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddRepair={handleAddRepair} />
       {selectedRepair && (
-        <RepairDetailModal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} repair={selectedRepair} />
+        <RepairDetailModal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} repair={selectedRepair} onUpdate={handleUpdateRepair} />
       )}
     </DashboardLayout>
   )
