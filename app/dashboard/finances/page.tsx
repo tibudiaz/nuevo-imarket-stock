@@ -5,64 +5,69 @@ import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DollarSign, TrendingUp, TrendingDown, BarChart, PieChart, Calendar, Download } from "lucide-react"
+import { DollarSign, TrendingUp, TrendingDown, BarChart, PieChart, Calendar, Download, Smartphone, Headphones } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { toast } from "sonner" // 1. Importamos el toast de sonner
+import { toast } from "sonner" 
 
-// (Las interfaces se mantienen igual)
+// --- Interfaces de Datos (sin cambios) ---
 interface User {
-  username: string
-  role: string
+  username: string;
+  role: string;
 }
 
 interface Sale {
-  id: string
-  date: string
-  productId?: string
+  id: string;
+  date: string;
+  productId?: string;
   productName?: string;
-  salePrice?: number | string
-  [key: string]: any
+  salePrice?: number | string;
+  [key: string]: any;
 }
 
 interface Product {
-  id: string
-  cost?: number
-  [key: string]: any
+  id: string;
+  category?: string;
+  cost?: number;
+  stock?: number;
+  [key: string]: any;
 }
 
 interface MonthSale {
-  month: string
-  year: number
-  total: number
+  month: string;
+  year: number;
+  total: number;
 }
 
 interface ProductProfitability {
-  productId: string
-  productName: string
-  totalSales: number
-  quantity: number
-  cost: number
-  profit: number
-  margin: number
+  productId: string;
+  productName: string;
+  totalSales: number;
+  quantity: number;
+  cost: number;
+  profit: number;
+  margin: number;
 }
 
 interface FinancialData {
-  totalIncome: number
-  totalCosts: number
-  profit: number
-  profitMargin: number
-  monthlySales: MonthSale[]
-  productProfitability: ProductProfitability[]
+  totalIncome: number;
+  totalCosts: number;
+  profit: number;
+  profitMargin: number;
+  monthlySales: MonthSale[];
+  productProfitability: ProductProfitability[];
+  deviceCount: number;
+  deviceTotalCost: number;
+  accessoryCount: number;
+  accessoryTotalCost: number;
 }
 
 
 export default function FinancesPage() {
   const router = useRouter()
-  // 2. Ya no necesitamos el hook useToast()
   const [user, setUser] = useState<User | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -126,8 +131,8 @@ export default function FinancesPage() {
   }, [router])
 
   const financialData = useMemo<FinancialData>(() => {
-    if (sales.length === 0) {
-      return { totalIncome: 0, totalCosts: 0, profit: 0, profitMargin: 0, monthlySales: [], productProfitability: [] }
+    if (sales.length === 0 && products.length === 0) {
+      return { totalIncome: 0, totalCosts: 0, profit: 0, profitMargin: 0, monthlySales: [], productProfitability: [], deviceCount: 0, deviceTotalCost: 0, accessoryCount: 0, accessoryTotalCost: 0 }
     }
 
     const now = new Date()
@@ -197,7 +202,28 @@ export default function FinancesPage() {
         return p;
     }).sort((a, b) => b.profit - a.profit);
 
-    return { totalIncome, totalCosts, profit, profitMargin, monthlySales, productProfitability }
+    let deviceCount = 0;
+    let deviceTotalCost = 0;
+    let accessoryCount = 0;
+    let accessoryTotalCost = 0;
+
+    products.forEach(product => {
+        const stock = Number(product.stock) || 0;
+        const cost = Number(product.cost) || 0;
+        const totalCostForProduct = cost * stock;
+
+        // --- LÓGICA CORREGIDA Y SIMPLIFICADA ---
+        const category = product.category;
+        if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+            deviceCount += stock;
+            deviceTotalCost += totalCostForProduct;
+        } else {
+            accessoryCount += stock;
+            accessoryTotalCost += totalCostForProduct;
+        }
+    });
+
+    return { totalIncome, totalCosts, profit, profitMargin, monthlySales, productProfitability, deviceCount, deviceTotalCost, accessoryCount, accessoryTotalCost }
   }, [sales, products, timeRange])
 
   const handleExportData = () => {
@@ -243,7 +269,7 @@ export default function FinancesPage() {
   }
 
   if (!user || user.role !== "admin") {
-    return null // No mostrar nada mientras se redirige
+    return null 
   }
 
   return (
@@ -270,7 +296,7 @@ export default function FinancesPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
@@ -278,15 +304,6 @@ export default function FinancesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${financialData.totalIncome.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Costos Totales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${financialData.totalCosts.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -305,6 +322,39 @@ export default function FinancesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{financialData.profitMargin.toFixed(2)}%</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Dispositivos (Celulares)</CardTitle>
+              <Smartphone className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{financialData.deviceCount} unidades</div>
+              <p className="text-xs text-muted-foreground">
+                Valor de costo total: ${financialData.deviceTotalCost.toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Accesorios</CardTitle>
+              <Headphones className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{financialData.accessoryCount} unidades</div>
+              <p className="text-xs text-muted-foreground">
+                Valor de costo total: ${financialData.accessoryTotalCost.toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Costos Totales de Mercadería</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${(financialData.deviceTotalCost + financialData.accessoryTotalCost).toFixed(2)}</div>
             </CardContent>
           </Card>
         </div>

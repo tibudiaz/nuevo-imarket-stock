@@ -2,12 +2,12 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner" // CORRECCIÓN
 import { useMobile } from "@/hooks/use-mobile"
 
 export default function MobilePage() {
   const router = useRouter()
-  const { toast } = useToast()
+  // Se elimina la línea: const { toast } = useToast()
   const isMobile = useMobile()
   const [user, setUser] = useState<{ username: string; role: string } | null>(null)
   const [isScannerOpen, setIsScannerOpen] = useState(false)

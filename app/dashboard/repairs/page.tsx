@@ -13,8 +13,9 @@ import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import AddRepairForm from "@/components/add-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
+import { generateRepairReceiptPdf } from "@/lib/pdf-generator" // Se importa la nueva función
 
-// Interfaces para la estructura de datos
+// ... (Interfaces sin cambios)
 interface Repair {
   id: string
   receiptNumber: string
@@ -44,6 +45,7 @@ interface CustomerData {
     phone: string;
     email: string;
 }
+
 
 export default function RepairsPage() {
   const [repairs, setRepairs] = useState<Repair[]>([])
@@ -84,11 +86,9 @@ export default function RepairsPage() {
 
       let customerId: string;
       if (customerSnapshot.exists()) {
-          // Cliente encontrado
           const snapshotVal = customerSnapshot.val();
           customerId = Object.keys(snapshotVal)[0];
       } else {
-          // Cliente nuevo
           const newCustomerRef = push(customersRef);
           customerId = newCustomerRef.key!;
           await set(newCustomerRef, { ...customerData, createdAt: new Date().toISOString() });
@@ -134,6 +134,10 @@ export default function RepairsPage() {
       };
       
       await set(newRepairRef, finalRepairData);
+      
+      // --- LLAMADA PARA GENERAR EL PDF ---
+      await generateRepairReceiptPdf(finalRepairData, customerData);
+
       toast.success("Reparación agregada correctamente.", { description: `Recibo N°: ${newReceiptNumber}` });
       setIsAddModalOpen(false);
 

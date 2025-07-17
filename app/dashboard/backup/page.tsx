@@ -1,7 +1,6 @@
 "use client"
 
 import { CardDescription } from "@/components/ui/card"
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
@@ -10,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Download, Upload, Calendar, Clock, Database, Save, Trash, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ref, onValue, get } from "firebase/database"
+// --- CORRECCIÓN AQUÍ ---
+import { ref, onValue, get, set } from "firebase/database" 
 import { database } from "@/lib/firebase"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -48,7 +48,6 @@ interface ScheduleSettings {
 
 export default function BackupPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const [user, setUser] = useState<{ username: string; role: string } | null>(null)
   const [backups, setBackups] = useState<Backup[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -155,10 +154,8 @@ export default function BackupPage() {
 
   const handleCreateBackup = async () => {
     if (user?.role !== "admin") {
-      toast({
-        title: "Acceso denegado",
+      toast.error("Acceso denegado", {
         description: "Solo los administradores pueden crear backups",
-        variant: "destructive",
       })
       return
     }
@@ -209,16 +206,13 @@ export default function BackupPage() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      toast({
-        title: "Backup creado",
+      toast.success("Backup creado", {
         description: "El backup ha sido creado y descargado correctamente",
       })
     } catch (error) {
       console.error("Error al crear el backup:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Ocurrió un error al crear el backup",
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -229,8 +223,7 @@ export default function BackupPage() {
   const handleRestoreBackup = (backup: Backup) => {
     // En una implementación real, aquí se restauraría el backup
     // Para este ejemplo, solo mostramos un mensaje
-    toast({
-      title: "Restauración simulada",
+    toast.info("Restauración simulada", {
       description: `Se simularía la restauración del backup del ${new Date(backup.date).toLocaleDateString()}`,
     })
   }
@@ -239,8 +232,7 @@ export default function BackupPage() {
   const handleDeleteBackup = (backup: Backup) => {
     // En una implementación real, aquí se eliminaría el backup
     // Para este ejemplo, solo mostramos un mensaje
-    toast({
-      title: "Eliminación simulada",
+    toast.info("Eliminación simulada", {
       description: `Se simularía la eliminación del backup del ${new Date(backup.date).toLocaleDateString()}`,
     })
   }
@@ -249,8 +241,7 @@ export default function BackupPage() {
   const handleDownloadBackup = (backup: Backup) => {
     // En una implementación real, aquí se descargaría el backup desde Firebase Storage
     // Para este ejemplo, solo mostramos un mensaje
-    toast({
-      title: "Descarga simulada",
+    toast.info("Descarga simulada", {
       description: `Se simularía la descarga del backup del ${new Date(backup.date).toLocaleDateString()}`,
     })
   }
@@ -260,8 +251,7 @@ export default function BackupPage() {
     setAutoBackupEnabled(scheduleData.enabled)
     setBackupFrequency(scheduleData.frequency)
 
-    toast({
-      title: "Programación actualizada",
+    toast.success("Programación actualizada", {
       description: `Los backups automáticos han sido ${scheduleData.enabled ? "activados" : "desactivados"}`,
     })
 
@@ -369,7 +359,7 @@ export default function BackupPage() {
                       <TableRow key={backup.id}>
                         <TableCell>{new Date(backup.date).toLocaleString()}</TableCell>
                         <TableCell>{backup.createdBy}</TableCell>
-                        <TableCell>{formatFileSize(backup.size)}</TableCell>
+                        <TableCell>{(backup.size / 1024).toFixed(2)} KB</TableCell>
                         <TableCell>
                           <Badge variant={backup.status === "completed" ? "default" : "secondary"}>
                             {backup.status === "completed" ? "Completado" : "En proceso"}
@@ -495,22 +485,4 @@ export default function BackupPage() {
       />
     </DashboardLayout>
   )
-}
-
-// Función auxiliar para formatear el tamaño del archivo
-function formatFileSize(bytes: number): string {
-  if (!bytes) return "0 Bytes"
-  const k = 1024
-  const sizes = ["Bytes", "KB", "MB", "GB"]
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-}
-
-// Función auxiliar para simular la creación de un backup
-async function set(ref: any, data: any): Promise<boolean> {
-  // En una implementación real, esto usaría Firebase
-  console.log("Simulando set en Firebase:", ref, data)
-  // Simular un retraso
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-  return true
 }

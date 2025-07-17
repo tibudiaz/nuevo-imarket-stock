@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { ref, set, push, get, update, onValue, query, orderByChild, equalTo } from "firebase/database"
+import { ref, set, push, get, update, onValue, query, orderByChild, equalTo, remove } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,8 +30,9 @@ interface CartProduct {
   stock: number;
   quantity: number;
   imei?: string;
+  barcode?: string; // Usaremos barcode para el número de serie de los celulares
   category?: string;
-  model?: string; // Es crucial que los productos tengan este campo
+  model?: string;
 }
 
 interface BundleRule {
@@ -61,7 +62,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [productSearchTerm, setProductSearchTerm] = useState("")
   const [usdRate, setUsdRate] = useState(0)
   const [isTradeIn, setIsTradeIn] = useState(false);
-  const [tradeInProduct, setTradeInProduct] = useState({ name: "", imei: "", price: 0 });
+  // Añadimos serialNumber al estado del tradeInProduct
+  const [tradeInProduct, setTradeInProduct] = useState({ name: "", imei: "", price: 0, serialNumber: "" });
   const [bundles, setBundles] = useState<BundleRule[]>([]);
 
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setIsTradeIn(false)
       setProductSearchTerm("")
       setCustomer({ name: "", dni: "", phone: "", email: "" })
-      setTradeInProduct({ name: "", imei: "", price: 0 });
+      setTradeInProduct({ name: "", imei: "", price: 0, serialNumber: "" });
     }
   }, [isOpen, product])
 
@@ -227,8 +229,116 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     return cartTotal - tradeInValueInARS;
   }, [cart, usdRate, isTradeIn, tradeInProduct.price]);
 
-  const handleSellProduct = async () => { /* ...Lógica de venta... */ };
-  const handlePdfDialogClose = (generatePdfOption) => { /* ...Lógica de PDF... */ };
+  const handleSellProduct = async () => {
+    if (!customer.name || !customer.dni || !customer.phone) {
+        toast.error("Faltan datos del cliente", { description: "Por favor, complete nombre, DNI y teléfono." });
+        return;
+    }
+    if (cart.length === 0) {
+        toast.error("El carrito está vacío.");
+        return;
+    }
+    setIsLoading(true);
+
+    try {
+        const customersRef = ref(database, "customers");
+        const q = query(customersRef, orderByChild('dni'), equalTo(customer.dni));
+        const customerSnapshot = await get(q);
+        let customerId;
+
+        if (customerSnapshot.exists()) {
+            customerId = Object.keys(customerSnapshot.val())[0];
+            const customerRef = ref(database, `customers/${customerId}`);
+            await update(customerRef, { ...customer, lastPurchase: new Date().toISOString() });
+        } else {
+            const newCustomerRef = push(customersRef);
+            customerId = newCustomerRef.key;
+            await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId });
+        }
+
+        for (const item of cart) {
+            const productRef = ref(database, `products/${item.id}`);
+            const productSnapshot = await get(productRef);
+            if (productSnapshot.exists()) {
+                const currentStock = productSnapshot.val().stock || 0;
+                const newStock = currentStock - item.quantity;
+
+                if (newStock < 0) {
+                    throw new Error(`Stock insuficiente para ${item.name}.`);
+                }
+
+                if (newStock === 0) {
+                    await remove(productRef);
+                } else {
+                    await update(productRef, { stock: newStock });
+                }
+            }
+        }
+        
+        if (isTradeIn && tradeInProduct.name && tradeInProduct.price > 0) {
+            const newProductRef = push(ref(database, 'products'));
+            const newProductData = {
+                id: newProductRef.key,
+                name: tradeInProduct.name,
+                imei: tradeInProduct.imei,
+                barcode: tradeInProduct.serialNumber, // Guardamos el N/S en barcode
+                brand: "Apple",
+                model: "Celular",
+                category: "Celulares Usados",
+                cost: tradeInProduct.price,
+                price: tradeInProduct.price + 50,
+                stock: 1,
+                provider: customer.name,
+                createdAt: new Date().toISOString(),
+            };
+            await set(newProductRef, newProductData);
+            toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${tradeInProduct.name} al inventario.` });
+        }
+
+        const newSaleRef = push(ref(database, "sales"));
+        const saleData = {
+            id: newSaleRef.key,
+            receiptNumber,
+            date: new Date().toISOString(),
+            customerId,
+            customerName: customer.name,
+            customerDni: customer.dni,
+            customerPhone: customer.phone,
+            items: cart.map(item => ({
+                productId: item.id,
+                productName: item.name,
+                quantity: item.quantity,
+                price: item.price,
+                currency: item.currency,
+                imei: item.imei || null,
+                barcode: item.barcode || null, // Incluimos el N/S
+            })),
+            paymentMethod,
+            totalAmount: totalAmountInARS,
+            tradeIn: isTradeIn ? tradeInProduct : null,
+            usdRate,
+        };
+        await set(newSaleRef, saleData);
+        
+        setCompletedSale(saleData);
+        onProductSold();
+        toast.success("Venta completada con éxito.");
+        setIsPdfDialogOpen(true);
+
+    } catch (error) {
+        toast.error("Error al completar la venta", { description: (error as Error).message });
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const handlePdfDialogClose = async (generatePdfOption) => {
+    setIsPdfDialogOpen(false);
+    if (generatePdfOption && completedSale) {
+        await generateSaleReceiptPdf(completedSale);
+    }
+    onClose();
+  };
 
   return (
     <>
@@ -236,9 +346,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         <DialogContent className="sm:max-w-5xl h-[95vh] flex flex-col">
           <DialogHeader><DialogTitle>Registrar Venta</DialogTitle></DialogHeader>
           <div className="grid md:grid-cols-2 gap-x-8 flex-grow min-h-0">
-            {/* Columna Izquierda: Carrito y Búsqueda */}
             <ScrollArea className="pr-4 -mr-4">
               <div className="space-y-4">
+                {/* Carrito y Búsqueda */}
                 <div>
                   <h3 className="text-lg font-medium">Carrito de Compra</h3>
                   <Separator className="my-2"/>
@@ -277,7 +387,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               </div>
             </ScrollArea>
 
-            {/* Columna Derecha: Datos de la Venta */}
             <ScrollArea className="pr-4 -mr-4">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Datos de la Venta</h3>
@@ -290,7 +399,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                   <div className="space-y-2"><Label htmlFor="customerEmail" className="flex items-center gap-1.5"><Mail className="h-4 w-4"/>Email (Opcional)</Label><Input id="customerEmail" value={customer.email} onChange={(e) => setCustomer({...customer, email: e.target.value})}/></div>
                   <div className="space-y-2"><Label>Método de Pago</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="tarjeta">Tarjeta</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem></SelectContent></Select></div>
                   <div><Button type="button" variant="secondary" onClick={() => setIsTradeIn(!isTradeIn)} className="w-full">{isTradeIn ? "Cancelar Parte de Pago" : "Recibir en Parte de Pago"}</Button></div>
-                  {isTradeIn && <div className="p-4 border rounded-md space-y-3"><h4 className="font-medium text-center text-sm">Equipo Recibido (Apple)</h4><div className="space-y-1"><Label htmlFor="tradeIn-name" className="text-xs">Modelo</Label><Input id="tradeIn-name" placeholder="Ej: iPhone 13 Pro" value={tradeInProduct.name} onChange={(e) => setTradeInProduct({ ...tradeInProduct, name: e.target.value })} /></div><div className="space-y-1"><Label htmlFor="tradeIn-imei" className="text-xs">IMEI</Label><Input id="tradeIn-imei" value={tradeInProduct.imei} onChange={(e) => setTradeInProduct({ ...tradeInProduct, imei: e.target.value })} /></div><div className="space-y-1"><Label htmlFor="tradeIn-price" className="text-xs">Valor Toma (USD)</Label><Input id="tradeIn-price" type="number" value={tradeInProduct.price} onChange={(e) => setTradeInProduct({ ...tradeInProduct, price: Number(e.target.value) })} /></div></div>}
+                  {isTradeIn && <div className="p-4 border rounded-md space-y-3"><h4 className="font-medium text-center text-sm">Equipo Recibido (Apple)</h4>
+                    <div className="space-y-1"><Label htmlFor="tradeIn-name" className="text-xs">Modelo</Label><Input id="tradeIn-name" placeholder="Ej: iPhone 13 Pro" value={tradeInProduct.name} onChange={(e) => setTradeInProduct({ ...tradeInProduct, name: e.target.value })} /></div>
+                    <div className="space-y-1"><Label htmlFor="tradeIn-serial" className="text-xs">Número de Serie</Label><Input id="tradeIn-serial" value={tradeInProduct.serialNumber} onChange={(e) => setTradeInProduct({ ...tradeInProduct, serialNumber: e.target.value })} /></div>
+                    <div className="space-y-1"><Label htmlFor="tradeIn-imei" className="text-xs">IMEI</Label><Input id="tradeIn-imei" value={tradeInProduct.imei} onChange={(e) => setTradeInProduct({ ...tradeInProduct, imei: e.target.value })} /></div>
+                    <div className="space-y-1"><Label htmlFor="tradeIn-price" className="text-xs">Valor Toma (USD)</Label><Input id="tradeIn-price" type="number" value={tradeInProduct.price} onChange={(e) => setTradeInProduct({ ...tradeInProduct, price: Number(e.target.value) })} /></div>
+                  </div>}
                 </div>
               </div>
             </ScrollArea>

@@ -5,22 +5,31 @@ import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ShoppingBag, Package, DollarSign, TrendingUp } from "lucide-react"
+import { ShoppingBag, Package, DollarSign, TrendingUp, User } from "lucide-react"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 
-// (El resto de las interfaces se mantienen igual)
+// Interfaces
 interface User {
   username: string
   role: string
 }
 
+interface SaleItem {
+    productId: string;
+    productName: string;
+    quantity: number;
+}
+
 interface Sale {
   id: string
-  productId?: string
-  salePrice?: number
+  items: SaleItem[];
+  totalAmount: number;
   date?: string
+  customerName?: string;
   [key: string]: any
 }
 
@@ -42,10 +51,12 @@ interface DashboardData {
   profitGrowth: number
   monthlySales: { name: string; total: number }[]
 }
+
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [sales, setSales] = useState<Sale[]>([]);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalSales: 0,
     totalProducts: 0,
@@ -57,9 +68,10 @@ export default function Dashboard() {
     profitGrowth: 0,
     monthlySales: [],
   })
+  const [products, setProducts] = useState<Product[]>([]);
+  const [dailySalesData, setDailySalesData] = useState<Sale[]>([]); // Nuevo estado para ventas del día
 
   useEffect(() => {
-    // (El resto del useEffect se mantiene igual)
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
@@ -72,55 +84,12 @@ export default function Dashboard() {
       localStorage.removeItem("user")
       router.push("/")
     }
-
-    loadDashboardData()
-
-    setIsLoading(false)
-  }, [router])
-
-  const loadDashboardData = () => {
-    const salesRef = ref(database, "sales")
-    onValue(salesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const salesData: Sale[] = []
-        let totalSalesAmount = 0
-        const monthlySales: { [key: string]: number } = {}
-
-        snapshot.forEach((childSnapshot) => {
-          const sale: Sale = {
-            id: childSnapshot.key || "",
-            ...childSnapshot.val(),
-          }
-          salesData.push(sale)
-          totalSalesAmount += Number(sale.salePrice || 0)
-
-          const saleDate = new Date(sale.date || "")
-          const month = saleDate.toLocaleString("default", { month: "short" })
-          monthlySales[month] = (monthlySales[month] || 0) + Number(sale.salePrice || 0)
-        })
-
-        const formattedMonthlySales = Object.entries(monthlySales).map(([name, total]) => ({
-          name,
-          total,
-        }))
-
-        setDashboardData((prev) => ({
-          ...prev,
-          totalSales: totalSalesAmount,
-          salesGrowth: 20.1, // Simulado
-          monthlySales: formattedMonthlySales,
-        }))
-
-        calculateProfits(salesData)
-      }
-    })
-    // (El resto de la función se mantiene igual)
+    
     const productsRef = ref(database, "products")
     onValue(productsRef, (snapshot) => {
       if (snapshot.exists()) {
         const productsData: Product[] = []
         let totalInvestment = 0
-
         snapshot.forEach((childSnapshot) => {
           const product: Product = {
             id: childSnapshot.key || "",
@@ -129,7 +98,8 @@ export default function Dashboard() {
           productsData.push(product)
           totalInvestment += Number(product.cost || 0) * Number(product.stock || 0)
         })
-
+        
+        setProducts(productsData);
         setDashboardData((prev) => ({
           ...prev,
           totalProducts: productsData.length,
@@ -139,42 +109,75 @@ export default function Dashboard() {
         }))
       }
     })
-  }
 
-  const calculateProfits = (salesData: Sale[]) => {
-    // (La función se mantiene igual)
-    const productsRef = ref(database, "products")
-    onValue(productsRef, (snapshot) => {
+    setIsLoading(false)
+  }, [router])
+
+  useEffect(() => {
+    if (products.length === 0) return;
+
+    const salesRef = ref(database, "sales")
+    onValue(salesRef, (snapshot) => {
       if (snapshot.exists()) {
-        const productsMap: Record<string, Product> = {}
+        const salesData: Sale[] = []
+        let totalSalesAmount = 0
+        const monthlySales: { [key: string]: number } = {}
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const salesFromToday: Sale[] = [];
 
         snapshot.forEach((childSnapshot) => {
-          const product: Product = {
+          const sale: Sale = {
             id: childSnapshot.key || "",
             ...childSnapshot.val(),
           }
-          productsMap[product.id] = product
-        })
+          salesData.push(sale)
+          totalSalesAmount += Number(sale.totalAmount || 0)
 
-        let totalCost = 0
-        salesData.forEach((sale) => {
-          const product = sale.productId ? productsMap[sale.productId] : undefined
-          if (product) {
-            totalCost += Number(product.cost || 0)
+          const saleDate = new Date(sale.date || "")
+          
+          if (saleDate >= today) {
+              salesFromToday.push(sale);
           }
+          
+          const month = saleDate.toLocaleString("es-AR", { month: "short" })
+          monthlySales[month] = (monthlySales[month] || 0) + Number(sale.totalAmount || 0)
         })
 
-        const totalSalesAmount = salesData.reduce((sum, sale) => sum + Number(sale.salePrice || 0), 0)
-        const totalProfit = totalSalesAmount - totalCost
+        setSales(salesData);
+        setDailySalesData(salesFromToday); // Guardar ventas del día
+
+        const formattedMonthlySales = Object.entries(monthlySales).map(([name, total]) => ({
+          name,
+          total,
+        }))
+
+        const productsMap = new Map(products.map(p => [p.id, p]));
+        let totalCostOfGoodsSold = 0;
+        salesData.forEach((sale) => {
+            sale.items?.forEach(item => {
+                const productInfo = productsMap.get(item.productId);
+                if(productInfo){
+                    totalCostOfGoodsSold += (Number(productInfo.cost) || 0) * item.quantity;
+                }
+            });
+        });
+
+        const totalProfit = totalSalesAmount - totalCostOfGoodsSold;
 
         setDashboardData((prev) => ({
           ...prev,
+          totalSales: totalSalesAmount,
           totalProfit: totalProfit,
+          salesGrowth: 20.1, // Simulado
           profitGrowth: 10.3, // Simulado
+          monthlySales: formattedMonthlySales,
         }))
       }
     })
-  }
+  }, [products]);
 
   if (isLoading) {
     return <div className="flex h-screen items-center justify-center">Cargando...</div>
@@ -244,7 +247,7 @@ export default function Dashboard() {
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overview">Resumen</TabsTrigger>
-            <TabsTrigger value="sales">Ventas</TabsTrigger>
+            <TabsTrigger value="sales">Ventas del Día</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="mt-6">
             <Card>
@@ -266,7 +269,46 @@ export default function Dashboard() {
             </Card>
           </TabsContent>
           <TabsContent value="sales" className="mt-6">
-            {/* Contenido de la pestaña de ventas */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Ventas Realizadas Hoy</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Hora</TableHead>
+                                <TableHead>Cliente</TableHead>
+                                <TableHead>Productos</TableHead>
+                                <TableHead className="text-right">Monto</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {dailySalesData.length > 0 ? (
+                                dailySalesData.map(sale => (
+                                    <TableRow key={sale.id}>
+                                        <TableCell>{new Date(sale.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <User className="h-4 w-4 text-muted-foreground" />
+                                                {sale.customerName}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>{sale.items.map(item => item.productName).join(', ')}</TableCell>
+                                        <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                                        No se han registrado ventas hoy.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

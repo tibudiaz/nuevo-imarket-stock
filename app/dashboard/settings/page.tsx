@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator" // Importación añadida
 
+// ... (Interfaces sin cambios)
 interface Product {
   id: string;
   name: string;
@@ -25,7 +27,7 @@ interface Product {
 }
 
 interface BundleRule {
-  id: string; // El ID de la regla (key de Firebase)
+  id: string; 
   name: string;
   type: 'model_range' | 'model_start' | 'category';
   conditions: {
@@ -33,12 +35,17 @@ interface BundleRule {
     end?: string;
     category?: string;
   };
-  accessories: { id: string; name: string; category: string }[]; // Los accesorios guardan su categoría
+  accessories: { id: string; name: string; category: string }[];
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 export default function SettingsPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [bundles, setBundles] = useState<BundleRule[]>([]);
   
   const [ruleName, setRuleName] = useState("");
@@ -50,7 +57,9 @@ export default function SettingsPage() {
 
   const [selectedAccessories, setSelectedAccessories] = useState<Product[]>([]);
   const [openAccessory, setOpenAccessory] = useState(false);
-  const [openMain, setOpenMain] = useState(false); // Estado para el popover de producto principal
+
+  // Estado para la nueva categoría
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   useEffect(() => {
     const productsRef = ref(database, 'products');
@@ -58,9 +67,14 @@ export default function SettingsPage() {
       const data = snapshot.val();
       const productList: Product[] = data ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value })) : [];
       setProducts(productList);
-      
-      const uniqueCategories = [...new Set(productList.map(p => p.category).filter(Boolean))] as string[];
-      setCategories(uniqueCategories);
+    });
+
+    // Cargar categorías
+    const categoriesRef = ref(database, 'categories');
+    onValue(categoriesRef, (snapshot) => {
+        const data = snapshot.val();
+        const categoryList: Category[] = data ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, name: value.name })) : [];
+        setCategories(categoryList);
     });
 
     const bundlesRef = ref(database, 'config/accessoryBundles');
@@ -77,6 +91,32 @@ export default function SettingsPage() {
     setEndModel("");
     setSelectedCategory("");
     setSelectedAccessories([]);
+  };
+
+  const handleSaveCategory = async () => {
+    if (!newCategoryName.trim()) {
+        toast.error("El nombre de la categoría no puede estar vacío.");
+        return;
+    }
+    const newCategoryRef = push(ref(database, 'categories'));
+    try {
+        await set(newCategoryRef, { name: newCategoryName.trim() });
+        toast.success(`Categoría "${newCategoryName.trim()}" creada.`);
+        setNewCategoryName(""); // Limpiar input
+    } catch (error) {
+        toast.error("Error al crear la categoría.");
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+      if (!window.confirm("¿Estás seguro de que quieres eliminar esta categoría?")) return;
+      const categoryRef = ref(database, `categories/${categoryId}`);
+      try {
+          await remove(categoryRef);
+          toast.success("Categoría eliminada.");
+      } catch (error) {
+          toast.error("Error al eliminar la categoría.");
+      }
   };
 
   const handleSaveBundle = async () => {
@@ -110,7 +150,6 @@ export default function SettingsPage() {
         name: ruleName,
         type: ruleType,
         conditions,
-        // **CORRECCIÓN CLAVE:** Guardamos el ID, nombre y categoría del accesorio.
         accessories: selectedAccessories.map(a => ({ id: a.id, name: a.name, category: a.category })),
       });
       toast.success("Regla de combo guardada exitosamente.");
@@ -135,21 +174,56 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 space-y-8">
-        <h1 className="text-3xl font-bold">Configuración de Combos Automáticos</h1>
+        <h1 className="text-3xl font-bold">Configuración</h1>
         
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          
           <Card>
             <CardHeader>
-              <CardTitle>Crear Nueva Regla de Combo</CardTitle>
+              <CardTitle>Gestionar Categorías</CardTitle>
+              <CardDescription>Añade o elimina categorías de productos.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Nombre de la nueva categoría" 
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                  />
+                  <Button onClick={handleSaveCategory}><PlusCircle className="h-4 w-4"/></Button>
+                </div>
+                <Separator />
+                <ScrollArea className="h-64">
+                    <div className="space-y-2">
+                        {categories.map(cat => (
+                            <div key={cat.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                                <span>{cat.name}</span>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteCategory(cat.id)}>
+                                    <Trash className="h-4 w-4"/>
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Reglas de Combos Automáticos</CardTitle>
               <CardDescription>Define reglas para agregar accesorios automáticamente a las ventas.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="grid md:grid-cols-2 gap-6">
+               <div>
+                  <div className="space-y-6">
               <div className="space-y-2"><Label htmlFor="rule-name">Nombre de la Regla</Label><Input id="rule-name" placeholder="Ej: Combo iPhones 11-14" value={ruleName} onChange={(e) => setRuleName(e.target.value)} /></div>
               <div className="space-y-2"><Label>Tipo de Regla</Label><Select value={ruleType} onValueChange={(v: any) => setRuleType(v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="model_range">Por Rango de Modelos</SelectItem><SelectItem value="model_start">A Partir de un Modelo</SelectItem><SelectItem value="category">Por Categoría</SelectItem></SelectContent></Select></div>
               
               {ruleType === 'model_range' && (<div className="grid grid-cols-2 gap-4"><div><Label>Desde Modelo</Label><Input placeholder="Ej: 11" value={startModel} onChange={(e) => setStartModel(e.target.value)} /></div><div><Label>Hasta Modelo</Label><Input placeholder="Ej: 14 Pro Max" value={endModel} onChange={(e) => setEndModel(e.target.value)} /></div></div>)}
               {ruleType === 'model_start' && (<div><Label>A Partir del Modelo</Label><Input placeholder="Ej: 15" value={startModel} onChange={(e) => setStartModel(e.target.value)} /></div>)}
-              {ruleType === 'category' && (<div><Label>Categoría</Label><Select value={selectedCategory} onValueChange={setSelectedCategory}><SelectTrigger><SelectValue placeholder="Seleccionar categoría..." /></SelectTrigger><SelectContent>{categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}</SelectContent></Select></div>)}
+              {ruleType === 'category' && (<div><Label>Categoría</Label><Select value={selectedCategory} onValueChange={setSelectedCategory}><SelectTrigger><SelectValue placeholder="Seleccionar categoría..." /></SelectTrigger><SelectContent>{categories.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}</SelectContent></Select></div>)}
 
               <div className="space-y-2">
                 <Label>Accesorios del Combo</Label>
@@ -166,25 +240,23 @@ export default function SettingsPage() {
               <Button onClick={handleSaveBundle} disabled={!ruleName || selectedAccessories.length === 0}>
                 Guardar Regla
               </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Reglas Existentes</CardTitle><CardDescription>Lista de combos configurados.</CardDescription></CardHeader>
-            <CardContent>
-                <ScrollArea className="h-[50vh]">
-                    {bundles.length > 0 ? bundles.map(bundle => (
-                        <div key={bundle.id} className="mb-4 p-4 border rounded-lg relative">
-                          <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => handleDeleteBundle(bundle.id)}><Trash className="h-4 w-4"/></Button>
-                          <h4 className="font-semibold pr-10">{bundle.name}</h4>
-                          <div className="text-sm text-muted-foreground">
-                            {bundle.type === 'category' && `Aplica a la categoría: "${bundle.conditions.category}"`}
-                            {bundle.type === 'model_range' && `Aplica desde ${bundle.conditions.start} hasta ${bundle.conditions.end}`}
-                            {bundle.type === 'model_start' && `Aplica desde ${bundle.conditions.start} en adelante`}
-                          </div>
-                          <div className="flex flex-wrap gap-2 mt-2">{bundle.accessories.map(acc => (<Badge key={acc.id} variant="secondary">{acc.name}</Badge>))}</div>
-                        </div>)) : <p className="text-sm text-muted-foreground text-center py-10">No hay reglas de combos configuradas.</p>}
-                </ScrollArea>
+            </div>
+               </div>
+               <div>
+                  <ScrollArea className="h-[60vh]">
+                      {bundles.length > 0 ? bundles.map(bundle => (
+                          <div key={bundle.id} className="mb-4 p-4 border rounded-lg relative">
+                            <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => handleDeleteBundle(bundle.id)}><Trash className="h-4 w-4"/></Button>
+                            <h4 className="font-semibold pr-10">{bundle.name}</h4>
+                            <div className="text-sm text-muted-foreground">
+                              {bundle.type === 'category' && `Aplica a la categoría: "${bundle.conditions.category}"`}
+                              {bundle.type === 'model_range' && `Aplica desde ${bundle.conditions.start} hasta ${bundle.conditions.end}`}
+                              {bundle.type === 'model_start' && `Aplica desde ${bundle.conditions.start} en adelante`}
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-2">{bundle.accessories.map(acc => (<Badge key={acc.id} variant="secondary">{acc.name}</Badge>))}</div>
+                          </div>)) : <p className="text-sm text-muted-foreground text-center py-10">No hay reglas de combos configuradas.</p>}
+                  </ScrollArea>
+               </div>
             </CardContent>
           </Card>
         </div>

@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2 } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner" // CORRECCIÓN: Se importa directamente de sonner
 
 interface CreateNotificationModalProps {
   isOpen: boolean
@@ -30,7 +30,7 @@ export default function CreateNotificationModal({
   customers,
   onCreateNotification,
 }: CreateNotificationModalProps) {
-  const { toast } = useToast()
+  // Se elimina la línea: const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [notificationType, setNotificationType] = useState("general")
   const [recipient, setRecipient] = useState("")
@@ -45,38 +45,30 @@ export default function CreateNotificationModal({
       setRecipient(customer.email)
     } else {
       setRecipient("")
-      toast({
-        title: "Cliente sin email",
+      toast.error("Cliente sin email", {
         description: "El cliente seleccionado no tiene un correo electrónico registrado",
-        variant: "destructive",
       })
     }
   }
 
   const handleSubmit = () => {
     if (!recipient) {
-      toast({
-        title: "Destinatario requerido",
+      toast.error("Destinatario requerido", {
         description: "Por favor ingrese un destinatario válido",
-        variant: "destructive",
       })
       return
     }
 
     if (!subject) {
-      toast({
-        title: "Asunto requerido",
+      toast.error("Asunto requerido", {
         description: "Por favor ingrese un asunto para la notificación",
-        variant: "destructive",
       })
       return
     }
 
     if (!message) {
-      toast({
-        title: "Mensaje requerido",
+      toast.error("Mensaje requerido", {
         description: "Por favor ingrese un mensaje para la notificación",
-        variant: "destructive",
       })
       return
     }
@@ -94,10 +86,8 @@ export default function CreateNotificationModal({
       onCreateNotification(notificationData)
     } catch (error) {
       console.error("Error al crear la notificación:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Ocurrió un error al crear la notificación",
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react" // Se importa useEffect
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,11 +16,17 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { generateDeliveryReceiptPdf } from "@/lib/pdf-generator"
 
 export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }) {
   if (!repair) return null
 
   const [editableRepair, setEditableRepair] = useState(repair)
+
+  // --- CORRECCIÓN: Se añade useEffect para resetear el estado ---
+  useEffect(() => {
+    setEditableRepair(repair);
+  }, [repair]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;
@@ -31,12 +37,19 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate })
     setEditableRepair(prev => ({ ...prev, status: value }));
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     const updatedData = {
         ...editableRepair,
-        deliveredAt: editableRepair.status === 'delivered' ? Date.now() : repair.deliveredAt || null
+        deliveredAt: editableRepair.status === 'delivered' && !repair.deliveredAt 
+            ? new Date().toISOString() 
+            : repair.deliveredAt || null
     }
-    onUpdate(repair.id, updatedData)
+    
+    await onUpdate(repair.id, updatedData)
+
+    if (updatedData.status === 'delivered') {
+        await generateDeliveryReceiptPdf(updatedData);
+    }
   }
 
   const getStatusVariant = (status) => {

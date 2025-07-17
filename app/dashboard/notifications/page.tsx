@@ -11,7 +11,7 @@ import { Search, Mail, Bell, Send, CheckCircle, AlertCircle, Clock } from "lucid
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue, update, push, set } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner" // CORRECCIÓN: Se importa directamente de sonner
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import CreateNotificationModal from "@/components/create-notification-modal"
 
@@ -58,7 +58,7 @@ interface NotificationData {
 
 export default function NotificationsPage() {
   const router = useRouter()
-  const { toast } = useToast()
+  // Se elimina la línea: const { toast } = useToast()
   const [user, setUser] = useState<User | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -169,16 +169,13 @@ export default function NotificationsPage() {
         })
       }, 2000)
 
-      toast({
-        title: "Notificación reenviada",
+      toast.success("Notificación reenviada", {
         description: "La notificación ha sido reenviada correctamente",
       })
     } catch (error) {
       console.error("Error al reenviar la notificación:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Ocurrió un error al reenviar la notificación",
-        variant: "destructive",
       })
     }
   }
@@ -203,18 +200,15 @@ export default function NotificationsPage() {
         })
       }, 2000)
 
-      toast({
-        title: "Notificación creada",
+      toast.success("Notificación creada", {
         description: "La notificación ha sido creada y enviada correctamente",
       })
 
       setIsCreateModalOpen(false)
     } catch (error) {
       console.error("Error al crear la notificación:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Ocurrió un error al crear la notificación",
-        variant: "destructive",
       })
     }
   }

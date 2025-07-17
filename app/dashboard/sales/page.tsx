@@ -12,10 +12,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 
-// Definir interfaces para los tipos
+// Interfaces actualizadas para reflejar la estructura de datos correcta
 interface UserType {
   username: string
   role: string
+}
+
+interface SaleItem {
+    productName: string;
+    quantity: number;
 }
 
 interface Sale {
@@ -23,8 +28,8 @@ interface Sale {
   date: string
   customerName?: string
   customerDni?: string
-  productName?: string
-  salePrice: string | number
+  items: SaleItem[] // Las ventas ahora tienen un array de items
+  totalAmount: number // El precio ahora es totalAmount
   paymentMethod?: string
   [key: string]: any
 }
@@ -49,7 +54,6 @@ export default function SalesPage() {
   const [topProduct, setTopProduct] = useState<TopProductType>({ name: "", count: 0 })
 
   useEffect(() => {
-    // Verificar autenticación
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
@@ -63,7 +67,6 @@ export default function SalesPage() {
       router.push("/")
     }
 
-    // Cargar ventas desde Firebase
     const salesRef = ref(database, "sales")
     const unsubscribe = onValue(salesRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -75,12 +78,8 @@ export default function SalesPage() {
           })
         })
 
-        // Ordenar por fecha (más reciente primero)
         salesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
         setSales(salesData)
-
-        // Calcular estadísticas
         calculateSalesStats(salesData)
       } else {
         setSales([])
@@ -91,7 +90,6 @@ export default function SalesPage() {
     })
 
     return () => {
-      // Desuscribirse cuando el componente se desmonte
       unsubscribe()
     }
   }, [router])
@@ -102,32 +100,21 @@ export default function SalesPage() {
     const weekStart = new Date(today)
     weekStart.setDate(today.getDate() - today.getDay())
 
-    // Ventas del día
-    const todaySales = salesData.filter((sale) => {
-      const saleDate = new Date(sale.date)
-      return saleDate >= today
-    })
+    const todaySales = salesData.filter((sale) => new Date(sale.date) >= today)
+    const todayTotal = todaySales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
 
-    const todayTotal = todaySales.reduce((sum, sale) => sum + Number(sale.salePrice), 0)
+    const weekSales = salesData.filter((sale) => new Date(sale.date) >= weekStart)
+    const weekTotal = weekSales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
 
-    // Ventas de la semana
-    const weekSales = salesData.filter((sale) => {
-      const saleDate = new Date(sale.date)
-      return saleDate >= weekStart
-    })
-
-    const weekTotal = weekSales.reduce((sum, sale) => sum + Number(sale.salePrice), 0)
-
-    // Producto más vendido
     const productCounts: Record<string, number> = {}
     salesData.forEach((sale) => {
-      const productName = sale.productName || ""
-      productCounts[productName] = (productCounts[productName] || 0) + 1
+      sale.items?.forEach(item => {
+        productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity;
+      });
     })
 
     let topProductName = ""
     let topCount = 0
-
     Object.entries(productCounts).forEach(([product, count]) => {
       if (count > topCount) {
         topProductName = product
@@ -144,11 +131,10 @@ export default function SalesPage() {
     (sale) =>
       sale.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sale.customerDni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.productName?.toLowerCase().includes(searchTerm.toLowerCase()),
+      sale.items?.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const downloadSaleReceipt = (sale: Sale) => {
-    // Aquí se implementaría la lógica para descargar nuevamente el comprobante
     console.log("Descargar comprobante para la venta:", sale.id)
   }
 
@@ -172,39 +158,40 @@ export default function SalesPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${dailySales.total.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">{dailySales.count} ventas hoy</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Ventas de la Semana</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${weeklySales.total.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">{weeklySales.count} ventas esta semana</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Productos Más Vendidos</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg font-medium">{topProduct.name || "Sin datos"}</div>
-              <p className="text-xs text-muted-foreground">
-                {topProduct.count > 0 ? `${topProduct.count} unidades vendidas` : "No hay ventas registradas"}
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold">${dailySales.total.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">{dailySales.count} ventas hoy</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Ventas de la Semana</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-2xl font-bold">${weeklySales.total.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">{weeklySales.count} ventas esta semana</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Productos Más Vendidos</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                <div className="text-lg font-medium">{topProduct.name || "Sin datos"}</div>
+                <p className="text-xs text-muted-foreground">
+                    {topProduct.count > 0 ? `${topProduct.count} unidades vendidas` : "No hay ventas registradas"}
+                </p>
+                </CardContent>
+            </Card>
         </div>
+
 
         <div className="rounded-md border">
           <Table>
@@ -235,19 +222,17 @@ export default function SalesPage() {
                       {sale.customerName}
                     </TableCell>
                     <TableCell>{sale.customerDni}</TableCell>
-                    <TableCell>{sale.productName}</TableCell>
-                    <TableCell>${Number(sale.salePrice).toFixed(2)}</TableCell>
+                    <TableCell>
+                        {sale.items?.map(item => item.productName).join(', ')}
+                    </TableCell>
+                    <TableCell>${Number(sale.totalAmount).toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
                         {sale.paymentMethod === "efectivo"
                           ? "Efectivo"
                           : sale.paymentMethod === "tarjeta"
                             ? "Tarjeta"
-                            : sale.paymentMethod === "transferencia"
-                              ? "Transferencia"
-                              : sale.paymentMethod === "mercadopago"
-                                ? "Mercado Pago"
-                                : sale.paymentMethod}
+                            : "Transferencia"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

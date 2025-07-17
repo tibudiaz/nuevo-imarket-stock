@@ -17,13 +17,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Edit, Trash, ShoppingCart, Barcode } from "lucide-react"
+import { Plus, Search, Edit, Trash, ShoppingCart, Barcode, User } from "lucide-react"
 import { ref, onValue, set, push, remove, update } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import SellProductModal from "@/components/sell-product-modal"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-// Interfaces
+// --- Interfaces Actualizadas ---
 interface User {
   username: string
   role: string
@@ -40,6 +41,7 @@ interface Product {
   category?: string
   barcode?: string
   imei?: string
+  provider?: string;
   [key: string]: any
 }
 
@@ -53,15 +55,22 @@ interface NewProduct {
   category: string
   barcode: string
   imei: string
+  provider: string; // Se añade el proveedor
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 export default function InventoryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const category = searchParams.get('category')
+  const categorySearch = searchParams.get('category')
 
   const [user, setUser] = useState<User | null>(null)
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isSellDialogOpen, setIsSellDialogOpen] = useState(false)
@@ -78,10 +87,17 @@ export default function InventoryPage() {
     category: "",
     barcode: "",
     imei: "",
+    provider: "", // Se inicializa el proveedor
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
+  const isCellphoneCategory = newProduct.category === 'Celulares' || newProduct.category === 'Celulares Usados' || newProduct.category === "Celulares Nuevos";
+  const isUsedCellphoneCategory = newProduct.category === 'Celulares Usados';
+  
+  const isEditingCellphoneCategory = editingProduct?.category === 'Celulares' || editingProduct?.category === 'Celulares Usados' || editingProduct?.category === "Celulares Nuevos";
+
   useEffect(() => {
+    // Carga inicial de datos
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
@@ -95,7 +111,7 @@ export default function InventoryPage() {
     }
 
     const productsRef = ref(database, "products")
-    const unsubscribe = onValue(
+    const unsubscribeProducts = onValue(
       productsRef,
       (snapshot) => {
         setIsLoading(false)
@@ -117,12 +133,23 @@ export default function InventoryPage() {
         })
       },
     )
-    return () => unsubscribe()
+
+    const categoriesRef = ref(database, 'categories');
+    const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
+        const data = snapshot.val();
+        const categoryList: Category[] = data ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, name: value.name })) : [];
+        setCategories(categoryList);
+    });
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeCategories();
+    }
   }, [router])
 
   const filteredProducts = products.filter(
     (product) => {
-      const categoryMatch = category ? product.category === category : true;
+      const categoryMatch = categorySearch ? product.category === categorySearch : true;
       if (!searchTerm) {
         return categoryMatch;
       }
@@ -136,14 +163,14 @@ export default function InventoryPage() {
       return categoryMatch && searchMatch;
     }
   );
-
+  
   const handleAddProduct = async () => {
-    if (!newProduct.name || !newProduct.brand || !newProduct.model || !newProduct.category) {
-      toast.error("Campos incompletos", { description: "Por favor complete todos los campos requeridos" })
+    if (!newProduct.name || !newProduct.brand || (!newProduct.model && !isUsedCellphoneCategory) || !newProduct.category) {
+      toast.error("Campos incompletos", { description: "Por favor complete todos los campos requeridos." })
       return
     }
     if (newProduct.price <= 0) {
-      toast.error("Precio inválido", { description: "El precio debe ser mayor que cero" })
+      toast.error("Precio inválido", { description: "El precio debe ser mayor que cero." })
       return
     }
 
@@ -151,12 +178,12 @@ export default function InventoryPage() {
       const productsRef = ref(database, "products")
       const newProductRef = push(productsRef)
       await set(newProductRef, { ...newProduct, createdAt: new Date().toISOString() })
-      setNewProduct({ name: "", brand: "", model: "", price: 0, cost: 0, stock: 0, category: "", barcode: "", imei: "" })
+      setNewProduct({ name: "", brand: "", model: "", price: 0, cost: 0, stock: 0, category: "", barcode: "", imei: "", provider: "" })
       setIsAddDialogOpen(false)
-      toast.success("Producto agregado", { description: "El producto ha sido agregado correctamente" })
+      toast.success("Producto agregado", { description: "El producto ha sido agregado correctamente." })
     } catch (error) {
       console.error("Error al agregar producto:", error)
-      toast.error("Error", { description: "Ocurrió un error al agregar el producto" })
+      toast.error("Error", { description: "Ocurrió un error al agregar el producto." })
     }
   }
 
@@ -172,21 +199,23 @@ export default function InventoryPage() {
       await update(productRef, editingProduct)
       setIsEditDialogOpen(false)
       setEditingProduct(null)
-      toast.success("Producto actualizado", { description: "El producto ha sido actualizado correctamente" })
+      toast.success("Producto actualizado", { description: "El producto ha sido actualizado correctamente." })
     } catch (error) {
       console.error("Error al actualizar producto:", error)
-      toast.error("Error", { description: "Ocurrió un error al actualizar el producto" })
+      toast.error("Error", { description: "Ocurrió un error al actualizar el producto." })
     }
   }
 
   const handleDeleteProduct = async (id: string) => {
-    try {
-      const productRef = ref(database, `products/${id}`)
-      await remove(productRef)
-      toast.success("Producto eliminado", { description: "El producto ha sido eliminado correctamente" })
-    } catch (error) {
-      console.error("Error al eliminar producto:", error)
-      toast.error("Error", { description: "Ocurrió un error al eliminar el producto" })
+    if (window.confirm("¿Estás seguro de que quieres eliminar este producto?")) {
+        try {
+            const productRef = ref(database, `products/${id}`);
+            await remove(productRef);
+            toast.success("Producto eliminado", { description: "El producto ha sido eliminado correctamente." });
+        } catch (error) {
+            console.error("Error al eliminar producto:", error);
+            toast.error("Error", { description: "Ocurrió un error al eliminar el producto." });
+        }
     }
   }
 
@@ -198,6 +227,19 @@ export default function InventoryPage() {
   const handleProductSold = () => {
     setIsSellDialogOpen(false)
   }
+
+  const handleCategoryChange = (value: string) => {
+      const isUsed = value === 'Celulares Usados';
+      const isNew = value === 'Celulares Nuevos';
+      const isCellphone = isUsed || isNew;
+
+      setNewProduct(prev => ({
+          ...prev,
+          category: value,
+          stock: isCellphone ? 1 : prev.stock,
+          model: isUsed ? 'Celular' : prev.model,
+      }));
+  };
   
   if (isLoading) {
     return (
@@ -260,40 +302,52 @@ export default function InventoryPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="model">Modelo</Label>
-                      <Input
-                        id="model"
-                        value={newProduct.model}
-                        onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
+                     <div className="space-y-2">
                       <Label htmlFor="category">Categoría</Label>
-                      <Input
-                        id="category"
-                        value={newProduct.category}
-                        onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                      />
+                      <Select value={newProduct.category} onValueChange={handleCategoryChange}>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar categoría" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {categories.map(cat => (
+                                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
                     </div>
+                    {!isUsedCellphoneCategory && (
+                        <div className="space-y-2">
+                          <Label htmlFor="model">Modelo</Label>
+                          <Input
+                            id="model"
+                            value={newProduct.model}
+                            onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
+                          />
+                        </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="provider">Proveedor</Label>
+                      <Input id="provider" value={newProduct.provider} onChange={(e) => setNewProduct({...newProduct, provider: e.target.value})} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="barcode">Código de Barras</Label>
-                      <Input
-                        id="barcode"
-                        value={newProduct.barcode}
-                        onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="imei">IMEI</Label>
-                      <Input
-                        id="imei"
-                        value={newProduct.imei}
-                        onChange={(e) => setNewProduct({ ...newProduct, imei: e.target.value })}
-                      />
-                    </div>
+                    {isCellphoneCategory ? (
+                        <>
+                            <div className="space-y-2">
+                                <Label htmlFor="imei">IMEI</Label>
+                                <Input id="imei" value={newProduct.imei} onChange={(e) => setNewProduct({ ...newProduct, imei: e.target.value })} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="barcode">Número de Serie</Label>
+                                <Input id="barcode" value={newProduct.barcode} onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })} />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-2 col-span-2">
+                            <Label htmlFor="barcode">Código de Barras</Label>
+                            <Input id="barcode" value={newProduct.barcode} onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })} />
+                        </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
@@ -302,7 +356,7 @@ export default function InventoryPage() {
                         id="price"
                         type="number"
                         value={newProduct.price}
-                        onChange={(e) => setNewProduct({ ...newProduct, price: Number.parseFloat(e.target.value) })}
+                        onChange={(e) => setNewProduct({ ...newProduct, price: Number.parseFloat(e.target.value) || 0 })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -311,7 +365,7 @@ export default function InventoryPage() {
                         id="cost"
                         type="number"
                         value={newProduct.cost}
-                        onChange={(e) => setNewProduct({ ...newProduct, cost: Number.parseFloat(e.target.value) })}
+                        onChange={(e) => setNewProduct({ ...newProduct, cost: Number.parseFloat(e.target.value) || 0 })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -319,8 +373,13 @@ export default function InventoryPage() {
                       <Input
                         id="stock"
                         type="number"
-                        value={newProduct.stock}
-                        onChange={(e) => setNewProduct({ ...newProduct, stock: Number.parseInt(e.target.value) })}
+                        value={isCellphoneCategory ? 1 : newProduct.stock}
+                        disabled={isCellphoneCategory}
+                        onChange={(e) => {
+                            if (!isCellphoneCategory) {
+                                setNewProduct({ ...newProduct, stock: Number.parseInt(e.target.value) || 0 })
+                            }
+                        }}
                       />
                     </div>
                   </div>
@@ -344,6 +403,7 @@ export default function InventoryPage() {
                 <TableHead>Marca</TableHead>
                 <TableHead>Modelo</TableHead>
                 <TableHead>Categoría</TableHead>
+                <TableHead>Proveedor</TableHead>
                 <TableHead>Código/IMEI</TableHead>
                 <TableHead>Precio</TableHead>
                 <TableHead>Costo</TableHead>
@@ -354,7 +414,7 @@ export default function InventoryPage() {
             <TableBody>
               {filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                     No se encontraron productos
                   </TableCell>
                 </TableRow>
@@ -365,6 +425,14 @@ export default function InventoryPage() {
                     <TableCell>{product.brand}</TableCell>
                     <TableCell>{product.model}</TableCell>
                     <TableCell>{product.category}</TableCell>
+                    <TableCell>
+                        {product.provider && (
+                            <div className="flex items-center gap-1">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                {product.provider}
+                            </div>
+                        )}
+                    </TableCell>
                     <TableCell>
                       {product.barcode && (
                         <div className="flex items-center gap-1">
@@ -377,13 +445,13 @@ export default function InventoryPage() {
                     <TableCell>${product.price?.toFixed(2) || "0.00"}</TableCell>
                     <TableCell>${product.cost?.toFixed(2) || "0.00"}</TableCell>
                     <TableCell>
-                      <Badge variant={product.stock && product.stock > 5 ? "default" : "destructive"}>
+                      <Badge variant={product.stock && product.stock > 0 ? "default" : "destructive"}>
                         {product.stock}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleSellProduct(product)}>
+                        <Button variant="ghost" size="icon" onClick={() => handleSellProduct(product)} disabled={!product.stock || product.stock === 0}>
                           <ShoppingCart className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)}>
@@ -448,13 +516,37 @@ export default function InventoryPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="category">Categoría</Label>
-                      <Input
-                        id="category"
-                        value={editingProduct.category}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                      />
+                      <Select value={editingProduct.category} onValueChange={(value) => setEditingProduct({ ...editingProduct, category: value })}>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar categoría" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {categories.map(cat => (
+                                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
                     </div>
                   </div>
+                <div className="grid grid-cols-2 gap-4">
+                    {isEditingCellphoneCategory ? (
+                        <>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-imei">IMEI</Label>
+                                <Input id="edit-imei" value={editingProduct.imei} onChange={(e) => setEditingProduct({...editingProduct, imei: e.target.value})} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-barcode">Número de Serie</Label>
+                                <Input id="edit-barcode" value={editingProduct.barcode} onChange={(e) => setEditingProduct({...editingProduct, barcode: e.target.value})} />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-2 col-span-2">
+                            <Label htmlFor="edit-barcode">Código de Barras</Label>
+                            <Input id="edit-barcode" value={editingProduct.barcode} onChange={(e) => setEditingProduct({...editingProduct, barcode: e.target.value})} />
+                        </div>
+                    )}
+                </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-price">Precio Venta</Label>
@@ -463,7 +555,7 @@ export default function InventoryPage() {
                     type="number"
                     value={editingProduct.price}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, price: Number.parseFloat(e.target.value) })
+                      setEditingProduct({ ...editingProduct, price: Number.parseFloat(e.target.value) || 0 })
                     }
                   />
                 </div>
@@ -473,7 +565,7 @@ export default function InventoryPage() {
                         id="cost"
                         type="number"
                         value={editingProduct.cost}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, cost: Number.parseFloat(e.target.value) })}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, cost: Number.parseFloat(e.target.value) || 0 })}
                       />
                     </div>
                 <div className="space-y-2">
@@ -482,8 +574,9 @@ export default function InventoryPage() {
                     id="edit-stock"
                     type="number"
                     value={editingProduct.stock}
+                    disabled={isEditingCellphoneCategory}
                     onChange={(e) =>
-                      setEditingProduct({ ...editingProduct, stock: Number.parseInt(e.target.value) })
+                      setEditingProduct({ ...editingProduct, stock: Number.parseInt(e.target.value) || 0 })
                     }
                   />
                 </div>

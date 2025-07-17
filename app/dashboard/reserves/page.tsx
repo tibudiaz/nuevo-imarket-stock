@@ -11,29 +11,13 @@ import { Search, Calendar, User, Clock, AlertTriangle, CheckCircle, Download } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue, update } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { useToast } from "@/components/ui/use-toast"
-import CompleteReserveModal from "@/components/complete-reserve-modal"
+import { toast } from "sonner"
+// --- CORRECCIÓN: Se importa el componente y la interfaz desde el mismo lugar ---
+import CompleteReserveModal, { Reserve } from "@/components/complete-reserve-modal"
 
-// Definir interfaces para los tipos
 interface User {
   username: string
   role: string
-}
-
-interface Reserve {
-  id: string
-  date: string
-  expirationDate: string
-  customerName?: string
-  customerDni?: string
-  productName?: string
-  productPrice?: number
-  productId?: string
-  productStock?: number
-  downPayment?: number
-  remainingAmount?: number
-  status: string
-  [key: string]: any
 }
 
 interface ReserveStats {
@@ -45,7 +29,6 @@ interface ReserveStats {
 
 export default function ReservesPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const [user, setUser] = useState<User | null>(null)
   const [reserves, setReserves] = useState<Reserve[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -59,7 +42,6 @@ export default function ReservesPage() {
   })
 
   useEffect(() => {
-    // Verificar autenticación
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
@@ -73,7 +55,6 @@ export default function ReservesPage() {
       router.push("/")
     }
 
-    // Cargar reservas desde Firebase
     const reservesRef = ref(database, "reserves")
     const unsubscribe = onValue(reservesRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -85,7 +66,6 @@ export default function ReservesPage() {
           })
         })
 
-        // Ordenar por fecha (más reciente primero)
         reservesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
         setReserves(reservesData)
@@ -108,61 +88,37 @@ export default function ReservesPage() {
 
   const calculateReserveStats = (reservesData: Reserve[]) => {
     const now = new Date()
-
     const active = reservesData.filter(
       (reserve) => reserve.status === "reserved" && new Date(reserve.expirationDate) > now,
     ).length
-
     const expired = reservesData.filter(
       (reserve) => reserve.status === "reserved" && new Date(reserve.expirationDate) <= now,
     ).length
-
     const completed = reservesData.filter((reserve) => reserve.status === "completed").length
-
-    setReserveStats({
-      active,
-      expired,
-      completed,
-      total: reservesData.length,
-    })
+    setReserveStats({ active, expired, completed, total: reservesData.length })
   }
 
   const isReserveExpired = (reserve: Reserve): boolean => {
-    const now = new Date()
-    const expirationDate = new Date(reserve.expirationDate)
-    return expirationDate <= now && reserve.status === "reserved"
+    return new Date(reserve.expirationDate) <= new Date() && reserve.status === "reserved"
   }
 
   const handleCancelReserve = async (reserve: Reserve) => {
     try {
-      // 1. Actualizar el estado de la reserva
       const reserveRef = ref(database, `reserves/${reserve.id}`)
       await update(reserveRef, {
         status: "cancelled",
         cancelledAt: new Date().toISOString(),
       })
 
-      // 2. Actualizar el producto (quitar la reserva)
       const productRef = ref(database, `products/${reserve.productId}`)
       await update(productRef, {
         reserved: false,
-        reservedBy: null,
-        reservedUntil: null,
-        stock: (reserve.productStock || 0) + 1, // Devolver al stock
-        lastUpdated: new Date().toISOString(),
+        stock: (reserve.productStock || 0) + 1,
       })
-
-      toast({
-        title: "Reserva cancelada",
-        description: "La reserva ha sido cancelada correctamente",
-      })
+      toast.success("Reserva cancelada correctamente")
     } catch (error) {
       console.error("Error al cancelar la reserva:", error)
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al cancelar la reserva",
-        variant: "destructive",
-      })
+      toast.error("Error al cancelar la reserva")
     }
   }
 
@@ -172,11 +128,8 @@ export default function ReservesPage() {
   }
 
   const handleReserveCompleted = () => {
-    toast({
-      title: "Reserva completada",
-      description: "La reserva ha sido completada correctamente",
-    })
     setIsCompleteModalOpen(false)
+    toast.success("Venta completada con éxito.")
   }
 
   const filteredReserves = reserves.filter(
