@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,10 +20,10 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Search, Edit, Trash, ShoppingCart, Barcode } from "lucide-react"
 import { ref, onValue, set, push, remove, update } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { toast } from "sonner" // 1. Importamos el toast de sonner
+import { toast } from "sonner"
 import SellProductModal from "@/components/sell-product-modal"
 
-// (Las interfaces se mantienen igual)
+// Interfaces
 interface User {
   username: string
   role: string
@@ -57,7 +57,9 @@ interface NewProduct {
 
 export default function InventoryPage() {
   const router = useRouter()
-  // 2. Ya no necesitamos el hook useToast()
+  const searchParams = useSearchParams()
+  const category = searchParams.get('category')
+
   const [user, setUser] = useState<User | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -119,14 +121,21 @@ export default function InventoryPage() {
   }, [router])
 
   const filteredProducts = products.filter(
-    (product) =>
-      product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.imei?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+    (product) => {
+      const categoryMatch = category ? product.category === category : true;
+      if (!searchTerm) {
+        return categoryMatch;
+      }
+      const searchMatch =
+        product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.imei?.toLowerCase().includes(searchTerm.toLowerCase());
+      return categoryMatch && searchMatch;
+    }
+  );
 
   const handleAddProduct = async () => {
     if (!newProduct.name || !newProduct.brand || !newProduct.model || !newProduct.category) {
@@ -187,11 +196,9 @@ export default function InventoryPage() {
   }
 
   const handleProductSold = () => {
-    // La notificación ahora se maneja dentro del modal de venta
     setIsSellDialogOpen(false)
   }
   
-  // (El resto del componente JSX se mantiene igual)
   if (isLoading) {
     return (
       <DashboardLayout>
