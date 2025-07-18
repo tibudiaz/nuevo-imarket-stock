@@ -19,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getAuth, signOut } from "firebase/auth"
+import { getAuth, signOut, onAuthStateChanged } from "firebase/auth" // Importar onAuthStateChanged
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -40,7 +40,7 @@ interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-// Componente unificado para todos los items de la barra de navegación
+// ... (El componente NavItem no cambia)
 const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = false, ...props }) => {
   const itemContent = (
     <div
@@ -76,6 +76,7 @@ const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = fa
   );
 };
 
+
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -83,24 +84,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [user, setUser] = useState<{ username: string; role: string } | null>(null)
   const [categories, setCategories] = useState<string[]>([])
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
-  const [hasMounted, setHasMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true); // Nuevo estado de carga
 
   useEffect(() => {
-    setHasMounted(true)
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
-    try {
-      setUser(JSON.parse(storedUser))
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
-    }
+    const auth = getAuth();
+    // Escuchar cambios en el estado de autenticación
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // Si hay un usuario, obtener sus datos de localStorage
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch (e) {
+            // Si hay un error, limpiar y redirigir
+            localStorage.removeItem("user");
+            router.push("/");
+          }
+        }
+      } else {
+        // Si no hay usuario, limpiar y redirigir
+        localStorage.removeItem("user");
+        router.push("/");
+      }
+      // Una vez que se resuelve el estado de auth, terminamos de cargar
+      setIsLoading(false);
+    });
 
     const categoriesRef = ref(database, "categories")
-    const unsubscribe = onValue(categoriesRef, (snapshot) => {
+    const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
       if (snapshot.exists()) {
         const categoriesData = snapshot.val()
         const categoryNames = Object.values(categoriesData)
@@ -112,7 +124,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     })
 
-    return () => unsubscribe()
+    return () => {
+        unsubscribeAuth();
+        unsubscribeCategories();
+    }
   }, [router])
 
   useEffect(() => {
@@ -143,8 +158,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     out: { opacity: 0, y: -5 },
   };
 
-  if (!hasMounted) {
-    return null; // O un spinner de carga para evitar el parpadeo
+  // Muestra un loader mientras se verifica la sesión
+  if (isLoading) {
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        </div>
+    );
+  }
+  
+  // Si no hay usuario después de cargar, no renderizar el layout
+  if (!user) {
+      return null;
   }
 
   return (

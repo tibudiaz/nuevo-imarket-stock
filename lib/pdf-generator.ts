@@ -34,7 +34,7 @@ export const generateSaleReceiptPdf = async (completedSale: any) => {
     return;
   }
 
-  toast.loading("Generando PDF...", {
+  const toastId = toast.loading("Generando PDF...", {
     description: "Espere mientras se prepara el comprobante.",
   });
 
@@ -83,10 +83,10 @@ export const generateSaleReceiptPdf = async (completedSale: any) => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success("PDF generado", { description: "El comprobante se ha descargado." });
+    toast.success("PDF generado", { id: toastId, description: "El comprobante se ha descargado." });
   } catch (error) {
     console.error("Error al generar el PDF:", error);
-    toast.error("Error de PDF", { description: `No se pudo generar el comprobante: ${(error as Error).message}` });
+    toast.error("Error de PDF", { id: toastId, description: `No se pudo generar el comprobante: ${(error as Error).message}` });
   }
 };
 
@@ -101,9 +101,9 @@ const drawSalePdfContent = (page, saleData, fonts) => {
         celCliente: { x: 110, y: 630 },
         itemStartY: 548,
         itemStartX: 65,
-        imeiStartX: 320,
+        imeiStartX: 280,
         priceStartX: 455,
-        subtotal: { x: 400, y: 335 },
+        subtotal: { x: 400, y: 300 },
         parteDePago: { x: 400, y: 320 },
         precioFinal: { x: 455, y: 290 },
     };
@@ -170,7 +170,7 @@ const drawSalePdfContent = (page, saleData, fonts) => {
         page.drawText(`Subtotal: ${formatCurrencyForPdf(finalAmount)}`, { ...positions.subtotal, size: 10, font: helveticaFont });
     }
 
-    page.drawText(`Total: ${formatCurrencyForPdf(finalAmount)}`, { ...positions.precioFinal, size: 12, font: helveticaBold });
+    page.drawText(`${formatCurrencyForPdf(finalAmount)}`, { ...positions.precioFinal, size: 12, font: helveticaBold });
 }
 
 
@@ -181,7 +181,7 @@ export const generateRepairReceiptPdf = async (repairData: any, customerData: an
     return;
   }
 
-  toast.loading("Generando presupuesto PDF...", {
+  const toastId = toast.loading("Generando presupuesto PDF...", {
     description: "Espere mientras se prepara el comprobante.",
   });
 
@@ -230,10 +230,10 @@ export const generateRepairReceiptPdf = async (repairData: any, customerData: an
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success("PDF generado", { description: "El presupuesto se ha descargado." });
+    toast.success("PDF generado", { id: toastId, description: "El presupuesto se ha descargado." });
   } catch (error) {
     console.error("Error al generar el PDF de reparación:", error);
-    toast.error("Error de PDF", { description: `No se pudo generar el comprobante: ${(error as Error).message}` });
+    toast.error("Error de PDF", { id: toastId, description: `No se pudo generar el comprobante: ${(error as Error).message}` });
   }
 };
 
@@ -288,7 +288,7 @@ export const generateDeliveryReceiptPdf = async (repairData: any) => {
     return;
   }
 
-  toast.loading("Generando Comprobante de Entrega...", {
+  const toastId = toast.loading("Generando Comprobante de Entrega...", {
     description: "Espere mientras se prepara el PDF.",
   });
 
@@ -331,10 +331,10 @@ export const generateDeliveryReceiptPdf = async (repairData: any) => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success("PDF de Entrega generado", { description: "El comprobante se ha descargado." });
+    toast.success("PDF de Entrega generado", { id: toastId, description: "El comprobante se ha descargado." });
   } catch (error) {
     console.error("Error al generar el PDF de entrega:", error);
-    toast.error("Error de PDF", { description: `No se pudo generar el comprobante: ${(error as Error).message}` });
+    toast.error("Error de PDF", { id: toastId, description: `No se pudo generar el comprobante: ${(error as Error).message}` });
   }
 };
 

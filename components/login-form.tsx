@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
+import { getAuth, signInWithEmailAndPassword, UserCredential } from "firebase/auth"
 import { ref, get, set } from "firebase/database"
 import { database } from "@/lib/firebase"
 
@@ -19,79 +19,78 @@ export default function LoginForm() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
+    const auth = getAuth()
+    let userCredential: UserCredential;
+    
+    // 1. Primero, intentar autenticar al usuario
     try {
-      const auth = getAuth()
+      userCredential = await signInWithEmailAndPassword(auth, email, password)
+    } catch (authError: any) {
+      console.error("Error de Firebase Auth:", authError)
+      setError("Usuario o contraseña incorrectos. Verifique sus credenciales.")
+      setIsLoading(false)
+      return;
+    }
 
-      // Iniciar sesión con Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+    // 2. Si la autenticación es exitosa, proceder con la base de datos
+    try {
       const user = userCredential.user
+      const userRef = ref(database, `users/${user.uid}`)
 
       // Determinar el rol basado en el dominio del correo
-      let role = "moderator" // Rol por defecto
-
+      let role = "moderator"
       if (email.endsWith("@admin.com")) {
         role = "admin"
       } else if (email.endsWith("@moderador.com")) {
         role = "moderator"
       }
 
-      // Obtener el rol del usuario desde la base de datos
-      const userRef = ref(database, `users/${user.uid}`)
       const userSnapshot = await get(userRef)
+      let finalUserData;
 
       if (userSnapshot.exists()) {
-        const userData = userSnapshot.val()
-
-        // Actualizar el rol si ha cambiado
-        if (userData.role !== role) {
-          await set(userRef, {
-            ...userData,
-            role: role,
-            updatedAt: new Date().toISOString(),
-          })
+        const dbData = userSnapshot.val()
+        // Sincronizar el rol del email con la base de datos si es diferente
+        if (dbData.role !== role) {
+          await set(userRef, { ...dbData, role: role, updatedAt: new Date().toISOString() })
         }
-
-        // Guardar información del usuario en localStorage
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            username: userData.username || user.email,
-            role: role, // Usar el rol determinado por el dominio
-            uid: user.uid,
-            email: user.email,
-          }),
-        )
+        finalUserData = {
+          username: dbData.username || user.email,
+          role: role,
+          uid: user.uid,
+          email: user.email,
+        };
       } else {
-        // Si el usuario existe en Auth pero no en la base de datos, crear su perfil
-        await set(userRef, {
+        // El usuario no existe en la DB, así que lo creamos
+        const newUserProfile = {
           username: user.email,
-          role: role, // Usar el rol determinado por el dominio
+          role: role,
           email: user.email,
           createdAt: new Date().toISOString(),
-        })
-
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            username: user.email,
-            role: role,
-            uid: user.uid,
-            email: user.email,
-          }),
-        )
+        };
+        await set(userRef, newUserProfile)
+        finalUserData = {
+          username: user.email,
+          role: role,
+          uid: user.uid,
+          email: user.email,
+        };
       }
+      
+      // 3. Finalmente, guardar en localStorage y redirigir
+      localStorage.setItem("user", JSON.stringify(finalUserData));
+      router.push("/dashboard");
 
-      router.push("/dashboard")
-    } catch (error) {
-      console.error("Error de autenticación:", error)
-      setError("Usuario o contraseña incorrectos")
+    } catch (dbError: any) {
+      console.error("Error de base de datos o de lógica interna:", dbError);
+      setError("No se pudo acceder al perfil de usuario. Contacte al administrador.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
