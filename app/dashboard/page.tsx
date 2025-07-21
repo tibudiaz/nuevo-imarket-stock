@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ShoppingBag, Package, DollarSign, TrendingUp, User } from "lucide-react"
+import { ShoppingBag, Package, DollarSign, TrendingUp, User, AlertTriangle } from "lucide-react"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
 
 // Interfaces
 interface User {
@@ -34,10 +35,12 @@ interface Sale {
 }
 
 interface Product {
-  id: string
-  cost?: number
-  stock?: number
-  [key: string]: any
+  id: string;
+  name?: string;
+  category?: string;
+  cost?: number;
+  stock?: number;
+  [key: string]: any;
 }
 
 interface DashboardData {
@@ -69,7 +72,8 @@ export default function Dashboard() {
     monthlySales: [],
   })
   const [products, setProducts] = useState<Product[]>([]);
-  const [dailySalesData, setDailySalesData] = useState<Sale[]>([]); // Nuevo estado para ventas del día
+  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -79,36 +83,55 @@ export default function Dashboard() {
     }
 
     try {
-      setUser(JSON.parse(storedUser))
+      const parsedUser = JSON.parse(storedUser)
+      setUser(parsedUser)
+      
+      const productsRef = ref(database, "products")
+      onValue(productsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const productsData: Product[] = []
+          let totalInvestment = 0
+          snapshot.forEach((childSnapshot) => {
+            const product: Product = {
+              id: childSnapshot.key || "",
+              ...childSnapshot.val(),
+            }
+            productsData.push(product)
+            totalInvestment += Number(product.cost || 0) * Number(product.stock || 0)
+          })
+          
+          setProducts(productsData);
+
+          // Filtro para bajo stock excluyendo celulares
+          const lowStockAccessories = productsData.filter(p => 
+            p.stock !== undefined && 
+            p.stock <= 5 && 
+            p.category !== 'Celulares Nuevos' && 
+            p.category !== 'Celulares Usados'
+          );
+          
+          setLowStockProducts(lowStockAccessories);
+
+          // Alerta para ambos roles si hay bajo stock de accesorios
+          if (lowStockAccessories.length > 0) {
+              toast.warning(`${lowStockAccessories.length} productos con bajo stock!`, {
+                  description: 'Revisa el inventario de accesorios para reponer stock.',
+              });
+          }
+          
+          setDashboardData((prev) => ({
+            ...prev,
+            totalProducts: productsData.reduce((sum, p) => sum + (p.stock || 0), 0),
+            totalInvestment: totalInvestment,
+            productsGrowth: 12, // Simulado
+            investmentGrowth: 5.2, // Simulado
+          }))
+        }
+      })
     } catch (e) {
       localStorage.removeItem("user")
       router.push("/")
     }
-    
-    const productsRef = ref(database, "products")
-    onValue(productsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const productsData: Product[] = []
-        let totalInvestment = 0
-        snapshot.forEach((childSnapshot) => {
-          const product: Product = {
-            id: childSnapshot.key || "",
-            ...childSnapshot.val(),
-          }
-          productsData.push(product)
-          totalInvestment += Number(product.cost || 0) * Number(product.stock || 0)
-        })
-        
-        setProducts(productsData);
-        setDashboardData((prev) => ({
-          ...prev,
-          totalProducts: productsData.length,
-          totalInvestment: totalInvestment,
-          productsGrowth: 12, // Simulado
-          investmentGrowth: 5.2, // Simulado
-        }))
-      }
-    })
 
     setIsLoading(false)
   }, [router])
@@ -147,7 +170,7 @@ export default function Dashboard() {
         })
 
         setSales(salesData);
-        setDailySalesData(salesFromToday); // Guardar ventas del día
+        setDailySalesData(salesFromToday);
 
         const formattedMonthlySales = Object.entries(monthlySales).map(([name, total]) => ({
           name,
@@ -179,7 +202,7 @@ export default function Dashboard() {
     })
   }, [products]);
 
-  if (isLoading) {
+  if (isLoading || !user) {
     return <div className="flex h-screen items-center justify-center">Cargando...</div>
   }
 
@@ -190,127 +213,166 @@ export default function Dashboard() {
           Bienvenido, {user?.username} ({user?.role === "admin" ? "Administrador" : "Moderador"})
         </h1>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Ventas Totales</CardTitle>
-              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${dashboardData.totalSales.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">
-                +{dashboardData.salesGrowth.toFixed(1)}% desde el mes pasado
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Productos en Stock</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dashboardData.totalProducts}</div>
-              <p className="text-xs text-muted-foreground">+{dashboardData.productsGrowth} nuevos productos</p>
-            </CardContent>
-          </Card>
-
-          {user?.role === "admin" && (
-            <>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Inversión Total</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${dashboardData.totalInvestment.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    +{dashboardData.investmentGrowth.toFixed(1)}% desde el mes pasado
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Ganancias</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${dashboardData.totalProfit.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    +{dashboardData.profitGrowth.toFixed(1)}% desde el mes pasado
-                  </p>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </div>
-
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview">Resumen</TabsTrigger>
-            <TabsTrigger value="sales">Ventas del Día</TabsTrigger>
-          </TabsList>
-          <TabsContent value="overview" className="mt-6">
+        {/* --- VISTA PARA ADMIN --- */}
+        {user.role === 'admin' && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Ventas Mensuales</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Ventas Totales</CardTitle>
+                <ShoppingBag className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={dashboardData.monthlySales}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="total" fill="#8884d8" name="Ventas" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="text-2xl font-bold">${dashboardData.totalSales.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">
+                  +{dashboardData.salesGrowth.toFixed(1)}% desde el mes pasado
+                </p>
               </CardContent>
             </Card>
-          </TabsContent>
-          <TabsContent value="sales" className="mt-6">
             <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Productos en Stock</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dashboardData.totalProducts}</div>
+                <p className="text-xs text-muted-foreground">+{dashboardData.productsGrowth} nuevos productos</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Inversión Total</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${dashboardData.totalInvestment.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">
+                  +{dashboardData.investmentGrowth.toFixed(1)}% desde el mes pasado
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Ganancias</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${dashboardData.totalProfit.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">
+                  +{dashboardData.profitGrowth.toFixed(1)}% desde el mes pasado
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* --- VISTA PARA MODERADOR --- */}
+        {user.role === 'moderator' && (
+          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-1 mb-6">
+            <Card className="col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-destructive">Productos con Bajo Stock</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                {lowStockProducts.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Producto</TableHead>
+                          <TableHead>Categoría</TableHead>
+                          <TableHead className="text-right">Stock Actual</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {lowStockProducts.map((p) => (
+                              <TableRow key={p.id}>
+                                  <TableCell className="font-medium">{p.name}</TableCell>
+                                  <TableCell>{p.category}</TableCell>
+                                  <TableCell className="text-right">
+                                      <Badge variant="destructive">{p.stock}</Badge>
+                                  </TableCell>
+                              </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No hay productos con bajo stock.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        
+        {/* --- Gráficos y Tablas (SOLO PARA ADMIN) --- */}
+        {user.role === 'admin' && (
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="overview">Resumen</TabsTrigger>
+              <TabsTrigger value="sales">Ventas del Día</TabsTrigger>
+            </TabsList>
+            <TabsContent value="overview" className="mt-6">
+              <Card>
                 <CardHeader>
-                    <CardTitle>Ventas Realizadas Hoy</CardTitle>
+                  <CardTitle>Ventas Mensuales</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Hora</TableHead>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Productos</TableHead>
-                                <TableHead className="text-right">Monto</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {dailySalesData.length > 0 ? (
-                                dailySalesData.map(sale => (
-                                    <TableRow key={sale.id}>
-                                        <TableCell>{new Date(sale.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <User className="h-4 w-4 text-muted-foreground" />
-                                                {sale.customerName}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{sale.items.map(item => item.productName).join(', ')}</TableCell>
-                                        <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                                        No se han registrado ventas hoy.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={dashboardData.monthlySales}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="total" fill="#8884d8" name="Ventas" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </Card>
+            </TabsContent>
+            <TabsContent value="sales" className="mt-6">
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Ventas Realizadas Hoy</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <Table>
+                          <TableHeader>
+                              <TableRow>
+                                  <TableHead>Hora</TableHead>
+                                  <TableHead>Cliente</TableHead>
+                                  <TableHead>Productos</TableHead>
+                                  <TableHead className="text-right">Monto</TableHead>
+                              </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                              {dailySalesData.length > 0 ? (
+                                  dailySalesData.map(sale => (
+                                      <TableRow key={sale.id}>
+                                          <TableCell>{new Date(sale.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                          <TableCell>
+                                              <div className="flex items-center gap-2">
+                                                  <User className="h-4 w-4 text-muted-foreground" />
+                                                  {sale.customerName}
+                                              </div>
+                                          </TableCell>
+                                          <TableCell>{sale.items.map(item => item.productName).join(', ')}</TableCell>
+                                          <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                  ))
+                              ) : (
+                                  <TableRow>
+                                      <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                                          No se han registrado ventas hoy.
+                                      </TableCell>
+                                  </TableRow>
+                              )}
+                          </TableBody>
+                      </Table>
+                  </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </DashboardLayout>
   )

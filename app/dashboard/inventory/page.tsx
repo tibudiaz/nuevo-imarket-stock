@@ -268,130 +268,133 @@ export default function InventoryPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Agregar Producto
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Agregar Nuevo Producto</DialogTitle>
-                  <DialogDescription>
-                    Complete los detalles del nuevo producto a agregar al inventario.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nombre</Label>
-                      <Input
-                        id="name"
-                        value={newProduct.name}
-                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="brand">Marca</Label>
-                      <Input
-                        id="brand"
-                        value={newProduct.brand}
-                        onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-2">
-                      <Label htmlFor="category">Categoría</Label>
-                      <Select value={newProduct.category} onValueChange={handleCategoryChange}>
-                          <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar categoría" />
-                          </SelectTrigger>
-                          <SelectContent>
-                              {categories.map(cat => (
-                                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
-                    </div>
-                    {!isUsedCellphoneCategory && (
-                        <div className="space-y-2">
-                          <Label htmlFor="model">Modelo</Label>
-                          <Input
-                            id="model"
-                            value={newProduct.model}
-                            onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
-                          />
-                        </div>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="provider">Proveedor</Label>
-                      <Input id="provider" value={newProduct.provider} onChange={(e) => setNewProduct({...newProduct, provider: e.target.value})} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    {isCellphoneCategory ? (
-                        <>
-                            <div className="space-y-2">
-                                <Label htmlFor="imei">IMEI</Label>
-                                <Input id="imei" value={newProduct.imei} onChange={(e) => setNewProduct({ ...newProduct, imei: e.target.value })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="barcode">Número de Serie</Label>
-                                <Input id="barcode" value={newProduct.barcode} onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })} />
-                            </div>
-                        </>
-                    ) : (
-                        <div className="space-y-2 col-span-2">
-                            <Label htmlFor="barcode">Código de Barras</Label>
-                            <Input id="barcode" value={newProduct.barcode} onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })} />
-                        </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="price">Precio Venta</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        value={newProduct.price}
-                        onChange={(e) => setNewProduct({ ...newProduct, price: Number.parseFloat(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cost">Precio Costo</Label>
-                      <Input
-                        id="cost"
-                        type="number"
-                        value={newProduct.cost}
-                        onChange={(e) => setNewProduct({ ...newProduct, cost: Number.parseFloat(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="stock">Stock</Label>
-                      <Input
-                        id="stock"
-                        type="number"
-                        value={isCellphoneCategory ? 1 : newProduct.stock}
-                        disabled={isCellphoneCategory}
-                        onChange={(e) => {
-                            if (!isCellphoneCategory) {
-                                setNewProduct({ ...newProduct, stock: Number.parseInt(e.target.value) || 0 })
-                            }
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancelar
+            {/* --- BOTÓN AGREGAR PRODUCTO (SOLO ADMIN) --- */}
+            {user?.role === 'admin' && (
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar Producto
                   </Button>
-                  <Button onClick={handleAddProduct}>Guardar</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Agregar Nuevo Producto</DialogTitle>
+                    <DialogDescription>
+                      Complete los detalles del nuevo producto a agregar al inventario.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Nombre</Label>
+                        <Input
+                          id="name"
+                          value={newProduct.name}
+                          onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="brand">Marca</Label>
+                        <Input
+                          id="brand"
+                          value={newProduct.brand}
+                          onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="category">Categoría</Label>
+                        <Select value={newProduct.category} onValueChange={handleCategoryChange}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar categoría" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {categories.map(cat => (
+                                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                      </div>
+                      {!isUsedCellphoneCategory && (
+                          <div className="space-y-2">
+                            <Label htmlFor="model">Modelo</Label>
+                            <Input
+                              id="model"
+                              value={newProduct.model}
+                              onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
+                            />
+                          </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="provider">Proveedor</Label>
+                        <Input id="provider" value={newProduct.provider} onChange={(e) => setNewProduct({...newProduct, provider: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {isCellphoneCategory ? (
+                          <>
+                              <div className="space-y-2">
+                                  <Label htmlFor="imei">IMEI</Label>
+                                  <Input id="imei" value={newProduct.imei} onChange={(e) => setNewProduct({ ...newProduct, imei: e.target.value })} />
+                              </div>
+                              <div className="space-y-2">
+                                  <Label htmlFor="barcode">Número de Serie</Label>
+                                  <Input id="barcode" value={newProduct.barcode} onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })} />
+                              </div>
+                          </>
+                      ) : (
+                          <div className="space-y-2 col-span-2">
+                              <Label htmlFor="barcode">Código de Barras</Label>
+                              <Input id="barcode" value={newProduct.barcode} onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })} />
+                          </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="price">Precio Venta</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          value={newProduct.price}
+                          onChange={(e) => setNewProduct({ ...newProduct, price: Number.parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cost">Precio Costo</Label>
+                        <Input
+                          id="cost"
+                          type="number"
+                          value={newProduct.cost}
+                          onChange={(e) => setNewProduct({ ...newProduct, cost: Number.parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="stock">Stock</Label>
+                        <Input
+                          id="stock"
+                          type="number"
+                          value={isCellphoneCategory ? 1 : newProduct.stock}
+                          disabled={isCellphoneCategory}
+                          onChange={(e) => {
+                              if (!isCellphoneCategory) {
+                                  setNewProduct({ ...newProduct, stock: Number.parseInt(e.target.value) || 0 })
+                              }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleAddProduct}>Guardar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
 
@@ -403,10 +406,10 @@ export default function InventoryPage() {
                 <TableHead>Marca</TableHead>
                 <TableHead>Modelo</TableHead>
                 <TableHead>Categoría</TableHead>
-                <TableHead>Proveedor</TableHead>
+                {user?.role === 'admin' && <TableHead>Proveedor</TableHead>}
                 <TableHead>Código/IMEI</TableHead>
                 <TableHead>Precio</TableHead>
-                <TableHead>Costo</TableHead>
+                {user?.role === 'admin' && <TableHead>Costo</TableHead>}
                 <TableHead>Stock</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -414,7 +417,7 @@ export default function InventoryPage() {
             <TableBody>
               {filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
+                  <TableCell colSpan={user?.role === 'admin' ? 10 : 8} className="text-center py-6 text-muted-foreground">
                     No se encontraron productos
                   </TableCell>
                 </TableRow>
@@ -425,14 +428,16 @@ export default function InventoryPage() {
                     <TableCell>{product.brand}</TableCell>
                     <TableCell>{product.model}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>
-                        {product.provider && (
-                            <div className="flex items-center gap-1">
-                                <User className="h-3 w-3 text-muted-foreground" />
-                                {product.provider}
-                            </div>
-                        )}
-                    </TableCell>
+                    {user?.role === 'admin' && (
+                      <TableCell>
+                          {product.provider && (
+                              <div className="flex items-center gap-1">
+                                  <User className="h-3 w-3 text-muted-foreground" />
+                                  {product.provider}
+                              </div>
+                          )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       {product.barcode && (
                         <div className="flex items-center gap-1">
@@ -443,7 +448,7 @@ export default function InventoryPage() {
                       {product.imei && <div className="text-xs text-muted-foreground mt-1">IMEI: {product.imei}</div>}
                     </TableCell>
                     <TableCell>${product.price?.toFixed(2) || "0.00"}</TableCell>
-                    <TableCell>${product.cost?.toFixed(2) || "0.00"}</TableCell>
+                    {user?.role === 'admin' && <TableCell>${product.cost?.toFixed(2) || "0.00"}</TableCell>}
                     <TableCell>
                       <Badge variant={product.stock && product.stock > 0 ? "default" : "destructive"}>
                         {product.stock}
@@ -454,12 +459,16 @@ export default function InventoryPage() {
                         <Button variant="ghost" size="icon" onClick={() => handleSellProduct(product)} disabled={!product.stock || product.stock === 0}>
                           <ShoppingCart className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(product.id)}>
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        {user?.role === 'admin' && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(product.id)}>
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -479,7 +488,7 @@ export default function InventoryPage() {
         />
       )}
       
-      {editingProduct && (
+      {editingProduct && user?.role === 'admin' && (
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent>
             <DialogHeader>

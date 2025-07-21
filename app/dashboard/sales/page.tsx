@@ -7,20 +7,24 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Calendar, ShoppingCart, DollarSign, User, Download } from "lucide-react"
+import { Search, Calendar, ShoppingCart, DollarSign, User, Download, Eye } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import SaleDetailModal from "@/components/sale-detail-modal"
 
-// Interfaces actualizadas para reflejar la estructura de datos correcta
+// Interfaces
 interface UserType {
   username: string
   role: string
 }
 
 interface SaleItem {
-    productName: string;
-    quantity: number;
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  currency: 'USD' | 'ARS';
 }
 
 interface Sale {
@@ -28,10 +32,18 @@ interface Sale {
   date: string
   customerName?: string
   customerDni?: string
-  items: SaleItem[] // Las ventas ahora tienen un array de items
-  totalAmount: number // El precio ahora es totalAmount
+  items: SaleItem[]
+  totalAmount: number
   paymentMethod?: string
   [key: string]: any
+}
+
+interface Product {
+  id: string;
+  name?: string;
+  provider?: string;
+  cost?: number;
+  [key: string]: any;
 }
 
 interface SalesStats {
@@ -48,10 +60,14 @@ export default function SalesPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserType | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [dailySales, setDailySales] = useState<SalesStats>({ count: 0, total: 0 })
   const [weeklySales, setWeeklySales] = useState<SalesStats>({ count: 0, total: 0 })
   const [topProduct, setTopProduct] = useState<TopProductType>({ name: "", count: 0 })
+  
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -68,7 +84,7 @@ export default function SalesPage() {
     }
 
     const salesRef = ref(database, "sales")
-    const unsubscribe = onValue(salesRef, (snapshot) => {
+    const unsubscribeSales = onValue(salesRef, (snapshot) => {
       if (snapshot.exists()) {
         const salesData: Sale[] = []
         snapshot.forEach((childSnapshot) => {
@@ -88,9 +104,21 @@ export default function SalesPage() {
         setTopProduct({ name: "", count: 0 })
       }
     })
+    
+    const productsRef = ref(database, "products")
+    const unsubscribeProducts = onValue(productsRef, (snapshot) => {
+        if(snapshot.exists()) {
+            const productsData: Product[] = [];
+            snapshot.forEach(child => {
+                productsData.push({ id: child.key!, ...child.val() });
+            });
+            setProducts(productsData);
+        }
+    });
 
     return () => {
-      unsubscribe()
+      unsubscribeSales()
+      unsubscribeProducts()
     }
   }, [router])
 
@@ -133,6 +161,11 @@ export default function SalesPage() {
       sale.customerDni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sale.items?.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()))
   )
+
+  const handleViewDetails = (sale: Sale) => {
+    setSelectedSale(sale);
+    setIsDetailModalOpen(true);
+  };
 
   const downloadSaleReceipt = (sale: Sale) => {
     console.log("Descargar comprobante para la venta:", sale.id)
@@ -192,7 +225,6 @@ export default function SalesPage() {
             </Card>
         </div>
 
-
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -200,8 +232,8 @@ export default function SalesPage() {
                 <TableHead>Fecha</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>DNI</TableHead>
-                <TableHead>Producto</TableHead>
-                <TableHead>Precio</TableHead>
+                <TableHead>Productos</TableHead>
+                <TableHead>Total</TableHead>
                 <TableHead>Método de Pago</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -223,7 +255,7 @@ export default function SalesPage() {
                     </TableCell>
                     <TableCell>{sale.customerDni}</TableCell>
                     <TableCell>
-                        {sale.items?.map(item => item.productName).join(', ')}
+                        {sale.items?.map(item => `${item.quantity}x ${item.productName}`).join(', ')}
                     </TableCell>
                     <TableCell>${Number(sale.totalAmount).toFixed(2)}</TableCell>
                     <TableCell>
@@ -236,9 +268,12 @@ export default function SalesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => downloadSaleReceipt(sale)}>
-                        <Download className="h-4 w-4" />
-                      </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleViewDetails(sale)}>
+                            <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => downloadSaleReceipt(sale)}>
+                            <Download className="h-4 w-4" />
+                        </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -247,6 +282,14 @@ export default function SalesPage() {
           </Table>
         </div>
       </div>
+      
+      <SaleDetailModal 
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        sale={selectedSale}
+        products={products}
+        user={user}
+      />
     </DashboardLayout>
   )
 }
