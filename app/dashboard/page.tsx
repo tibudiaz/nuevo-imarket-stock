@@ -85,62 +85,68 @@ export default function Dashboard() {
     try {
       const parsedUser = JSON.parse(storedUser)
       setUser(parsedUser)
-      
-      const productsRef = ref(database, "products")
-      onValue(productsRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const productsData: Product[] = []
-          let totalInvestment = 0
-          snapshot.forEach((childSnapshot) => {
-            const product: Product = {
-              id: childSnapshot.key || "",
-              ...childSnapshot.val(),
-            }
-            productsData.push(product)
-            totalInvestment += Number(product.cost || 0) * Number(product.stock || 0)
-          })
-          
-          setProducts(productsData);
-
-          // Filtro para bajo stock excluyendo celulares
-          const lowStockAccessories = productsData.filter(p => 
-            p.stock !== undefined && 
-            p.stock <= 5 && 
-            p.category !== 'Celulares Nuevos' && 
-            p.category !== 'Celulares Usados'
-          );
-          
-          setLowStockProducts(lowStockAccessories);
-
-          // Alerta para ambos roles si hay bajo stock de accesorios
-          if (lowStockAccessories.length > 0) {
-              toast.warning(`${lowStockAccessories.length} productos con bajo stock!`, {
-                  description: 'Revisa el inventario de accesorios para reponer stock.',
-              });
-          }
-          
-          setDashboardData((prev) => ({
-            ...prev,
-            totalProducts: productsData.reduce((sum, p) => sum + (p.stock || 0), 0),
-            totalInvestment: totalInvestment,
-            productsGrowth: 12, // Simulado
-            investmentGrowth: 5.2, // Simulado
-          }))
-        }
-      })
     } catch (e) {
       localStorage.removeItem("user")
       router.push("/")
+    } finally {
+        setIsLoading(false)
     }
-
-    setIsLoading(false)
   }, [router])
+
+  useEffect(() => {
+    if (!user) return; // Espera a que el usuario esté verificado
+
+    const productsRef = ref(database, "products")
+    const unsubscribeProducts = onValue(productsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const productsData: Product[] = []
+        let totalInvestment = 0
+        snapshot.forEach((childSnapshot) => {
+          const product: Product = {
+            id: childSnapshot.key || "",
+            ...childSnapshot.val(),
+          }
+          productsData.push(product)
+          totalInvestment += Number(product.cost || 0) * Number(product.stock || 0)
+        })
+        
+        setProducts(productsData);
+
+        // Filtro para bajo stock excluyendo celulares
+        const lowStockAccessories = productsData.filter(p => 
+          p.stock !== undefined && 
+          p.stock <= 5 && 
+          p.category !== 'Celulares Nuevos' && 
+          p.category !== 'Celulares Usados'
+        );
+        
+        setLowStockProducts(lowStockAccessories);
+
+        // Alerta para ambos roles si hay bajo stock de accesorios
+        if (lowStockAccessories.length > 0) {
+            toast.warning(`${lowStockAccessories.length} productos con bajo stock!`, {
+                description: 'Revisa el inventario de accesorios para reponer stock.',
+            });
+        }
+        
+        setDashboardData((prev) => ({
+          ...prev,
+          totalProducts: productsData.reduce((sum, p) => sum + (p.stock || 0), 0),
+          totalInvestment: totalInvestment,
+          productsGrowth: 12, // Simulado
+          investmentGrowth: 5.2, // Simulado
+        }))
+      }
+    });
+
+    return () => unsubscribeProducts();
+  }, [user]);
 
   useEffect(() => {
     if (products.length === 0) return;
 
     const salesRef = ref(database, "sales")
-    onValue(salesRef, (snapshot) => {
+    const unsubscribeSales = onValue(salesRef, (snapshot) => {
       if (snapshot.exists()) {
         const salesData: Sale[] = []
         let totalSalesAmount = 0
@@ -200,6 +206,8 @@ export default function Dashboard() {
         }))
       }
     })
+    
+    return () => unsubscribeSales();
   }, [products]);
 
   if (isLoading || !user) {

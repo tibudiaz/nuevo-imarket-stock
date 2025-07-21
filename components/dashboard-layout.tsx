@@ -169,6 +169,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       router.push("/")
     }
   }
+  
+  const handleInventoryLinkClick = () => {
+    setIsInventoryOpen(false);
+  };
 
   const currentCategory = searchParams.get('category')
 
@@ -254,9 +258,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", isInventoryOpen && "rotate-180")}/>
                 </NavItem>
                 <CollapsibleContent className="space-y-1 pt-1 hidden group-hover:block">
-                  <Link href="/dashboard/inventory" className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", pathname === "/dashboard/inventory" && !currentCategory && "bg-slate-200 font-semibold")}>Todos</Link>
+                  <Link href="/dashboard/inventory" onClick={handleInventoryLinkClick} className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", pathname === "/dashboard/inventory" && !currentCategory && "bg-slate-200 font-semibold")}>Todos</Link>
                   {categories.map((category) => (
-                    <Link key={category} href={`/dashboard/inventory?category=${encodeURIComponent(category)}`} className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", currentCategory === category && "bg-slate-200 font-semibold")}>{category}</Link>
+                    <Link key={category} href={`/dashboard/inventory?category=${encodeURIComponent(category)}`} onClick={handleInventoryLinkClick} className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", currentCategory === category && "bg-slate-200 font-semibold")}>{category}</Link>
                   ))}
                 </CollapsibleContent>
               </Collapsible>
