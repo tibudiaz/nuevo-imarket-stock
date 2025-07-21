@@ -19,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getAuth, signOut, onAuthStateChanged } from "firebase/auth" // Importar onAuthStateChanged
+import { getAuth, signOut, onAuthStateChanged } from "firebase/auth"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -40,7 +40,6 @@ interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-// ... (El componente NavItem no cambia)
 const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = false, ...props }) => {
   const itemContent = (
     <div
@@ -84,30 +83,51 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [user, setUser] = useState<{ username: string; role: string } | null>(null)
   const [categories, setCategories] = useState<string[]>([])
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(true); // Nuevo estado de carga
+  const [isLoading, setIsLoading] = useState(true);
+  const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
+  const [isDolarLoading, setIsDolarLoading] = useState(true);
+
+  // --- Hook para obtener la cotización del Dólar Blue ---
+  useEffect(() => {
+    const fetchDolarBlue = async () => {
+      try {
+        const response = await fetch("https://dolarapi.com/v1/dolares/blue");
+        if (!response.ok) {
+          throw new Error('No se pudo obtener la cotización');
+        }
+        const data = await response.json();
+        setDolarBlueRate(data.venta);
+      } catch (error) {
+        console.error("Error al obtener dólar blue:", error);
+        setDolarBlueRate(null); // Poner en null si hay error
+      } finally {
+        setIsDolarLoading(false);
+      }
+    };
+
+    fetchDolarBlue(); // Primera llamada al cargar
+    const intervalId = setInterval(fetchDolarBlue, 180000); // Actualizar cada 3 minutos
+
+    return () => clearInterval(intervalId); // Limpiar el intervalo al desmontar
+  }, []);
 
   useEffect(() => {
     const auth = getAuth();
-    // Escuchar cambios en el estado de autenticación
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // Si hay un usuario, obtener sus datos de localStorage
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
           try {
             setUser(JSON.parse(storedUser));
           } catch (e) {
-            // Si hay un error, limpiar y redirigir
             localStorage.removeItem("user");
             router.push("/");
           }
         }
       } else {
-        // Si no hay usuario, limpiar y redirigir
         localStorage.removeItem("user");
         router.push("/");
       }
-      // Una vez que se resuelve el estado de auth, terminamos de cargar
       setIsLoading(false);
     });
 
@@ -158,7 +178,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     out: { opacity: 0, y: -5 },
   };
 
-  // Muestra un loader mientras se verifica la sesión
   if (isLoading) {
     return (
         <div className="flex h-screen items-center justify-center">
@@ -167,7 +186,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     );
   }
   
-  // Si no hay usuario después de cargar, no renderizar el layout
   if (!user) {
       return null;
   }
@@ -181,6 +199,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <span className="text-xl">iMarket</span>
           </Link>
           <div className="flex items-center gap-4">
+            {/* --- CONTENEDOR DE LA COTIZACIÓN DEL DÓLAR --- */}
+            <div className="hidden sm:flex items-center gap-2">
+                <span className="font-semibold text-sm text-blue-600">Dólar Blue:</span>
+                {isDolarLoading ? (
+                    <span className="text-sm text-muted-foreground">Cargando...</span>
+                ) : (
+                    <span className="font-bold text-sm">
+                        ${dolarBlueRate ? dolarBlueRate.toFixed(2) : 'N/A'}
+                    </span>
+                )}
+            </div>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -203,9 +233,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <DropdownMenuItem asChild><Link href="/dashboard/reports"><BarChart className="mr-2 h-4 w-4" /><span>Reportes</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/notifications"><Bell className="mr-2 h-4 w-4" /><span>Notificaciones</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/backup"><Database className="mr-2 h-4 w-4" /><span>Backup</span></Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2 h-4 w-4" /><span>Configuración</span></Link></DropdownMenuItem>
                   </>
                 )}
-                <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2 h-4 w-4" /><span>Configuración</span></Link></DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" /><span>Cerrar Sesión</span></DropdownMenuItem>
               </DropdownMenuContent>
@@ -233,7 +263,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               
               <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
               <NavItem href="/dashboard/repairs" icon={Wrench} label="Reparaciones" active={pathname === "/dashboard/repairs"} />
-              <NavItem href="/dashboard/customers" icon={Users} label="Clientes" active={pathname === "/dashboard/customers"} />
+              
+              {user?.role === 'admin' && (
+                <NavItem href="/dashboard/customers" icon={Users} label="Clientes" active={pathname === "/dashboard/customers"} />
+              )}
 
             </nav>
           </aside>

@@ -1,29 +1,29 @@
 // Ruta: lib/price-converter.ts
 
-// Este es el umbral para decidir si un precio está en USD o ARS.
-// Precios menores a este umbral se considerarán en USD.
-const USD_PRICE_THRESHOLD = 3000;
+// Umbral para decidir si un precio está en USD (menor a 3500) o ARS (3500 o más).
+const USD_PRICE_THRESHOLD = 3500;
 
 /**
  * Convierte un precio a pesos argentinos (ARS) si es necesario,
- * basándose en el umbral.
+ * basándose únicamente en el umbral de precio.
  * @param price - El precio del producto.
  * @param usdRate - La cotización actual del dólar.
  * @returns El precio convertido a ARS.
  */
-export const convertPrice = (price: number, currency: 'USD' | 'ARS', usdRate: number): number => {
+export const convertPrice = (price: number, usdRate: number): number => {
   // Si el precio es menor al umbral, se asume que es USD y se convierte.
-  // De lo contrario, se asume que ya está en ARS.
-  if (price < USD_PRICE_THRESHOLD || currency === 'USD') {
+  if (price < USD_PRICE_THRESHOLD) {
     return price * usdRate;
   }
+  
+  // De lo contrario, se asume que ya está en ARS y se devuelve tal cual.
   return price;
 };
 
 /**
  * Formatea un número como una moneda en pesos argentinos.
  * @param amount - El monto a formatear.
- * @returns El monto formateado como string (ej. "$1,234.50").
+ * @returns El monto formateado como string (ej. "$1.234,50").
  */
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('es-AR', {

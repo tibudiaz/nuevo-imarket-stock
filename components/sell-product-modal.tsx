@@ -26,13 +26,13 @@ interface CartProduct {
   id: string;
   name: string;
   price: number;
-  currency: 'USD' | 'ARS';
   stock: number;
   quantity: number;
   imei?: string;
-  barcode?: string; // Usaremos barcode para el número de serie de los celulares
+  barcode?: string;
   category?: string;
   model?: string;
+  provider?: string;
 }
 
 interface BundleRule {
@@ -62,12 +62,17 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [productSearchTerm, setProductSearchTerm] = useState("")
   const [usdRate, setUsdRate] = useState(0)
   const [isTradeIn, setIsTradeIn] = useState(false);
-  // Añadimos serialNumber al estado del tradeInProduct
   const [tradeInProduct, setTradeInProduct] = useState({ name: "", imei: "", price: 0, serialNumber: "" });
   const [bundles, setBundles] = useState<BundleRule[]>([]);
+  
+  // --- CORRECCIÓN: Nuevo estado para controlar la carga inicial ---
+  const [initialProductProcessed, setInitialProductProcessed] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      // Resetea el estado del producto procesado cada vez que se abre el modal
+      setInitialProductProcessed(false);
+      
       const productsRef = ref(database, "products")
       const unsubscribeProducts = onValue(productsRef, (snapshot) => {
         const data = snapshot.val() ? Object.entries(snapshot.val()).map(([id, value]) => ({ id, ...(value as object) })) : [];
@@ -85,10 +90,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         const bundleList: BundleRule[] = data ? Object.values(data) : [];
         setBundles(bundleList);
       });
-
-      if (product) {
-        handleAddProductToCart(product, true);
-      }
       
       const date = new Date()
       const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
@@ -106,7 +107,17 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setCustomer({ name: "", dni: "", phone: "", email: "" })
       setTradeInProduct({ name: "", imei: "", price: 0, serialNumber: "" });
     }
-  }, [isOpen, product])
+  }, [isOpen]);
+
+  // --- CORRECCIÓN: Nuevo useEffect para manejar la adición del producto inicial ---
+  useEffect(() => {
+    // Se ejecuta solo si el modal está abierto, hay un producto inicial, las dependencias de datos están cargadas, y aún no ha sido procesado.
+    if (isOpen && product && !initialProductProcessed && allProducts.length > 0 && bundles.length > 0) {
+      handleAddProductToCart(product, true);
+      setInitialProductProcessed(true); // Marca como procesado para evitar que se ejecute de nuevo
+    }
+  }, [isOpen, product, allProducts, bundles, initialProductProcessed]);
+
 
   const searchCustomerByDni = async () => {
     if (!customer.dni) {
@@ -150,7 +161,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       if (existingProductInCart) {
         return prevCart.map(item => item.id === productToAdd.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prevCart, { ...productToAdd, quantity: 1, currency: productToAdd.currency || 'USD' }];
+      return [...prevCart, { ...productToAdd, quantity: 1 }];
     });
     
     if (!isInitialProduct) {
@@ -195,7 +206,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   
         if (accessoryProduct) {
           if (accessoryProduct.stock > 0) {
-            accessoriesToAdd.push({ ...accessoryProduct, quantity: 1, price: 0, currency: 'ARS' });
+            accessoriesToAdd.push({ ...accessoryProduct, quantity: 1, price: 0 });
           } else {
             toast.warning(`Sin stock`, { description: `El accesorio para "${mainProductModel}" no tiene stock.` });
           }
@@ -223,8 +234,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     if (!productSearchTerm) return [];
     return allProducts.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()) && p.stock > 0);
   }, [productSearchTerm, allProducts]);
+  
   const totalAmountInARS = useMemo(() => {
-    const cartTotal = cart.reduce((sum, item) => sum + (convertPrice(item.price, item.currency, usdRate) * item.quantity), 0);
+    const cartTotal = cart.reduce((sum, item) => sum + (convertPrice(item.price, usdRate) * item.quantity), 0);
     const tradeInValueInARS = isTradeIn ? tradeInProduct.price * usdRate : 0;
     return cartTotal - tradeInValueInARS;
   }, [cart, usdRate, isTradeIn, tradeInProduct.price]);
@@ -281,7 +293,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 id: newProductRef.key,
                 name: tradeInProduct.name,
                 imei: tradeInProduct.imei,
-                barcode: tradeInProduct.serialNumber, // Guardamos el N/S en barcode
+                barcode: tradeInProduct.serialNumber,
                 brand: "Apple",
                 model: "Celular",
                 category: "Celulares Usados",
@@ -309,9 +321,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 productName: item.name,
                 quantity: item.quantity,
                 price: item.price,
-                currency: item.currency,
                 imei: item.imei || null,
-                barcode: item.barcode || null, // Incluimos el N/S
+                barcode: item.barcode || null,
+                provider: item.provider || null,
             })),
             paymentMethod,
             totalAmount: totalAmountInARS,
@@ -358,8 +370,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                           <div>
                             <p className="font-medium">{item.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {item.price === 0 ? <span className="font-bold text-green-600">Regalo</span> : formatCurrency(convertPrice(item.price, item.currency, usdRate) * item.quantity)}
-                              {item.currency === 'USD' && item.price > 0 && <span className="text-xs text-blue-500"> ({item.quantity} x ${item.price})</span>}
+                              {item.price === 0 ? <span className="font-bold text-green-600">Regalo</span> : formatCurrency(convertPrice(item.price, usdRate) * item.quantity)}
+                              {item.price < 3500 && item.price > 0 && <span className="text-xs text-blue-500"> ({item.quantity} x ${item.price} USD)</span>}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -379,7 +391,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     {searchedProducts.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 hover:bg-accent cursor-pointer" onClick={() => handleAddProductToCart(p)}>
                             <div><p className="font-medium">{p.name}</p><p className="text-xs text-muted-foreground">Stock: {p.stock}</p></div>
-                            <span className="text-sm font-semibold">{formatCurrency(convertPrice(p.price, p.currency || 'USD', usdRate))}</span>
+                            <span className="text-sm font-semibold">{formatCurrency(convertPrice(p.price, usdRate))}</span>
                         </div>
                     ))}
                   </ScrollArea>
