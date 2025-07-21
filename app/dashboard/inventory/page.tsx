@@ -17,19 +17,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Edit, Trash, ShoppingCart, Barcode, User } from "lucide-react"
+import { Plus, Search, Edit, Trash, ShoppingCart, Barcode, User } from "lucide-react" // Se elimina Camera
 import { ref, onValue, set, push, remove, update } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import SellProductModal from "@/components/sell-product-modal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useMobile } from "@/hooks/use-mobile" // Se importa el hook useMobile
 
-// --- Interfaces Actualizadas ---
+// --- Interfaces (sin cambios) ---
 interface User {
   username: string
   role: string
 }
-
 interface Product {
   id: string
   name?: string
@@ -44,7 +44,6 @@ interface Product {
   provider?: string;
   [key: string]: any
 }
-
 interface NewProduct {
   name: string
   brand: string
@@ -55,9 +54,8 @@ interface NewProduct {
   category: string
   barcode: string
   imei: string
-  provider: string; // Se añade el proveedor
+  provider: string;
 }
-
 interface Category {
   id: string;
   name: string;
@@ -67,7 +65,9 @@ export default function InventoryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const categorySearch = searchParams.get('category')
+  const isMobile = useMobile(); // <- Se inicializa el hook
 
+  // ... (toda la lógica de useState, useEffect, etc., se mantiene igual hasta el return)
   const [user, setUser] = useState<User | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -87,7 +87,7 @@ export default function InventoryPage() {
     category: "",
     barcode: "",
     imei: "",
-    provider: "", // Se inicializa el proveedor
+    provider: "",
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
@@ -251,10 +251,10 @@ export default function InventoryPage() {
       </DashboardLayout>
     )
   }
-
+  
   return (
     <DashboardLayout>
-      <div className="p-6">
+      <div className="p-4 md:p-6"> {/* Se aplica la misma corrección de padding */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Inventario</h1>
           <div className="flex items-center gap-4">
@@ -268,7 +268,6 @@ export default function InventoryPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            {/* --- BOTÓN AGREGAR PRODUCTO (SOLO ADMIN) --- */}
             {user?.role === 'admin' && (
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
@@ -338,6 +337,7 @@ export default function InventoryPage() {
                               <div className="space-y-2">
                                   <Label htmlFor="imei">IMEI</Label>
                                   <Input id="imei" value={newProduct.imei} onChange={(e) => setNewProduct({ ...newProduct, imei: e.target.value })} />
+                                  {isMobile && <p className="text-xs text-muted-foreground pt-1">Mantén presionado para "Escanear texto" con la cámara.</p>}
                               </div>
                               <div className="space-y-2">
                                   <Label htmlFor="barcode">Número de Serie</Label>
@@ -543,6 +543,7 @@ export default function InventoryPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="edit-imei">IMEI</Label>
                                 <Input id="edit-imei" value={editingProduct.imei} onChange={(e) => setEditingProduct({...editingProduct, imei: e.target.value})} />
+                                {isMobile && <p className="text-xs text-muted-foreground pt-1">Mantén presionado para "Escanear texto" con la cámara.</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="edit-barcode">Número de Serie</Label>

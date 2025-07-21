@@ -35,6 +35,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { motion, AnimatePresence } from "framer-motion"
+import MobileMenu from "@/components/mobile-menu" // <- IMPORTACIÓN AÑADIDA
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -198,10 +199,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     <TooltipProvider delayDuration={0}>
       <div className="flex min-h-screen w-full flex-col bg-slate-50">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
-          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-             <Package className="h-6 w-6" />
-            <span className="text-xl">iMarket</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* INICIO: Integración del Menú Móvil */}
+            <MobileMenu userRole={user.role} />
+            {/* FIN: Integración del Menú Móvil */}
+            <Link href="/dashboard" className="hidden md:flex items-center gap-2 font-semibold">
+              <Package className="h-6 w-6" />
+              <span className="text-xl">iMarket</span>
+            </Link>
+          </div>
           <div className="flex items-center gap-4">
             {/* --- CONTENEDOR DE LA COTIZACIÓN DEL DÓLAR --- */}
             <div className="hidden sm:flex items-center gap-2">
@@ -277,14 +283,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <div className="flex-1 overflow-y-auto">
             <AnimatePresence mode="wait">
-              <motion.main
+                <motion.main
                 key={pathname + searchParams.toString()}
                 variants={pageVariants}
                 initial="initial"
                 animate="in"
                 exit="out"
                 transition={{ duration: 0.2, ease: "easeInOut" }}
-                className="p-6"
+                // --- INICIO DE LA CORRECCIÓN ---
+                className="p-4 md:p-6" // Se ajusta el padding para móviles
+                // --- FIN DE LA CORRECCIÓN ---
               >
                 {children}
               </motion.main>

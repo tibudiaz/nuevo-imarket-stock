@@ -1,10 +1,19 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useEffect, useRef } from "react"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Camera, X, Check, RotateCcw } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { X } from "lucide-react"
+
+// --- DECLARACIÓN DE TIPOS PARA LA LIBRERÍA EXTERNA ---
+// Esto ayuda a TypeScript a entender la librería que cargaremos dinámicamente.
+declare global {
+  interface Window {
+    Html5QrcodeScanner: any;
+    Html5Qrcode: any;
+  }
+}
 
 interface MobileScannerProps {
   onScan: (data: string) => void
@@ -12,130 +21,86 @@ interface MobileScannerProps {
 }
 
 export default function MobileScanner({ onScan, onClose }: MobileScannerProps) {
-  const { toast } = useToast()
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [isScanning, setIsScanning] = useState(false)
-  const [hasPermission, setHasPermission] = useState(false)
-  const [errorMessage, setErrorMessage] = useState("")
+  const scannerRef = useRef<any>(null);
 
   useEffect(() => {
-    let stream: MediaStream | null = null
+    // Cargar el script de la librería de escaneo de forma dinámica
+    const script = document.createElement("script")
+    script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
+    script.async = true
+    script.onload = () => {
+      // Una vez cargado el script, inicializamos el escáner
+      
+      const onScanSuccess = (decodedText: string, decodedResult: any) => {
+        // Cuando se escanea un código correctamente
+        console.log(`Código detectado: ${decodedText}`, decodedResult);
+        toast.success("Código detectado", {
+          description: `Valor: ${decodedText}`
+        });
 
-    const startCamera = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        })
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          setHasPermission(true)
-          setIsScanning(true)
+        // Detenemos el escáner para evitar múltiples detecciones
+        if (scannerRef.current) {
+          scannerRef.current.clear().catch((error: any) => {
+            console.error("Fallo al detener el escáner.", error);
+          });
         }
-      } catch (error) {
-        console.error("Error accessing camera:", error)
-        setErrorMessage("No se pudo acceder a la cámara. Por favor, verifique los permisos.")
-        setHasPermission(false)
-      }
-    }
+        
+        // Enviamos el dato escaneado al componente padre
+        onScan(decodedText);
+      };
 
-    startCamera()
+      const onScanFailure = (error: any) => {
+        // Ignoramos los errores de "QR code not found" que son constantes
+      };
+      
+      // Creamos la instancia del escáner
+      const html5QrcodeScanner = new window.Html5QrcodeScanner(
+        "reader", // ID del div donde se renderizará
+        {
+          fps: 10, // Frames por segundo para el escaneo
+          qrbox: { width: 250, height: 250 }, // Tamaño del cuadro de escaneo
+          supportedScanTypes: [0], // 0 para escanear con la cámara
+          rememberLastUsedCamera: true, // Recordar la última cámara usada
+        },
+        false // `verbose` en falso para no mostrar logs en consola
+      );
 
+      // Renderizamos el escáner
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+      scannerRef.current = html5QrcodeScanner;
+    };
+
+    document.body.appendChild(script);
+
+    // --- FUNCIÓN DE LIMPIEZA ---
+    // Se ejecuta cuando el componente se desmonta
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
+      if (scannerRef.current) {
+        // Nos aseguramos de que el escáner y la cámara se detengan
+        scannerRef.current.clear().catch((error: any) => {
+          console.error("Fallo al limpiar el escáner al desmontar.", error);
+        });
       }
-    }
-  }, [])
-
-  const captureImage = () => {
-    if (!videoRef.current || !canvasRef.current) return
-
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const context = canvas.getContext("2d")
-
-    if (!context) return
-
-    // Establecer dimensiones del canvas al tamaño del video
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-
-    // Dibujar el frame actual del video en el canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    // En una implementación real, aquí se procesaría la imagen para detectar códigos de barras o QR
-    // Para este ejemplo, simulamos una detección exitosa después de un breve retraso
-    setIsScanning(false)
-
-    setTimeout(() => {
-      // Simular un código de barras detectado (por ejemplo, un DNI)
-      const simulatedBarcode = Math.floor(10000000 + Math.random() * 90000000).toString()
-
-      toast({
-        title: "Código detectado",
-        description: `Se ha detectado el código: ${simulatedBarcode}`,
-      })
-
-      onScan(simulatedBarcode)
-    }, 1500)
-  }
-
-  const resetScanner = () => {
-    setIsScanning(true)
-  }
+      document.body.removeChild(script);
+    };
+  }, [onScan]);
 
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
         <CardTitle>Escanear Código</CardTitle>
-        <CardDescription>Apunte la cámara al código de barras o QR</CardDescription>
+        <CardDescription>Apunta la cámara al código de barras o QR del producto.</CardDescription>
       </CardHeader>
       <CardContent>
-        {hasPermission ? (
-          <div className="relative">
-            <video ref={videoRef} autoPlay playsInline className="w-full h-64 object-cover rounded-md" />
-            <canvas ref={canvasRef} className="hidden" />
-
-            {isScanning && (
-              <div className="absolute inset-0 border-2 border-dashed border-primary rounded-md flex items-center justify-center">
-                <div className="w-48 h-1 bg-primary opacity-50"></div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-muted h-64 rounded-md flex items-center justify-center">
-            <p className="text-muted-foreground text-center px-4">
-              {errorMessage || "Esperando acceso a la cámara..."}
-            </p>
-          </div>
-        )}
+        {/* Este div es donde la librería renderizará la vista de la cámara */}
+        <div id="reader" className="w-full"></div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={onClose}>
+      <CardFooter>
+        <Button variant="outline" className="w-full" onClick={onClose}>
           <X className="mr-2 h-4 w-4" />
           Cancelar
         </Button>
-
-        {isScanning ? (
-          <Button onClick={captureImage} disabled={!hasPermission}>
-            <Camera className="mr-2 h-4 w-4" />
-            Capturar
-          </Button>
-        ) : (
-          <div className="space-x-2">
-            <Button variant="outline" onClick={resetScanner}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reintentar
-            </Button>
-            <Button onClick={() => onScan("12345678")}>
-              <Check className="mr-2 h-4 w-4" />
-              Confirmar
-            </Button>
-          </div>
-        )}
       </CardFooter>
     </Card>
-  )
+  );
 }
