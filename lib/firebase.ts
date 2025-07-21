@@ -1,3 +1,5 @@
+// Ruta: lib/firebase.ts
+
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
@@ -25,43 +27,39 @@ function checkFirebaseConfig(config: typeof firebaseConfig): string | null {
   return null;
 }
 
-// Inicializa Firebase de forma segura
+// --- Inicialización Segura de Firebase ---
 let app: FirebaseApp;
 let database: Database;
 let storage: FirebaseStorage;
 let auth: Auth;
-
 const configError = checkFirebaseConfig(firebaseConfig);
 
 if (configError) {
-  // Si faltan claves, lanzamos un error claro en la consola del navegador y del servidor
   console.error("ERROR GRAVE DE CONFIGURACIÓN DE FIREBASE:", configError);
-  // Dejamos los objetos vacíos para que la app no se rompa por completo
-  app = {} as FirebaseApp;
-  database = {} as Database;
-  storage = {} as FirebaseStorage;
-  auth = {} as Auth;
-} else {
-  try {
-    if (!getApps().length) {
-      app = initializeApp(firebaseConfig);
-      console.log("Firebase se ha inicializado correctamente.");
-    } else {
-      app = getApp();
-      console.log("Usando la instancia de Firebase existente.");
-    }
+}
 
+// Inicializa Firebase solo si no se ha hecho ya
+if (!getApps().length) {
+  if (!configError) {
+    app = initializeApp(firebaseConfig);
+    console.log("Firebase se ha inicializado correctamente.");
+  } else {
+    console.error("La inicialización de Firebase se ha omitido debido a la falta de variables de entorno.");
+  }
+} else {
+  app = getApp();
+}
+
+// Asegúrate de que la app se inicializó antes de obtener los servicios
+if (app) {
     database = getDatabase(app);
     storage = getStorage(app);
     auth = getAuth(app);
-
-  } catch (error) {
-    console.error("Error al inicializar los servicios de Firebase:", error);
-    app = {} as FirebaseApp;
+} else {
+    // Si la app no se pudo inicializar, asignamos placeholders para evitar más errores
     database = {} as Database;
     storage = {} as FirebaseStorage;
     auth = {} as Auth;
-  }
 }
 
 export { app, database, storage, auth, configError };
