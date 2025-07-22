@@ -167,7 +167,7 @@ export default function Dashboard() {
 
           const saleDate = new Date(sale.date || "")
           
-          if (saleDate >= today) {
+          if (sale.date && saleDate >= today) {
               salesFromToday.push(sale);
           }
           
@@ -356,7 +356,8 @@ export default function Dashboard() {
                               {dailySalesData.length > 0 ? (
                                   dailySalesData.map(sale => (
                                       <TableRow key={sale.id}>
-                                          <TableCell>{new Date(sale.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                          {/* --- CORRECCIÓN 1: Verificamos si la fecha existe --- */}
+                                          <TableCell>{sale.date ? new Date(sale.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</TableCell>
                                           <TableCell>
                                               <div className="flex items-center gap-2">
                                                   <User className="h-4 w-4 text-muted-foreground" />
@@ -364,7 +365,8 @@ export default function Dashboard() {
                                               </div>
                                           </TableCell>
                                           <TableCell>{sale.items.map(item => item.productName).join(', ')}</TableCell>
-                                          <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                                           {/* --- CORRECCIÓN 2: Verificamos si el monto existe y lo formateamos --- */}
+                                          <TableCell className="text-right">${(sale.totalAmount || 0).toFixed(2)}</TableCell>
                                       </TableRow>
                                   ))
                               ) : (

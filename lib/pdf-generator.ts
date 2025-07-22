@@ -1,19 +1,72 @@
 import { getDownloadURL, ref as storageRef } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { toast } from "sonner";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFFont } from "pdf-lib";
 
-// --- NUEVA FUNCIÓN DE FORMATO DE MONEDA ---
-/**
- * Formatea un número como moneda ARS sin decimales y con punto de mil.
- * @param amount El monto a formatear.
- * @returns El monto formateado como string (ej. "$150.000").
- */
-const formatCurrencyForPdf = (amount: number): string => {
-  const roundedAmount = Math.round(amount);
+// --- INTERFACES PARA TIPADO SEGURO ---
+// Ayudan a prevenir errores si faltan datos.
+interface SaleItem {
+  productName: string;
+  quantity: number;
+  price: number;
+  currency?: 'USD' | 'ARS';
+  imei?: string;
+  barcode?: string;
+}
+
+interface TradeIn {
+  name: string;
+  price: number;
+  imei?: string;
+  serialNumber?: string;
+}
+
+interface Sale {
+  receiptNumber: string;
+  date: string;
+  customerName: string;
+  customerDni: string;
+  customerPhone: string;
+  items: SaleItem[];
+  totalAmount: number;
+  usdRate?: number;
+  tradeIn?: TradeIn;
+}
+
+interface Repair {
+    receiptNumber: string;
+    entryDate: string;
+    productName: string;
+    imei?: string;
+    unlockPin?: string;
+    description: string;
+    estimatedPrice: number;
+    finalPrice?: number;
+    technicianNotes?: string;
+    deliveredAt?: string;
+    customerName?: string;
+    customerDni?: string;
+    customerPhone?: string;
+}
+
+interface Customer {
+    name: string;
+    dni: string;
+    phone: string;
+}
+
+interface Fonts {
+    helveticaFont: PDFFont;
+    helveticaBold: PDFFont;
+}
+
+
+// --- NUEVA FUNCIÓN DE FORMATO DE MONEDA (MÁS SEGURA) ---
+const formatCurrencyForPdf = (amount: number | undefined | null): string => {
+  const numAmount = Number(amount || 0);
+  const roundedAmount = Math.round(numAmount);
   return `$${roundedAmount.toLocaleString('es-AR')}`;
 };
-
 
 // Función para verificar si una plantilla PDF existe en Firebase Storage
 const checkPdfExists = async (path: string): Promise<boolean> => {
@@ -28,7 +81,7 @@ const checkPdfExists = async (path: string): Promise<boolean> => {
 };
 
 // --- Generador de PDF para Ventas ---
-export const generateSaleReceiptPdf = async (completedSale: any) => {
+export const generateSaleReceiptPdf = async (completedSale: Sale) => {
   if (!completedSale) {
     toast.error("Error", { description: "No hay datos de la venta para generar el PDF." });
     return;
@@ -39,9 +92,7 @@ export const generateSaleReceiptPdf = async (completedSale: any) => {
   });
 
   try {
-    const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
     let pdfDoc: PDFDocument;
-
     const pdfTemplatePath = "templates/factura.pdf";
     const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
 
@@ -77,7 +128,7 @@ export const generateSaleReceiptPdf = async (completedSale: any) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Recibo-${completedSale.receiptNumber}.pdf`;
+    link.download = `Recibo-${completedSale.receiptNumber || 'venta'}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -90,9 +141,8 @@ export const generateSaleReceiptPdf = async (completedSale: any) => {
   }
 };
 
-const drawSalePdfContent = (page, saleData, fonts) => {
+const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
-
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
@@ -108,24 +158,25 @@ const drawSalePdfContent = (page, saleData, fonts) => {
         precioFinal: { x: 455, y: 290 },
     };
 
-    const formattedDate = new Date(saleData.date).toLocaleDateString();
+    const formattedDate = saleData.date ? new Date(saleData.date).toLocaleDateString() : 'N/A';
 
-    page.drawText(String(saleData.receiptNumber), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
+    page.drawText(String(saleData.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
     page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
-    page.drawText(String(saleData.customerName), { ...positions.nombreCliente, size: 10, font: helveticaFont });
-    page.drawText(String(saleData.customerDni), { ...positions.dniCliente, size: 10, font: helveticaFont });
-    page.drawText(String(saleData.customerPhone), { ...positions.celCliente, size: 10, font: helveticaFont });
+    page.drawText(String(saleData.customerName || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
+    page.drawText(String(saleData.customerDni || ''), { ...positions.dniCliente, size: 10, font: helveticaFont });
+    page.drawText(String(saleData.customerPhone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
 
     let currentY = positions.itemStartY;
     const itemLineHeight = 15;
 
-    saleData.items.forEach(item => {
-        const itemPrice = item.price * (item.currency === 'USD' ? saleData.usdRate : 1);
-        const totalPrice = itemPrice * item.quantity;
+    // --- CORRECCIÓN: Se asegura de que `items` sea un array antes de iterar ---
+    (saleData.items || []).forEach(item => {
+        const itemPrice = (item.price || 0) * (item.currency === 'USD' ? (saleData.usdRate || 1) : 1);
+        const totalPrice = itemPrice * (item.quantity || 1);
         
-        const displayName = item.imei ? item.productName : `${item.quantity}x ${item.productName}`;
+        const displayName = item.imei ? item.productName : `${item.quantity || 1}x ${item.productName}`;
         
-        page.drawText(displayName, { x: positions.itemStartX, y: currentY, size: 10, font: helveticaFont });
+        page.drawText(displayName || 'Producto sin nombre', { x: positions.itemStartX, y: currentY, size: 10, font: helveticaFont });
         
         if (item.price > 0) {
            page.drawText(formatCurrencyForPdf(totalPrice), { x: positions.priceStartX, y: currentY, size: 10, font: helveticaFont });
@@ -146,16 +197,17 @@ const drawSalePdfContent = (page, saleData, fonts) => {
 
     const finalAmount = saleData.totalAmount || 0;
     
+    // --- CORRECCIÓN: Se verifica que `tradeIn` y sus propiedades existan ---
     if (saleData.tradeIn && saleData.tradeIn.price > 0) {
-        const cartTotal = saleData.items.reduce((sum, item) => {
-            const priceInArs = item.price * (item.currency === 'USD' ? saleData.usdRate : 1);
-            return sum + (priceInArs * item.quantity);
+        const cartTotal = (saleData.items || []).reduce((sum, item) => {
+            const priceInArs = (item.price || 0) * (item.currency === 'USD' ? (saleData.usdRate || 1) : 1);
+            return sum + (priceInArs * (item.quantity || 1));
         }, 0);
-        const tradeInValue = saleData.tradeIn.price * saleData.usdRate;
+        const tradeInValue = (saleData.tradeIn.price || 0) * (saleData.usdRate || 1);
 
         page.drawText(`Subtotal: ${formatCurrencyForPdf(cartTotal)}`, { ...positions.subtotal, size: 10, font: helveticaFont });
         
-        const tradeInName = `Parte de Pago: ${saleData.tradeIn.name}`;
+        const tradeInName = `Parte de Pago: ${saleData.tradeIn.name || ''}`;
         let tradeInIdentifiers = [];
         if (saleData.tradeIn.serialNumber) tradeInIdentifiers.push(`S/N: ${saleData.tradeIn.serialNumber}`);
         if (saleData.tradeIn.imei) tradeInIdentifiers.push(`IMEI: ${saleData.tradeIn.imei}`);
@@ -175,7 +227,7 @@ const drawSalePdfContent = (page, saleData, fonts) => {
 
 
 // --- Generador de PDF para Reparaciones (Presupuesto) ---
-export const generateRepairReceiptPdf = async (repairData: any, customerData: any) => {
+export const generateRepairReceiptPdf = async (repairData: Repair, customerData: Customer) => {
   if (!repairData || !customerData) {
     toast.error("Error", { description: "No hay datos para generar el PDF de reparación." });
     return;
@@ -186,9 +238,7 @@ export const generateRepairReceiptPdf = async (repairData: any, customerData: an
   });
 
   try {
-    const { PDFDocument, StandardFonts } = await import("pdf-lib");
     let pdfDoc: PDFDocument;
-    
     const pdfTemplatePath = "templates/presupuesto.pdf";
     const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
 
@@ -224,7 +274,7 @@ export const generateRepairReceiptPdf = async (repairData: any, customerData: an
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Presupuesto-${repairData.receiptNumber}.pdf`;
+    link.download = `Presupuesto-${repairData.receiptNumber || 'reparacion'}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -237,9 +287,8 @@ export const generateRepairReceiptPdf = async (repairData: any, customerData: an
   }
 };
 
-const drawRepairPdfContent = (page, repair, customer, fonts) => {
+const drawRepairPdfContent = (page: any, repair: Repair, customer: Customer, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
-
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
@@ -254,15 +303,15 @@ const drawRepairPdfContent = (page, repair, customer, fonts) => {
         priceFinalY: 290
     };
 
-    const formattedDate = new Date(repair.entryDate).toLocaleDateString();
+    const formattedDate = repair.entryDate ? new Date(repair.entryDate).toLocaleDateString() : 'N/A';
 
-    page.drawText(String(repair.receiptNumber), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
+    page.drawText(String(repair.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
     page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
-    page.drawText(String(customer.name), { ...positions.nombreCliente, size: 10, font: helveticaFont });
-    page.drawText(String(customer.dni), { ...positions.dniCliente, size: 10, font: helveticaFont });
-    page.drawText(String(customer.phone), { ...positions.celCliente, size: 10, font: helveticaFont });
+    page.drawText(String(customer.name || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
+    page.drawText(String(customer.dni || ''), { ...positions.dniCliente, size: 10, font: helveticaFont });
+    page.drawText(String(customer.phone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
 
-    page.drawText(repair.productName, { x: positions.itemStartX, y: positions.itemStartY, size: 12, font: helveticaFont });
+    page.drawText(repair.productName || 'Equipo no especificado', { x: positions.itemStartX, y: positions.itemStartY, size: 12, font: helveticaFont });
 
     let identifiers = [];
     if (repair.unlockPin) identifiers.push(`PIN: ${repair.unlockPin}`);
@@ -273,7 +322,7 @@ const drawRepairPdfContent = (page, repair, customer, fonts) => {
     }
 
     page.drawText("Falla reportada:", { x: positions.itemStartX, y: positions.descriptionY, size: 10, font: helveticaBold });
-    page.drawText(repair.description, { x: positions.itemStartX, y: positions.descriptionY - 15, size: 10, font: helveticaFont });
+    page.drawText(repair.description || 'Sin descripción.', { x: positions.itemStartX, y: positions.descriptionY - 15, size: 10, font: helveticaFont });
 
     const priceText = formatCurrencyForPdf(repair.estimatedPrice);
     page.drawText("Presupuesto Estimado:", { x: positions.priceStartX - 110, y: positions.priceFinalY, size: 12, font: helveticaBold });
@@ -282,7 +331,7 @@ const drawRepairPdfContent = (page, repair, customer, fonts) => {
 
 
 // --- Generador de PDF para Entregas ---
-export const generateDeliveryReceiptPdf = async (repairData: any) => {
+export const generateDeliveryReceiptPdf = async (repairData: Repair) => {
   if (!repairData) {
     toast.error("Error", { description: "No hay datos para generar el comprobante de entrega." });
     return;
@@ -293,9 +342,7 @@ export const generateDeliveryReceiptPdf = async (repairData: any) => {
   });
 
   try {
-    const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
     let pdfDoc: PDFDocument;
-    
     const pdfTemplatePath = "templates/entrega.pdf";
     const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
 
@@ -318,14 +365,14 @@ export const generateDeliveryReceiptPdf = async (repairData: any) => {
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const firstPage = pdfDoc.getPages()[0];
     
-    drawDeliveryPdfContent(firstPage, repairData, {name: repairData.customerName, dni: repairData.customerDni, phone: repairData.customerPhone }, { helveticaFont, helveticaBold });
+    drawDeliveryPdfContent(firstPage, repairData, { helveticaFont, helveticaBold });
 
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Entrega-${repairData.receiptNumber}.pdf`;
+    link.download = `Entrega-${repairData.receiptNumber || 'reparacion'}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -338,9 +385,8 @@ export const generateDeliveryReceiptPdf = async (repairData: any) => {
   }
 };
 
-const drawDeliveryPdfContent = (page, repair, customer, fonts) => {
+const drawDeliveryPdfContent = (page: any, repair: Repair, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
-
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
@@ -357,13 +403,13 @@ const drawDeliveryPdfContent = (page, repair, customer, fonts) => {
 
     const formattedDate = new Date(repair.deliveredAt || repair.entryDate).toLocaleDateString();
 
-    page.drawText(String(repair.receiptNumber), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
+    page.drawText(String(repair.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
     page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
-    page.drawText(String(customer.name), { ...positions.nombreCliente, size: 10, font: helveticaFont });
-    page.drawText(String(customer.dni), { ...positions.dniCliente, size: 10, font: helveticaFont });
-    page.drawText(String(customer.phone), { ...positions.celCliente, size: 10, font: helveticaFont });
+    page.drawText(String(repair.customerName || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
+    page.drawText(String(repair.customerDni || ''), { ...positions.dniCliente, size: 10, font: helveticaFont });
+    page.drawText(String(repair.customerPhone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
 
-    page.drawText(repair.productName, { x: positions.itemStartX, y: positions.itemStartY, size: 12, font: helveticaFont });
+    page.drawText(repair.productName || 'Equipo no especificado', { x: positions.itemStartX, y: positions.itemStartY, size: 12, font: helveticaFont });
 
     let identifiers = [];
     if (repair.unlockPin) identifiers.push(`PIN: ${repair.unlockPin}`);

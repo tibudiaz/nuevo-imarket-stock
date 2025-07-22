@@ -1,339 +1,134 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import DashboardLayout from "@/components/dashboard-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Search, Calendar, User, Clock, AlertTriangle, CheckCircle, Download } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ref, onValue, update } from "firebase/database"
+import { useState } from "react"
+import { ref, set, push, update } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { toast } from "sonner" // CORRECCIÓN
-import CompleteReserveModal from "@/components/complete-reserve-modal"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
-// ... (El resto del archivo se mantiene igual)
-interface User {
-  username: string
-  role: string
+export interface Reserve {
+  id: string;
+  date: string;
+  expirationDate: string;
+  customerName?: string;
+  customerDni?: string;
+  productName?: string;
+  productPrice?: number;
+  productId?: string;
+  productStock?: number;
+  downPayment?: number;
+  remainingAmount?: number;
+  status: string;
+  [key: string]: any;
 }
 
-interface Reserve {
-  id: string
-  date: string
-  expirationDate: string
-  customerName?: string
-  customerDni?: string
-  productName?: string
-  productPrice?: number
-  productId?: string
-  productStock?: number
-  downPayment?: number
-  remainingAmount?: number
-  status: string
-  [key: string]: any
+interface CompleteReserveModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  reserve: Reserve | null;
+  onReserveCompleted: () => void;
 }
 
-interface ReserveStats {
-  active: number
-  expired: number
-  completed: number
-  total: number
-}
+export default function CompleteReserveModal({ isOpen, onClose, reserve, onReserveCompleted }: CompleteReserveModalProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("efectivo");
 
-export default function ReservesPage() {
-  const router = useRouter()
-  // Se elimina useToast
-  const [user, setUser] = useState<User | null>(null)
-  const [reserves, setReserves] = useState<Reserve[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedReserve, setSelectedReserve] = useState<Reserve | null>(null)
-  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false)
-  const [reserveStats, setReserveStats] = useState<ReserveStats>({
-    active: 0,
-    expired: 0,
-    completed: 0,
-    total: 0,
-  })
+  const handleCompleteSale = async () => {
+    if (!reserve) return;
 
-  useEffect(() => {
-    // Verificar autenticación
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
-
+    setIsLoading(true);
     try {
-      setUser(JSON.parse(storedUser))
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
-    }
+      // 1. Crear una nueva venta con el saldo restante
+      const newSaleRef = push(ref(database, "sales"));
+      const saleData = {
+        id: newSaleRef.key,
+        date: new Date().toISOString(),
+        customerId: reserve.customerId,
+        customerName: reserve.customerName,
+        customerDni: reserve.customerDni,
+        items: [{
+          productId: reserve.productId,
+          productName: reserve.productName,
+          quantity: 1,
+          price: reserve.productPrice,
+        }],
+        paymentMethod,
+        totalAmount: reserve.remainingAmount, // Se registra el pago del saldo
+        notes: `Venta completada desde reserva #${reserve.id}`,
+      };
+      await set(newSaleRef, saleData);
 
-    // Cargar reservas desde Firebase
-    const reservesRef = ref(database, "reserves")
-    const unsubscribe = onValue(reservesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const reservesData: Reserve[] = []
-        snapshot.forEach((childSnapshot) => {
-          reservesData.push({
-            id: childSnapshot.key || "",
-            ...childSnapshot.val(),
-          })
-        })
-
-        // Ordenar por fecha (más reciente primero)
-        reservesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-        setReserves(reservesData)
-        calculateReserveStats(reservesData)
-      } else {
-        setReserves([])
-        setReserveStats({
-          active: 0,
-          expired: 0,
-          completed: 0,
-          total: 0,
-        })
-      }
-    })
-
-    return () => {
-      unsubscribe()
-    }
-  }, [router])
-
-  const calculateReserveStats = (reservesData: Reserve[]) => {
-    const now = new Date()
-
-    const active = reservesData.filter(
-      (reserve) => reserve.status === "reserved" && new Date(reserve.expirationDate) > now,
-    ).length
-
-    const expired = reservesData.filter(
-      (reserve) => reserve.status === "reserved" && new Date(reserve.expirationDate) <= now,
-    ).length
-
-    const completed = reservesData.filter((reserve) => reserve.status === "completed").length
-
-    setReserveStats({
-      active,
-      expired,
-      completed,
-      total: reservesData.length,
-    })
-  }
-
-  const isReserveExpired = (reserve: Reserve): boolean => {
-    const now = new Date()
-    const expirationDate = new Date(reserve.expirationDate)
-    return expirationDate <= now && reserve.status === "reserved"
-  }
-
-  const handleCancelReserve = async (reserve: Reserve) => {
-    try {
-      // 1. Actualizar el estado de la reserva
-      const reserveRef = ref(database, `reserves/${reserve.id}`)
+      // 2. Actualizar el estado de la reserva a "completada"
+      const reserveRef = ref(database, `reserves/${reserve.id}`);
       await update(reserveRef, {
-        status: "cancelled",
-        cancelledAt: new Date().toISOString(),
-      })
+        status: "completed",
+        completedAt: new Date().toISOString(),
+      });
 
-      // 2. Actualizar el producto (quitar la reserva)
-      const productRef = ref(database, `products/${reserve.productId}`)
-      await update(productRef, {
-        reserved: false,
-        reservedBy: null,
-        reservedUntil: null,
-        stock: (reserve.productStock || 0) + 1, // Devolver al stock
-        lastUpdated: new Date().toISOString(),
-      })
+      // 3. Notificar al componente padre que la operación fue exitosa
+      onReserveCompleted();
 
-      toast.success("Reserva cancelada", {
-        description: "La reserva ha sido cancelada correctamente",
-      })
     } catch (error) {
-      console.error("Error al cancelar la reserva:", error)
-      toast.error("Error", {
-        description: "Ocurrió un error al cancelar la reserva",
-      })
+      console.error("Error al completar la reserva:", error);
+      toast.error("Error al completar la venta.");
+    } finally {
+      setIsLoading(false);
     }
-  }
-
-  const handleCompleteReserve = (reserve: Reserve) => {
-    setSelectedReserve(reserve)
-    setIsCompleteModalOpen(true)
-  }
-
-  const handleReserveCompleted = () => {
-    toast.success("Reserva completada", {
-      description: "La reserva ha sido completada correctamente",
-    })
-    setIsCompleteModalOpen(false)
-  }
-
-  const filteredReserves = reserves.filter(
-    (reserve) =>
-      reserve.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reserve.customerDni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reserve.productName?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  };
+  
+  if (!reserve) return null;
 
   return (
-    <DashboardLayout>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Productos Reservados (Señados)</h1>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar reservas..."
-                className="pl-8 w-[250px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Completar Venta de Reserva</DialogTitle>
+          <DialogDescription>
+            Confirma el pago del saldo restante para finalizar la venta.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+          <div className="text-sm space-y-1">
+            <p><strong>Cliente:</strong> {reserve.customerName}</p>
+            <p><strong>Producto:</strong> {reserve.productName}</p>
+            <p className="font-bold text-base mt-2">Saldo a pagar: ${Number(reserve.remainingAmount || 0).toFixed(2)}</p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="payment-method">Método de Pago del Saldo</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger id="payment-method">
+                <SelectValue placeholder="Seleccionar método" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="efectivo">Efectivo</SelectItem>
+                <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                <SelectItem value="transferencia">Transferencia</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Reservas Activas</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reserveStats.active}</div>
-              <p className="text-xs text-muted-foreground">Productos señados vigentes</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Reservas Vencidas</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reserveStats.expired}</div>
-              <p className="text-xs text-muted-foreground">Productos con señas vencidas</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Reservas Completadas</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reserveStats.completed}</div>
-              <p className="text-xs text-muted-foreground">Reservas finalizadas con venta</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Reservas</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reserveStats.total}</div>
-              <p className="text-xs text-muted-foreground">Histórico de reservas</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Producto</TableHead>
-                <TableHead>Precio Total</TableHead>
-                <TableHead>Seña Pagada</TableHead>
-                <TableHead>Saldo</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredReserves.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
-                    No se encontraron reservas
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredReserves.map((reserve) => (
-                  <TableRow key={reserve.id} className={isReserveExpired(reserve) ? "bg-red-50" : ""}>
-                    <TableCell>{new Date(reserve.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      {reserve.customerName}
-                    </TableCell>
-                    <TableCell>{reserve.productName}</TableCell>
-                    <TableCell>${Number(reserve.productPrice).toFixed(2)}</TableCell>
-                    <TableCell>${Number(reserve.downPayment).toFixed(2)}</TableCell>
-                    <TableCell>${Number(reserve.remainingAmount).toFixed(2)}</TableCell>
-                    <TableCell className={isReserveExpired(reserve) ? "text-red-500 font-medium" : ""}>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(reserve.expirationDate).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          reserve.status === "completed"
-                            ? "default"
-                            : isReserveExpired(reserve)
-                              ? "destructive"
-                              : "secondary"
-                        }
-                      >
-                        {reserve.status === "completed"
-                          ? "Completada"
-                          : isReserveExpired(reserve)
-                            ? "Vencida"
-                            : "Activa"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {reserve.status === "reserved" && (
-                          <>
-                            <Button variant="outline" size="sm" onClick={() => handleCompleteReserve(reserve)}>
-                              Completar
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleCancelReserve(reserve)}>
-                              Cancelar
-                            </Button>
-                          </>
-                        )}
-                        <Button variant="ghost" size="icon">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {selectedReserve && (
-        <CompleteReserveModal
-          isOpen={isCompleteModalOpen}
-          onClose={() => setIsCompleteModalOpen(false)}
-          reserve={selectedReserve}
-          onReserveCompleted={handleReserveCompleted}
-        />
-      )}
-    </DashboardLayout>
-  )
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleCompleteSale} disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Completar Venta
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

@@ -13,9 +13,9 @@ import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import AddRepairForm from "@/components/add-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
-import { generateRepairReceiptPdf } from "@/lib/pdf-generator" // Se importa la nueva función
+import { generateRepairReceiptPdf } from "@/lib/pdf-generator"
 
-// ... (Interfaces sin cambios)
+// Interfaces
 interface Repair {
   id: string
   receiptNumber: string
@@ -44,6 +44,14 @@ interface CustomerData {
     dni: string;
     phone: string;
     email: string;
+}
+
+// --- NUEVA INTERFAZ PARA LOS DATOS DEL FORMULARIO ---
+interface RepairFormData {
+  productName: string;
+  imei?: string;
+  description: string;
+  estimatedPrice: number;
 }
 
 
@@ -77,9 +85,9 @@ export default function RepairsPage() {
     return () => unsubscribe()
   }, [])
 
-  const handleAddRepair = useCallback(async (repairData: Omit<Repair, 'id'>, customerData: CustomerData) => {
+  // --- CORRECCIÓN EN LA FIRMA Y LÓGICA DE LA FUNCIÓN ---
+  const handleAddRepair = useCallback(async (repairData: RepairFormData, customerData: CustomerData) => {
     try {
-      // 1. Buscar o crear cliente
       const customersRef = ref(database, "customers");
       const q = query(customersRef, orderByChild('dni'), equalTo(customerData.dni));
       const customerSnapshot = await get(q);
@@ -97,7 +105,6 @@ export default function RepairsPage() {
 
       if (!customerId) throw new Error("No se pudo obtener el ID del cliente.");
 
-      // 2. Transacción para el número de recibo
       const counterRef = ref(database, 'counters/repairNumber');
       const transactionResult = await runTransaction(counterRef, (currentData) => {
         if (currentData === null) {
@@ -115,19 +122,22 @@ export default function RepairsPage() {
       const newCounterData = transactionResult.snapshot.val();
       const newReceiptNumber = `${newCounterData.prefix}${String(newCounterData.value).padStart(5, '0')}`;
       
-      // 3. Crear la reparación
       const newRepairRef = push(ref(database, "repairs"));
       const newRepairId = newRepairRef.key;
       if (!newRepairId) throw new Error("No se pudo generar el ID para la reparación.");
 
+      // Objeto construido de forma explícita para evitar errores de tipo
       const finalRepairData: Repair = {
-          ...repairData,
           id: newRepairId,
           receiptNumber: newReceiptNumber,
           customerId,
           customerName: customerData.name,
           customerPhone: customerData.phone,
           customerEmail: customerData.email,
+          productName: repairData.productName,
+          imei: repairData.imei || "",
+          description: repairData.description,
+          estimatedPrice: repairData.estimatedPrice,
           entryDate: new Date().toISOString(),
           createdAt: Date.now(),
           status: 'pending',
@@ -135,7 +145,6 @@ export default function RepairsPage() {
       
       await set(newRepairRef, finalRepairData);
       
-      // --- LLAMADA PARA GENERAR EL PDF ---
       await generateRepairReceiptPdf(finalRepairData, customerData);
 
       toast.success("Reparación agregada correctamente.", { description: `Recibo N°: ${newReceiptNumber}` });
@@ -176,9 +185,9 @@ export default function RepairsPage() {
   }
 
   const filteredRepairs = repairs.filter(r =>
-    (r.customerName && r.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (r.productName && r.productName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (r.receiptNumber && r.receiptNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+    (r.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.productName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.receiptNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -230,9 +239,9 @@ export default function RepairsPage() {
                   <TableCell>{repair.customerName}</TableCell>
                   <TableCell>{repair.productName}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusVariant(repair.status)}>{repair.status.replace(/_/g, ' ')}</Badge>
+                    <Badge variant={getStatusVariant(repair.status)}>{(repair.status || 'desconocido').replace(/_/g, ' ')}</Badge>
                   </TableCell>
-                  <TableCell>{new Date(repair.entryDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{repair.entryDate ? new Date(repair.entryDate).toLocaleDateString() : 'N/A'}</TableCell>
                   <TableCell>${repair.estimatedPrice?.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => handleViewDetails(repair)}>

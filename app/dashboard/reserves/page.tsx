@@ -12,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue, update } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
-// --- CORRECCIÓN: Se importa el componente y la interfaz desde el mismo lugar ---
 import CompleteReserveModal, { Reserve } from "@/components/complete-reserve-modal"
 
 interface User {
@@ -66,7 +65,11 @@ export default function ReservesPage() {
           })
         })
 
-        reservesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        reservesData.sort((a, b) => {
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateB - dateA;
+        });
 
         setReserves(reservesData)
         calculateReserveStats(reservesData)
@@ -89,16 +92,17 @@ export default function ReservesPage() {
   const calculateReserveStats = (reservesData: Reserve[]) => {
     const now = new Date()
     const active = reservesData.filter(
-      (reserve) => reserve.status === "reserved" && new Date(reserve.expirationDate) > now,
+      (reserve) => reserve.status === "reserved" && reserve.expirationDate && new Date(reserve.expirationDate) > now,
     ).length
     const expired = reservesData.filter(
-      (reserve) => reserve.status === "reserved" && new Date(reserve.expirationDate) <= now,
+      (reserve) => reserve.status === "reserved" && reserve.expirationDate && new Date(reserve.expirationDate) <= now,
     ).length
     const completed = reservesData.filter((reserve) => reserve.status === "completed").length
     setReserveStats({ active, expired, completed, total: reservesData.length })
   }
 
   const isReserveExpired = (reserve: Reserve): boolean => {
+    if (!reserve.expirationDate) return false;
     return new Date(reserve.expirationDate) <= new Date() && reserve.status === "reserved"
   }
 
@@ -134,9 +138,9 @@ export default function ReservesPage() {
 
   const filteredReserves = reserves.filter(
     (reserve) =>
-      reserve.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reserve.customerDni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reserve.productName?.toLowerCase().includes(searchTerm.toLowerCase()),
+      (reserve.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (reserve.customerDni || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (reserve.productName || "").toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   return (
@@ -226,19 +230,19 @@ export default function ReservesPage() {
               ) : (
                 filteredReserves.map((reserve) => (
                   <TableRow key={reserve.id} className={isReserveExpired(reserve) ? "bg-red-50" : ""}>
-                    <TableCell>{new Date(reserve.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{reserve.date ? new Date(reserve.date).toLocaleDateString() : 'N/A'}</TableCell>
                     <TableCell className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
                       {reserve.customerName}
                     </TableCell>
                     <TableCell>{reserve.productName}</TableCell>
-                    <TableCell>${Number(reserve.productPrice).toFixed(2)}</TableCell>
-                    <TableCell>${Number(reserve.downPayment).toFixed(2)}</TableCell>
-                    <TableCell>${Number(reserve.remainingAmount).toFixed(2)}</TableCell>
+                    <TableCell>${Number(reserve.productPrice || 0).toFixed(2)}</TableCell>
+                    <TableCell>${Number(reserve.downPayment || 0).toFixed(2)}</TableCell>
+                    <TableCell>${Number(reserve.remainingAmount || 0).toFixed(2)}</TableCell>
                     <TableCell className={isReserveExpired(reserve) ? "text-red-500 font-medium" : ""}>
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {new Date(reserve.expirationDate).toLocaleDateString()}
+                        {reserve.expirationDate ? new Date(reserve.expirationDate).toLocaleDateString() : 'N/A'}
                       </div>
                     </TableCell>
                     <TableCell>

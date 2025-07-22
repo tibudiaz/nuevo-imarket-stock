@@ -18,10 +18,16 @@ interface User {
   role: string;
 }
 
+interface SaleItem {
+    productId: string;
+    quantity: number;
+    price: number;
+}
+
 interface Sale {
   id: string;
   date: string;
-  items: { productId: string; quantity: number; price: number }[];
+  items: SaleItem[];
   totalAmount: number;
   customerId?: string;
 }
@@ -84,10 +90,10 @@ export default function ReportsPage() {
       router.push("/")
     }
 
-    const fetchData = (path: string, setter: Function) => {
+    const fetchData = (path: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
         const dataRef = ref(database, path);
         return onValue(dataRef, (snapshot) => {
-            const data = [];
+            const data: any[] = [];
             if(snapshot.exists()){
                 snapshot.forEach(child => {
                     data.push({ id: child.key, ...child.val() });
@@ -116,8 +122,14 @@ export default function ReportsPage() {
   const filteredSales = useMemo(() => {
       const now = new Date();
       return sales.filter(sale => {
+          // --- CORRECCIÓN: Se asegura de que la fecha exista antes de procesarla ---
+          if (!sale.date) return false;
           const saleDate = new Date(sale.date);
-          if (timeRange === "week") return saleDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+          
+          const weekAgo = new Date();
+          weekAgo.setDate(now.getDate() - 7);
+
+          if (timeRange === "week") return saleDate >= weekAgo;
           if (timeRange === "month") return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
           if (timeRange === "year") return saleDate.getFullYear() === now.getFullYear();
           return true;
@@ -127,8 +139,10 @@ export default function ReportsPage() {
   const salesByPeriodChartData = useMemo<SalesByPeriodData[]>(() => {
     const data: { [key: string]: number } = {};
     filteredSales.forEach(sale => {
-        const date = new Date(sale.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-        data[date] = (data[date] || 0) + sale.totalAmount;
+        if (sale.date && sale.totalAmount) {
+            const date = new Date(sale.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+            data[date] = (data[date] || 0) + sale.totalAmount;
+        }
     });
     return Object.entries(data).map(([name, ventas]) => ({ name, ventas })).reverse();
   }, [filteredSales]);
@@ -136,10 +150,11 @@ export default function ReportsPage() {
   const topProductsChartData = useMemo<TopProductData[]>(() => {
       const productCounts: { [key: string]: number } = {};
       filteredSales.forEach(sale => {
-          sale.items.forEach(item => {
+          // --- CORRECCIÓN: Se asegura que `items` exista antes de iterar ---
+          sale.items?.forEach(item => {
               const product = products.find(p => p.id === item.productId);
-              if (product) {
-                  productCounts[product.name] = (productCounts[product.name] || 0) + item.quantity;
+              if (product && product.name) {
+                  productCounts[product.name] = (productCounts[product.name] || 0) + (item.quantity || 1);
               }
           });
       });
@@ -152,10 +167,11 @@ export default function ReportsPage() {
   const salesByCategoryChartData = useMemo<SalesByCategoryData[]>(() => {
       const categorySales: { [key: string]: number } = {};
       filteredSales.forEach(sale => {
-          sale.items.forEach(item => {
+          // --- CORRECCIÓN: Se asegura que `items` exista antes de iterar ---
+          sale.items?.forEach(item => {
               const product = products.find(p => p.id === item.productId);
               if (product?.category) {
-                  categorySales[product.category] = (categorySales[product.category] || 0) + (item.price * item.quantity);
+                  categorySales[product.category] = (categorySales[product.category] || 0) + ((item.price || 0) * (item.quantity || 1));
               }
           });
       });
@@ -163,7 +179,6 @@ export default function ReportsPage() {
   }, [filteredSales, products]);
 
   if (isLoading || !user || user.role !== "admin") {
-    // Muestra un loader mientras cargan los datos o se redirige
     return <div className="flex h-screen items-center justify-center">Cargando reportes...</div>;
   }
 
