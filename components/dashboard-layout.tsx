@@ -19,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getAuth, signOut, onAuthStateChanged } from "firebase/auth"
+import { getAuth, signOut } from "firebase/auth"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -35,7 +35,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { motion, AnimatePresence } from "framer-motion"
-import MobileMenu from "@/components/mobile-menu" // <- IMPORTACIÓN AÑADIDA
+import MobileMenu from "@/components/mobile-menu"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -88,7 +88,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
   const [isDolarLoading, setIsDolarLoading] = useState(true);
 
-  // --- Hook para obtener la cotización del Dólar Blue ---
   useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
@@ -100,37 +99,31 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         setDolarBlueRate(data.venta);
       } catch (error) {
         console.error("Error al obtener dólar blue:", error);
-        setDolarBlueRate(null); // Poner en null si hay error
+        setDolarBlueRate(null);
       } finally {
         setIsDolarLoading(false);
       }
     };
 
-    fetchDolarBlue(); // Primera llamada al cargar
-    const intervalId = setInterval(fetchDolarBlue, 180000); // Actualizar cada 3 minutos
+    fetchDolarBlue();
+    const intervalId = setInterval(fetchDolarBlue, 180000);
 
-    return () => clearInterval(intervalId); // Limpiar el intervalo al desmontar
+    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-          try {
-            setUser(JSON.parse(storedUser));
-          } catch (e) {
-            localStorage.removeItem("user");
-            router.push("/");
-          }
-        }
-      } else {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
         localStorage.removeItem("user");
         router.push("/");
       }
-      setIsLoading(false);
-    });
+    } else {
+      router.push("/");
+    }
+    setIsLoading(false);
 
     const categoriesRef = ref(database, "categories")
     const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
@@ -146,10 +139,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     })
 
     return () => {
-        unsubscribeAuth();
         unsubscribeCategories();
     }
-  }, [router])
+  }, [router]);
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/inventory")) {
@@ -200,16 +192,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex min-h-screen w-full flex-col bg-slate-50">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
           <div className="flex items-center gap-2">
-            {/* INICIO: Integración del Menú Móvil */}
             <MobileMenu userRole={user.role} />
-            {/* FIN: Integración del Menú Móvil */}
             <Link href="/dashboard" className="hidden md:flex items-center gap-2 font-semibold">
               <Package className="h-6 w-6" />
               <span className="text-xl">iMarket</span>
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            {/* --- CONTENEDOR DE LA COTIZACIÓN DEL DÓLAR --- */}
             <div className="hidden sm:flex items-center gap-2">
                 <span className="font-semibold text-sm text-blue-600">Dólar Blue:</span>
                 {isDolarLoading ? (
@@ -290,9 +279,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 animate="in"
                 exit="out"
                 transition={{ duration: 0.2, ease: "easeInOut" }}
-                // --- INICIO DE LA CORRECCIÓN ---
-                className="p-4 md:p-6" // Se ajusta el padding para móviles
-                // --- FIN DE LA CORRECCIÓN ---
+                className="p-4 md:p-6"
               >
                 {children}
               </motion.main>

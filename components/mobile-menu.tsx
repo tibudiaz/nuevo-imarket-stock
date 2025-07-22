@@ -30,12 +30,10 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    // Sincroniza el estado del menú de inventario con la ruta actual
     setIsInventoryOpen(pathname.startsWith("/dashboard/inventory"));
   }, [pathname]);
 
   useEffect(() => {
-    // Carga las categorías para el menú desplegable
     const categoriesRef = ref(database, 'categories');
     const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
       const data = snapshot.val();
@@ -49,11 +47,11 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
   const handleLinkClick = () => setIsOpen(false);
 
   const mainRoutes = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/dashboard" },
-    { href: "/dashboard/sales", label: "Ventas", icon: ShoppingCart, active: pathname === "/dashboard/sales" },
-    { href: "/dashboard/repairs", label: "Reparaciones", icon: Wrench, active: pathname === "/dashboard/repairs" },
-    { href: "/dashboard/reserves", label: "Reservas", icon: ShoppingCart, active: pathname === "/dashboard/reserves" },
-    { href: "/dashboard/customers", label: "Clientes", icon: Users, active: pathname === "/dashboard/customers" },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/dashboard", role: ["admin", "moderator"] },
+    { href: "/dashboard/sales", label: "Ventas", icon: ShoppingCart, active: pathname === "/dashboard/sales", role: ["admin", "moderator"] },
+    { href: "/dashboard/repairs", label: "Reparaciones", icon: Wrench, active: pathname === "/dashboard/repairs", role: ["admin", "moderator"] },
+    { href: "/dashboard/reserves", label: "Reservas", icon: ShoppingCart, active: pathname === "/dashboard/reserves", role: ["admin", "moderator"] },
+    { href: "/dashboard/customers", label: "Clientes", icon: Users, active: pathname === "/dashboard/customers", role: ["admin"] },
   ];
 
   return (
@@ -72,22 +70,19 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
             </Link>
           </div>
           <nav className="grid gap-1 p-4">
-            {mainRoutes.map((route) => (
-              <Link
-                key={route.href}
-                href={route.href}
+            <Link
+                href="/dashboard"
                 onClick={handleLinkClick}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-slate-900 transition-all hover:bg-slate-100",
-                  route.active && "bg-slate-100 font-medium"
+                  pathname === "/dashboard" && "bg-slate-100 font-medium"
                 )}
               >
-                <route.icon className={cn("h-5 w-5", route.active && "text-primary")} />
-                <span>{route.label}</span>
-              </Link>
-            ))}
-            
-            {/* INICIO: Menú desplegable para Inventario */}
+                <LayoutDashboard className={cn("h-5 w-5", pathname === "/dashboard" && "text-primary")} />
+                <span>Dashboard</span>
+            </Link>
+
+            {/* Menú desplegable para Inventario */}
             <Collapsible open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
               <CollapsibleTrigger className="w-full">
                 <div className={cn(
@@ -119,7 +114,24 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
                   ))}
               </CollapsibleContent>
             </Collapsible>
-            {/* FIN: Menú desplegable para Inventario */}
+
+            {/* Resto de las rutas filtradas por rol */}
+            {mainRoutes.filter(route => route.label !== 'Dashboard').map((route) => (
+              route.role.includes(userRole) && (
+                <Link
+                  key={route.href}
+                  href={route.href}
+                  onClick={handleLinkClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-slate-900 transition-all hover:bg-slate-100",
+                    route.active && "bg-slate-100 font-medium"
+                  )}
+                >
+                  <route.icon className={cn("h-5 w-5", route.active && "text-primary")} />
+                  <span>{route.label}</span>
+                </Link>
+              )
+            ))}
           </nav>
         </SheetContent>
       </Sheet>
