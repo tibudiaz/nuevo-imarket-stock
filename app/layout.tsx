@@ -3,6 +3,7 @@ import "./globals.css"
 import { Inter } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner" // Importa el Toaster de sonner
 import FirebaseProvider from "@/components/firebase-provider"
+import PathCleaner from "@/components/path-cleaner"
 import type { Metadata } from "next"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -21,6 +22,7 @@ export default function RootLayout({
     <html lang="es">
       <body className={inter.className}>
         <FirebaseProvider>
+          <PathCleaner />
           {children}
           {/* Este es el Toaster de sonner */}
           <Toaster position="top-right" richColors />
