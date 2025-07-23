@@ -43,13 +43,13 @@ import {
   ShoppingCart,
   Barcode,
   User,
-  ArrowRightLeft,
 } from "lucide-react";
 import { ref, onValue, set, push, remove, update } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
 import SellProductModal from "@/components/sell-product-modal";
+import TransferProductDialog from "@/components/transfer-product-dialog";
 import {
   Select,
   SelectContent,
@@ -365,16 +365,34 @@ export default function InventoryPage() {
     }));
   };
 
-  const handleTransferProduct = async (product: Product) => {
+  const handleTransferProduct = async (product: Product, quantity: number) => {
     const targetStore = product.store === "local1" ? "local2" : "local1";
+    const currentStock = product.stock || 0;
+
     try {
       const productRef = ref(database, `products/${product.id}`);
-      await update(productRef, {
-        store: targetStore,
-        lastTransfer: new Date().toISOString(),
-      });
+
+      if (quantity >= currentStock) {
+        await update(productRef, {
+          store: targetStore,
+          lastTransfer: new Date().toISOString(),
+        });
+      } else {
+        await update(productRef, { stock: currentStock - quantity });
+        const { id, ...rest } = product;
+        const newProductRef = push(ref(database, "products"));
+        await set(newProductRef, {
+          ...rest,
+          stock: quantity,
+          store: targetStore,
+          lastTransfer: new Date().toISOString(),
+        });
+      }
+
       toast.success("Producto transferido", {
-        description: `${product.name} ha sido enviado al ${targetStore === "local1" ? "Local 1" : "Local 2"}.`,
+        description: `${product.name} ha sido enviado al ${
+          targetStore === "local1" ? "Local 1" : "Local 2"
+        }.`,
       });
     } catch (error) {
       console.error("Error al transferir producto:", error);
@@ -729,43 +747,10 @@ export default function InventoryPage() {
                       <div className="flex justify-end gap-2">
                         {(user?.role === "admin" ||
                           user?.role === "moderator") && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Transferir producto"
-                              >
-                                <ArrowRightLeft className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Confirmar Transferencia
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  ¿Estás seguro de que quieres enviar el
-                                  producto <strong>{product.name}</strong> al{" "}
-                                  <strong>
-                                    {product.store === "local1"
-                                      ? "Local 2"
-                                      : "Local 1"}
-                                  </strong>
-                                  ? Esta acción actualizará la ubicación del
-                                  stock.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleTransferProduct(product)}
-                                >
-                                  Confirmar Envío
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <TransferProductDialog
+                            product={product}
+                            onTransfer={handleTransferProduct}
+                          />
                         )}
                         <Button
                           variant="ghost"
