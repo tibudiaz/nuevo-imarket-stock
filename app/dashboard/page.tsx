@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShoppingBag, Package, DollarSign, TrendingUp, User, AlertTriangle } from "lucide-react"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { getAuth } from "firebase/auth"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -76,20 +77,36 @@ export default function Dashboard() {
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
+    const auth = getAuth();
+
+    if (auth.currentUser) {
+      const role = auth.currentUser.email?.endsWith("@admin.com")
+        ? "admin"
+        : "moderator";
+      const currentUser = {
+        username: auth.currentUser.email || "",
+        role,
+      };
+      setUser(currentUser);
+      localStorage.setItem("user", JSON.stringify(currentUser));
+      setIsLoading(false);
+      return;
+    }
+
+    const storedUser = localStorage.getItem("user");
     if (!storedUser) {
-      router.push("/")
-      return
+      router.push("/");
+      return;
     }
 
     try {
-      const parsedUser = JSON.parse(storedUser)
-      setUser(parsedUser)
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
     } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
+      localStorage.removeItem("user");
+      router.push("/");
     } finally {
-        setIsLoading(false)
+      setIsLoading(false);
     }
   }, [router])
 

@@ -23,9 +23,11 @@ export default function LoginForm() {
     setIsLoading(true)
 
     const auth = getAuth()
-    
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword)
       // --- CORRECCIÓN CLAVE ---
       // Se redirige directamente al dashboard. El layout se encargará de la carga.
       router.push("/dashboard")
