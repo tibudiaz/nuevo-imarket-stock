@@ -1,6 +1,26 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { getAuth } from "firebase/auth"
 import LoginForm from "@/components/login-form"
 
 export default function Home() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const auth = getAuth()
+    if (auth.currentUser) {
+      router.replace("/dashboard")
+      return
+    }
+
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      router.replace("/dashboard")
+    }
+  }, [router])
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 p-4">
       <div className="w-full max-w-md">

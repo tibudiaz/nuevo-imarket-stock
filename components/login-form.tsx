@@ -8,7 +8,12 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth"
 
 export default function LoginForm() {
   const router = useRouter()
@@ -27,9 +32,16 @@ export default function LoginForm() {
     const trimmedPassword = password.trim()
 
     try {
+      await setPersistence(auth, browserLocalPersistence)
       await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword)
-      // --- CORRECCIÓN CLAVE ---
-      // Se redirige directamente al dashboard. El layout se encargará de la carga.
+
+      const currentUser = auth.currentUser
+      if (currentUser && currentUser.email) {
+        const role = currentUser.email.endsWith("@admin.com") ? "admin" : "moderator"
+        const userData = { username: currentUser.email, role }
+        localStorage.setItem("user", JSON.stringify(userData))
+      }
+
       router.push("/dashboard")
     } catch (authError: any) {
       console.error("Error de Firebase Auth:", authError)
