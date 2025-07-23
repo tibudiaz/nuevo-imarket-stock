@@ -143,6 +143,16 @@ export default function InventoryPage() {
 
   useEffect(() => {
     const auth = getAuth();
+    const storedUser = localStorage.getItem("user");
+    let fallbackUser: User | null = null;
+    if (storedUser) {
+      try {
+        fallbackUser = JSON.parse(storedUser);
+      } catch (e) {
+        localStorage.removeItem("user");
+      }
+    }
+
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
         const role = firebaseUser.email.endsWith("@admin.com")
@@ -154,18 +164,10 @@ export default function InventoryPage() {
         };
         setUser(currentUser);
         localStorage.setItem("user", JSON.stringify(currentUser));
+      } else if (fallbackUser) {
+        setUser(fallbackUser);
       } else {
-        const storedUser = localStorage.getItem("user");
-        if (!storedUser) {
-          router.push("/");
-          return;
-        }
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (e) {
-          localStorage.removeItem("user");
-          router.push("/");
-        }
+        router.push("/");
       }
     });
 

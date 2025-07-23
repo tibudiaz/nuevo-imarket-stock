@@ -78,6 +78,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     const auth = getAuth();
+    const storedUser = localStorage.getItem("user");
+    let fallbackUser: User | null = null;
+    if (storedUser) {
+      try {
+        fallbackUser = JSON.parse(storedUser);
+      } catch (e) {
+        localStorage.removeItem("user");
+      }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
         const role = firebaseUser.email.endsWith("@admin.com")
@@ -90,22 +100,11 @@ export default function Dashboard() {
         setUser(currentUser);
         localStorage.setItem("user", JSON.stringify(currentUser));
         setIsLoading(false);
+      } else if (fallbackUser) {
+        setUser(fallbackUser);
+        setIsLoading(false);
       } else {
-        const storedUser = localStorage.getItem("user");
-        if (!storedUser) {
-          router.push("/");
-          return;
-        }
-
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } catch (e) {
-          localStorage.removeItem("user");
-          router.push("/");
-        } finally {
-          setIsLoading(false);
-        }
+        router.push("/");
       }
     });
 
