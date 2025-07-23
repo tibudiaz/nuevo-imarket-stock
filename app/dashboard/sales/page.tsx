@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -58,7 +59,7 @@ interface TopProductType {
 
 export default function SalesPage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -70,17 +71,11 @@ export default function SalesPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
+    if (authLoading) return;
 
-    try {
-      setUser(JSON.parse(storedUser))
-    } catch (e) {
-      localStorage.removeItem("user")
+    if (!user) {
       router.push("/")
+      return;
     }
 
     const salesRef = ref(database, "sales")
@@ -120,7 +115,7 @@ export default function SalesPage() {
       unsubscribeSales()
       unsubscribeProducts()
     }
-  }, [router])
+  }, [router, user, authLoading])
 
   const calculateSalesStats = (salesData: Sale[]) => {
     const now = new Date()

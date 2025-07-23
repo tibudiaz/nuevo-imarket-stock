@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,7 @@ import {
 } from "lucide-react";
 import { ref, onValue, set, push, remove, update } from "firebase/database";
 import { database } from "@/lib/firebase";
-import { getAuth } from "firebase/auth";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import SellProductModal from "@/components/sell-product-modal";
 import TransferProductDialog from "@/components/transfer-product-dialog";
@@ -100,13 +100,12 @@ interface Category {
 }
 
 export default function InventoryPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const categorySearch = searchParams.get("category");
   const isMobile = useMobile();
   const { selectedStore } = useStore();
 
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -142,33 +141,6 @@ export default function InventoryPage() {
     editingProduct?.category === "Celulares Nuevos";
 
   useEffect(() => {
-    const auth = getAuth();
-
-    if (auth.currentUser) {
-      const role = auth.currentUser.email?.endsWith("@admin.com")
-        ? "admin"
-        : "moderator";
-      const currentUser = {
-        username: auth.currentUser.email || "",
-        role,
-      };
-      setUser(currentUser);
-      localStorage.setItem("user", JSON.stringify(currentUser));
-    } else {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
-        router.push("/");
-        return;
-      }
-
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem("user");
-        router.push("/");
-      }
-    }
-
     const productsRef = ref(database, "products");
     const unsubscribeProducts = onValue(
       productsRef,
@@ -214,7 +186,7 @@ export default function InventoryPage() {
       unsubscribeProducts();
       unsubscribeCategories();
     };
-  }, [router]);
+  }, []);
 
   // --- CORRECCIÓN CLAVE DE RENDIMIENTO ---
   // Se usa `useMemo` para evitar que el filtrado se ejecute en cada renderizado.
@@ -402,7 +374,7 @@ export default function InventoryPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || authLoading || !user) {
     return (
       <DashboardLayout>
         <div className="flex h-full items-center justify-center p-6">

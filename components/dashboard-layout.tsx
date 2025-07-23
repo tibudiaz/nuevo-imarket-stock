@@ -20,7 +20,7 @@ import {
   Store,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getAuth, signOut, onAuthStateChanged } from "firebase/auth"
+import { getAuth, signOut } from "firebase/auth"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -40,6 +40,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { motion, AnimatePresence } from "framer-motion"
 import MobileMenu from "@/components/mobile-menu"
 import { useStore } from "@/hooks/use-store"
+import { useAuth } from "@/hooks/use-auth"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -90,40 +91,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [user, setUser] = useState<{ username: string; role: string } | null>(null)
+  const { user, loading: isLoading } = useAuth();
   const [categories, setCategories] = useState<string[]>([])
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(true);
   const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
   const [isDolarLoading, setIsDolarLoading] = useState(true);
 
   const { selectedStore, setSelectedStore } = useStore();
-
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser && firebaseUser.email) {
-        let role = "moderator";
-        if (firebaseUser.email.endsWith("@admin.com")) {
-          role = "admin";
-        }
-        
-        const userData = {
-          username: firebaseUser.email,
-          role: role,
-        };
-        
-        setUser(userData);
-        localStorage.setItem("user", JSON.stringify(userData));
-        setIsLoading(false);
-      } else {
-        localStorage.removeItem("user");
-        router.push("/");
-      }
-    });
-
-    return () => unsubscribe();
-  }, [router]);
 
   useEffect(() => {
     const fetchDolarBlue = async () => {
