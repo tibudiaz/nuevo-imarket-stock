@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Download, Upload, Calendar, Clock, Database, Save, Trash, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 // --- CORRECCIÓN AQUÍ ---
-import { ref, onValue, get, set } from "firebase/database" 
+import { ref, onValue, get, set, type DataSnapshot } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import { Switch } from "@/components/ui/switch"
@@ -84,10 +84,10 @@ export default function BackupPage() {
 
     // Cargar backups desde Firebase
     const backupsRef = ref(database, "backups")
-    const unsubscribe = onValue(backupsRef, (snapshot) => {
+    const unsubscribe = onValue(backupsRef, (snapshot: DataSnapshot) => {
       if (snapshot.exists()) {
         const backupsData: Backup[] = []
-        snapshot.forEach((childSnapshot) => {
+        snapshot.forEach((childSnapshot: DataSnapshot) => {
           backupsData.push({
             id: childSnapshot.key || "",
             ...childSnapshot.val(),
