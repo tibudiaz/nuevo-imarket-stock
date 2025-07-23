@@ -117,6 +117,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         localStorage.setItem("user", JSON.stringify(userData));
         setIsLoading(false);
       } else {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+            setIsLoading(false);
+            return;
+          } catch {
+            localStorage.removeItem("user");
+          }
+        }
         localStorage.removeItem("user");
         router.push("/");
       }
