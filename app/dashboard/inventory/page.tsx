@@ -1,12 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   Dialog,
   DialogContent,
@@ -17,15 +28,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Edit, Trash, ShoppingCart, Barcode, User } from "lucide-react" // Se elimina Camera
+import { Plus, Search, Edit, Trash, ShoppingCart, Barcode, User, ArrowRightLeft } from "lucide-react"
 import { ref, onValue, set, push, remove, update } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import SellProductModal from "@/components/sell-product-modal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useMobile } from "@/hooks/use-mobile" // Se importa el hook useMobile
+import { useMobile } from "@/hooks/use-mobile"
+import { useStore } from "@/hooks/use-store"
 
-// --- Interfaces (sin cambios) ---
+// --- Interfaces ---
 interface User {
   username: string
   role: string
@@ -42,6 +54,8 @@ interface Product {
   barcode?: string
   imei?: string
   provider?: string;
+  store?: 'local1' | 'local2';
+  lastTransfer?: string;
   [key: string]: any
 }
 interface NewProduct {
@@ -55,6 +69,7 @@ interface NewProduct {
   barcode: string
   imei: string
   provider: string;
+  store: 'local1' | 'local2';
 }
 interface Category {
   id: string;
@@ -65,9 +80,9 @@ export default function InventoryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const categorySearch = searchParams.get('category')
-  const isMobile = useMobile(); // <- Se inicializa el hook
+  const isMobile = useMobile();
+  const { selectedStore } = useStore();
 
-  // ... (toda la lógica de useState, useEffect, etc., se mantiene igual hasta el return)
   const [user, setUser] = useState<User | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -88,6 +103,7 @@ export default function InventoryPage() {
     barcode: "",
     imei: "",
     provider: "",
+    store: 'local1',
   })
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
@@ -97,7 +113,6 @@ export default function InventoryPage() {
   const isEditingCellphoneCategory = editingProduct?.category === 'Celulares' || editingProduct?.category === 'Celulares Usados' || editingProduct?.category === "Celulares Nuevos";
 
   useEffect(() => {
-    // Carga inicial de datos
     const storedUser = localStorage.getItem("user")
     if (!storedUser) {
       router.push("/")
@@ -118,7 +133,9 @@ export default function InventoryPage() {
         if (snapshot.exists()) {
           const productsData: Product[] = []
           snapshot.forEach((childSnapshot) => {
-            productsData.push({ id: childSnapshot.key || "", ...childSnapshot.val() })
+            if (typeof childSnapshot.val() === 'object' && childSnapshot.key) {
+              productsData.push({ id: childSnapshot.key, ...childSnapshot.val() })
+            }
           })
           setProducts(productsData)
         } else {
@@ -147,22 +164,29 @@ export default function InventoryPage() {
     }
   }, [router])
 
-  const filteredProducts = products.filter(
-    (product) => {
-      const categoryMatch = categorySearch ? product.category === categorySearch : true;
-      if (!searchTerm) {
-        return categoryMatch;
+  // --- CORRECCIÓN CLAVE DE RENDIMIENTO ---
+  // Se usa `useMemo` para evitar que el filtrado se ejecute en cada renderizado.
+  // Esto optimiza drásticamente el rendimiento en listas grandes.
+  const filteredProducts = useMemo(() => {
+    return products.filter(
+      (product) => {
+        if (!product) return false;
+
+        const storeMatch = selectedStore === 'all' || product.store === selectedStore;
+        const categoryMatch = categorySearch ? product.category === categorySearch : true;
+        
+        const searchMatch = !searchTerm ||
+          (product.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (product.brand || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (product.model || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (product.category || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (product.barcode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (product.imei || "").toLowerCase().includes(searchTerm.toLowerCase());
+          
+        return storeMatch && categoryMatch && searchMatch;
       }
-      const searchMatch =
-        product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.imei?.toLowerCase().includes(searchTerm.toLowerCase());
-      return categoryMatch && searchMatch;
-    }
-  );
+    );
+  }, [products, selectedStore, categorySearch, searchTerm]);
   
   const handleAddProduct = async () => {
     if (!newProduct.name || !newProduct.brand || (!newProduct.model && !isUsedCellphoneCategory) || !newProduct.category) {
@@ -178,7 +202,7 @@ export default function InventoryPage() {
       const productsRef = ref(database, "products")
       const newProductRef = push(productsRef)
       await set(newProductRef, { ...newProduct, createdAt: new Date().toISOString() })
-      setNewProduct({ name: "", brand: "", model: "", price: 0, cost: 0, stock: 0, category: "", barcode: "", imei: "", provider: "" })
+      setNewProduct({ name: "", brand: "", model: "", price: 0, cost: 0, stock: 0, category: "", barcode: "", imei: "", provider: "", store: 'local1' })
       setIsAddDialogOpen(false)
       toast.success("Producto agregado", { description: "El producto ha sido agregado correctamente." })
     } catch (error) {
@@ -240,6 +264,23 @@ export default function InventoryPage() {
           model: isUsed ? 'Celular' : prev.model,
       }));
   };
+
+  const handleTransferProduct = async (product: Product) => {
+    const targetStore = product.store === 'local1' ? 'local2' : 'local1';
+    try {
+      const productRef = ref(database, `products/${product.id}`);
+      await update(productRef, {
+        store: targetStore,
+        lastTransfer: new Date().toISOString(),
+      });
+      toast.success("Producto transferido", {
+        description: `${product.name} ha sido enviado al ${targetStore === 'local1' ? 'Local 1' : 'Local 2'}.`
+      });
+    } catch (error) {
+      console.error("Error al transferir producto:", error);
+      toast.error("Error", { description: "No se pudo completar la transferencia." });
+    }
+  };
   
   if (isLoading) {
     return (
@@ -254,7 +295,7 @@ export default function InventoryPage() {
   
   return (
     <DashboardLayout>
-      <div className="p-4 md:p-6"> {/* Se aplica la misma corrección de padding */}
+      <div className="p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Inventario</h1>
           <div className="flex items-center gap-4">
@@ -284,6 +325,18 @@ export default function InventoryPage() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="store">Local</Label>
+                        <Select value={newProduct.store} onValueChange={(value: 'local1' | 'local2') => setNewProduct({ ...newProduct, store: value })}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar local" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="local1">Local 1</SelectItem>
+                                <SelectItem value="local2">Local 2</SelectItem>
+                            </SelectContent>
+                        </Select>
+                      </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="name">Nombre</Label>
@@ -403,6 +456,7 @@ export default function InventoryPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Producto</TableHead>
+                <TableHead>Local</TableHead>
                 <TableHead>Marca</TableHead>
                 <TableHead>Modelo</TableHead>
                 <TableHead>Categoría</TableHead>
@@ -417,20 +471,25 @@ export default function InventoryPage() {
             <TableBody>
               {filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={user?.role === 'admin' ? 10 : 8} className="text-center py-6 text-muted-foreground">
+                  <TableCell colSpan={user?.role === 'admin' ? 11 : 9} className="text-center py-6 text-muted-foreground">
                     No se encontraron productos
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredProducts.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.brand}</TableCell>
-                    <TableCell>{product.model}</TableCell>
-                    <TableCell>{product.category}</TableCell>
+                    <TableCell className="font-medium">{product.name || 'Sin nombre'}</TableCell>
+                    <TableCell>
+                      <Badge variant={product.store === 'local1' ? 'default' : 'secondary'}>
+                        {product.store === 'local1' ? 'Local 1' : product.store === 'local2' ? 'Local 2' : 'N/A'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{product.brand || 'N/A'}</TableCell>
+                    <TableCell>{product.model || 'N/A'}</TableCell>
+                    <TableCell>{product.category || 'N/A'}</TableCell>
                     {user?.role === 'admin' && (
                       <TableCell>
-                          {product.provider && (
+                          {(product.provider) && (
                               <div className="flex items-center gap-1">
                                   <User className="h-3 w-3 text-muted-foreground" />
                                   {product.provider}
@@ -447,15 +506,36 @@ export default function InventoryPage() {
                       )}
                       {product.imei && <div className="text-xs text-muted-foreground mt-1">IMEI: {product.imei}</div>}
                     </TableCell>
-                    <TableCell>${product.price?.toFixed(2) || "0.00"}</TableCell>
-                    {user?.role === 'admin' && <TableCell>${product.cost?.toFixed(2) || "0.00"}</TableCell>}
+                    <TableCell>${Number(product.price || 0).toFixed(2)}</TableCell>
+                    {user?.role === 'admin' && <TableCell>${Number(product.cost || 0).toFixed(2)}</TableCell>}
                     <TableCell>
-                      <Badge variant={product.stock && product.stock > 0 ? "default" : "destructive"}>
-                        {product.stock}
+                      <Badge variant={(product.stock || 0) > 0 ? "default" : "destructive"}>
+                        {product.stock || 0}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        {(user?.role === 'admin' || user?.role === 'moderator') && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" title="Transferir producto">
+                                <ArrowRightLeft className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmar Transferencia</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  ¿Estás seguro de que quieres enviar el producto <strong>{product.name}</strong> al <strong>{product.store === 'local1' ? 'Local 2' : 'Local 1'}</strong>? Esta acción actualizará la ubicación del stock.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleTransferProduct(product)}>Confirmar Envío</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                         <Button variant="ghost" size="icon" onClick={() => handleSellProduct(product)} disabled={!product.stock || product.stock === 0}>
                           <ShoppingCart className="h-4 w-4" />
                         </Button>
@@ -496,6 +576,21 @@ export default function InventoryPage() {
               <DialogDescription>Actualice los detalles del producto.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                  <Label htmlFor="edit-store">Local</Label>
+                  <Select 
+                    value={editingProduct.store} 
+                    onValueChange={(value: 'local1' | 'local2') => setEditingProduct({ ...editingProduct, store: value })}
+                  >
+                      <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar local" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="local1">Local 1</SelectItem>
+                          <SelectItem value="local2">Local 2</SelectItem>
+                      </SelectContent>
+                  </Select>
+                </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-name">Nombre</Label>

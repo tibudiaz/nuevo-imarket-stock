@@ -15,27 +15,27 @@ import AddRepairForm from "@/components/add-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
 import { generateRepairReceiptPdf } from "@/lib/pdf-generator"
 
-// Interfaces
+// --- INTERFAZ UNIFICADA Y DEFINITIVA ---
+// Esta es la estructura de datos consistente que se usará en ambos componentes.
 interface Repair {
-  id: string
-  receiptNumber: string
-  customerName: string
-  customerPhone: string
-  productName: string
-  imei?: string
-  description: string
-  estimatedPrice: number
-  status: 'pending' | 'in_progress' | 'completed' | 'delivered' | 'cancelled'
-  entryDate: string
-  createdAt: number
-  customerEmail?: string
-  customerId?: string
-  deliveredAt?: number
-  finalPrice?: number
-  notes?: string
-  repairCost?: number
-  technicianNotes?: string
-  [key: string]: any
+  id: string;
+  receiptNumber: string;
+  customerId: string;
+  customerName: string;
+  customerDni: string;
+  customerPhone: string;
+  customerEmail?: string;
+  productName: string;
+  imei?: string;
+  description: string;
+  estimatedPrice: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'delivered' | 'cancelled';
+  entryDate: string;
+  createdAt: number;
+  deliveredAt?: string;
+  finalPrice?: number;
+  technicianNotes?: string;
+  [key: string]: any;
 }
 
 interface CustomerData {
@@ -46,7 +46,6 @@ interface CustomerData {
     email: string;
 }
 
-// --- NUEVA INTERFAZ PARA LOS DATOS DEL FORMULARIO ---
 interface RepairFormData {
   productName: string;
   imei?: string;
@@ -85,7 +84,6 @@ export default function RepairsPage() {
     return () => unsubscribe()
   }, [])
 
-  // --- CORRECCIÓN EN LA FIRMA Y LÓGICA DE LA FUNCIÓN ---
   const handleAddRepair = useCallback(async (repairData: RepairFormData, customerData: CustomerData) => {
     try {
       const customersRef = ref(database, "customers");
@@ -126,12 +124,12 @@ export default function RepairsPage() {
       const newRepairId = newRepairRef.key;
       if (!newRepairId) throw new Error("No se pudo generar el ID para la reparación.");
 
-      // Objeto construido de forma explícita para evitar errores de tipo
-      const finalRepairData: Repair = {
+      const finalRepairData = {
           id: newRepairId,
           receiptNumber: newReceiptNumber,
           customerId,
           customerName: customerData.name,
+          customerDni: customerData.dni,
           customerPhone: customerData.phone,
           customerEmail: customerData.email,
           productName: repairData.productName,
@@ -140,7 +138,7 @@ export default function RepairsPage() {
           estimatedPrice: repairData.estimatedPrice,
           entryDate: new Date().toISOString(),
           createdAt: Date.now(),
-          status: 'pending',
+          status: 'pending' as const,
       };
       
       await set(newRepairRef, finalRepairData);

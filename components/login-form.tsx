@@ -26,8 +26,9 @@ export default function LoginForm() {
     
     try {
       await signInWithEmailAndPassword(auth, email, password)
-      // Al iniciar sesión correctamente, redirige a la página de carga
-      router.push("/loading")
+      // --- CORRECCIÓN CLAVE ---
+      // Se redirige directamente al dashboard. El layout se encargará de la carga.
+      router.push("/dashboard")
     } catch (authError: any) {
       console.error("Error de Firebase Auth:", authError)
       setError("Usuario o contraseña incorrectos. Verifique sus credenciales.")

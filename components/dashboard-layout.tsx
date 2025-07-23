@@ -17,9 +17,10 @@ import {
   BarChart,
   DollarSign,
   Wrench,
+  Store,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getAuth, signOut } from "firebase/auth"
+import { getAuth, signOut, onAuthStateChanged } from "firebase/auth"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -30,45 +31,53 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { motion, AnimatePresence } from "framer-motion"
 import MobileMenu from "@/components/mobile-menu"
+import { useStore } from "@/hooks/use-store"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = false, ...props }) => {
-  const itemContent = (
-    <div
-      className={cn(
-        "flex h-10 w-full items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground group-hover:justify-start group-hover:px-4",
-        active && "bg-accent text-accent-foreground"
-      )}
-      {...props}
-    >
-      <Icon className="h-5 w-5 shrink-0" />
-      <div className="ml-4 flex flex-1 items-center justify-between max-w-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:max-w-full group-hover:opacity-100">
-        <span className="whitespace-nowrap">{label}</span>
-        {children}
-      </div>
-    </div>
+// --- VERSIÓN CORREGIDA Y ROBUSTA DE NavItem ---
+// Esta nueva implementación soluciona el problema de alineación visual.
+const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = false }) => {
+  const commonClasses = cn(
+    "flex items-center h-10 w-full justify-center group-hover:justify-start group-hover:px-4 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+    active && "bg-accent text-accent-foreground"
   );
 
-  const trigger = isCollapsible ? (
-    <CollapsibleTrigger asChild>{itemContent}</CollapsibleTrigger>
+  const itemContent = (
+    <>
+      <Icon className="h-5 w-5 shrink-0" />
+      <div className="ml-4 flex-1 overflow-hidden opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <span className="whitespace-nowrap">{label}</span>
+      </div>
+      {children && <div className="ml-auto opacity-0 transition-opacity duration-200 group-hover:opacity-100">{children}</div>}
+    </>
+  );
+
+  const triggerElement = isCollapsible ? (
+    <CollapsibleTrigger className={commonClasses} asChild>
+      <div>{itemContent}</div>
+    </CollapsibleTrigger>
   ) : (
-    <Link href={href} className="w-full">
+    <Link href={href || "#"} className={commonClasses}>
       {itemContent}
     </Link>
   );
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipTrigger asChild>
+        {triggerElement}
+      </TooltipTrigger>
       <TooltipContent side="right" className="group-hover:hidden">
         {label}
       </TooltipContent>
@@ -87,6 +96,34 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
   const [isDolarLoading, setIsDolarLoading] = useState(true);
+
+  const { selectedStore, setSelectedStore } = useStore();
+
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser && firebaseUser.email) {
+        let role = "moderator";
+        if (firebaseUser.email.endsWith("@admin.com")) {
+          role = "admin";
+        }
+        
+        const userData = {
+          username: firebaseUser.email,
+          role: role,
+        };
+        
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+        setIsLoading(false);
+      } else {
+        localStorage.removeItem("user");
+        router.push("/");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     const fetchDolarBlue = async () => {
@@ -112,19 +149,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, []);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem("user");
-        router.push("/");
-      }
-    } else {
-      router.push("/");
-    }
-    setIsLoading(false);
-
     const categoriesRef = ref(database, "categories")
     const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -141,7 +165,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => {
         unsubscribeCategories();
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     if (pathname.startsWith("/dashboard/inventory")) {
@@ -152,27 +176,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [pathname])
 
   const handleLogout = async () => {
+    const auth = getAuth();
     try {
-      const auth = getAuth()
-      await signOut(auth)
+      await signOut(auth);
     } catch (error) {
-      console.error("Error al cerrar sesión:", error)
-    } finally {
-      localStorage.removeItem("user")
-      router.push("/")
+      console.error("Error al cerrar sesión:", error);
     }
   }
   
-  const handleInventoryLinkClick = () => {
-    setIsInventoryOpen(false);
-  };
-
   const currentCategory = searchParams.get('category')
 
   const pageVariants = {
     initial: { opacity: 0, y: 5 },
     in: { opacity: 1, y: 0 },
     out: { opacity: 0, y: -5 },
+  };
+  
+  const storeLabel = {
+    all: 'Todos los locales',
+    local1: 'Local 1',
+    local2: 'Local 2'
   };
 
   if (isLoading) {
@@ -199,6 +222,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </Link>
           </div>
           <div className="flex items-center gap-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Store className="h-4 w-4" />
+                  <span className="hidden sm:inline">{storeLabel[selectedStore]}</span>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-48">
+                <DropdownMenuLabel>Seleccionar Local</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={selectedStore} onValueChange={(value) => setSelectedStore(value as any)}>
+                  <DropdownMenuRadioItem value="all">Todos los locales</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="local1">Local 1</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="local2">Local 2</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <div className="hidden sm:flex items-center gap-2">
                 <span className="font-semibold text-sm text-blue-600">Dólar Blue:</span>
                 {isDolarLoading ? (
@@ -253,9 +295,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", isInventoryOpen && "rotate-180")}/>
                 </NavItem>
                 <CollapsibleContent className="space-y-1 pt-1 hidden group-hover:block">
-                  <Link href="/dashboard/inventory" onClick={handleInventoryLinkClick} className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", pathname === "/dashboard/inventory" && !currentCategory && "bg-slate-200 font-semibold")}>Todos</Link>
+                  <Link href="/dashboard/inventory" className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", pathname === "/dashboard/inventory" && !currentCategory && "bg-slate-200 font-semibold")}>Todos</Link>
                   {categories.map((category) => (
-                    <Link key={category} href={`/dashboard/inventory?category=${encodeURIComponent(category)}`} onClick={handleInventoryLinkClick} className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", currentCategory === category && "bg-slate-200 font-semibold")}>{category}</Link>
+                    <Link key={category} href={`/dashboard/inventory?category=${encodeURIComponent(category)}`} className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", currentCategory === category && "bg-slate-200 font-semibold")}>{category}</Link>
                   ))}
                 </CollapsibleContent>
               </Collapsible>

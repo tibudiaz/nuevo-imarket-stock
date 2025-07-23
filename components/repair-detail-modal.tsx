@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react" // Se importa useEffect
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,50 +9,82 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
-import { generateDeliveryReceiptPdf } from "@/lib/pdf-generator"
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { generateDeliveryReceiptPdf } from "@/lib/pdf-generator";
 
-export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }) {
-  if (!repair) return null
+// --- INTERFAZ UNIFICADA Y DEFINITIVA ---
+// Usando la misma estructura que la página principal para consistencia.
+interface Repair {
+  id: string;
+  receiptNumber: string;
+  customerName: string;
+  customerDni?: string;
+  customerPhone?: string;
+  productName: string;
+  entryDate: string;
+  description: string;
+  technicianNotes?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'delivered' | 'cancelled';
+  estimatedPrice?: number;
+  repairCost?: number;
+  finalPrice?: number;
+  deliveredAt?: string;
+  [key: string]: any;
+}
 
-  const [editableRepair, setEditableRepair] = useState(repair)
+interface RepairDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  repair: Repair | null;
+  onUpdate: (id: string, data: Partial<Repair>) => Promise<void>;
+}
 
-  // --- CORRECCIÓN: Se añade useEffect para resetear el estado ---
+export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }: RepairDetailModalProps) {
+  const [editableRepair, setEditableRepair] = useState<Repair | null>(repair);
+
   useEffect(() => {
-    setEditableRepair(repair);
+    if (repair) {
+      setEditableRepair({ ...repair });
+    }
   }, [repair]);
+
+  if (!repair || !editableRepair) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;
-    setEditableRepair(prev => ({ ...prev, [id]: type === 'number' ? parseFloat(value) || 0 : value }));
+    setEditableRepair(prev => prev ? { ...prev, [id]: type === 'number' ? parseFloat(value) || 0 : value } : null);
   }
 
-  const handleStatusChange = (value: string) => {
-    setEditableRepair(prev => ({ ...prev, status: value }));
+  const handleStatusChange = (value: Repair['status']) => {
+    setEditableRepair(prev => prev ? { ...prev, status: value } : null);
   }
 
   const handleUpdate = async () => {
+    if (!editableRepair) return;
+    
     const updatedData = {
         ...editableRepair,
         deliveredAt: editableRepair.status === 'delivered' && !repair.deliveredAt 
             ? new Date().toISOString() 
-            : repair.deliveredAt || null
-    }
+            : repair.deliveredAt,
+    };
     
-    await onUpdate(repair.id, updatedData)
+    await onUpdate(repair.id, updatedData);
 
-    if (updatedData.status === 'delivered') {
-        await generateDeliveryReceiptPdf(updatedData);
+    if (updatedData.status === 'delivered' && repair.status !== 'delivered') {
+        const pdfDataForGeneration = { ...repair, ...updatedData };
+        await generateDeliveryReceiptPdf(pdfDataForGeneration);
     }
+    onClose();
   }
 
-  const getStatusVariant = (status) => {
+  const getStatusVariant = (status: Repair['status']) => {
     switch (status) {
       case 'pending': return 'destructive';
       case 'in_progress': return 'secondary';
@@ -79,18 +111,18 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate })
             <div className="space-y-2 text-sm">
               <p><span className="font-medium text-muted-foreground">Fecha de Ingreso:</span> {new Date(repair.entryDate).toLocaleString()}</p>
               {repair.deliveredAt && <p><span className="font-medium text-muted-foreground">Fecha de Entrega:</span> {new Date(repair.deliveredAt).toLocaleString()}</p>}
-              <p><span className="font-medium text-muted-foreground">Presupuesto:</span> ${repair.estimatedPrice?.toFixed(2)}</p>
-              <p><span className="font-medium text-muted-foreground">Costo Reparación:</span> ${repair.repairCost?.toFixed(2)}</p>
+              <p><span className="font-medium text-muted-foreground">Presupuesto:</span> ${repair.estimatedPrice?.toFixed(2) || '0.00'}</p>
+              <p><span className="font-medium text-muted-foreground">Costo Reparación:</span> ${repair.repairCost?.toFixed(2) || '0.00'}</p>
               <p><span className="font-medium text-muted-foreground">Precio Final:</span> ${repair.finalPrice?.toFixed(2) || 'No definido'}</p>
-              <p className="flex items-center gap-2"><span className="font-medium text-muted-foreground">Estado Actual:</span> <Badge variant={getStatusVariant(repair.status)}>{repair.status.replace('_', ' ')}</Badge></p>
+              <p className="flex items-center gap-2"><span className="font-medium text-muted-foreground">Estado Actual:</span> <Badge variant={getStatusVariant(repair.status)}>{repair.status.replace(/_/g, ' ')}</Badge></p>
             </div>
             <div className="mt-4">
                 <Label htmlFor="description" className="font-semibold">Falla reportada</Label>
-                <Textarea id="description" value={editableRepair.description} onChange={handleChange} className="mt-1" />
+                <Textarea id="description" value={editableRepair.description || ''} onChange={handleChange} className="mt-1" />
             </div>
              <div className="mt-4">
                 <Label htmlFor="technicianNotes" className="font-semibold">Notas del técnico</Label>
-                <Textarea id="technicianNotes" value={editableRepair.technicianNotes} onChange={handleChange} className="mt-1" />
+                <Textarea id="technicianNotes" value={editableRepair.technicianNotes || ''} onChange={handleChange} className="mt-1" />
             </div>
           </div>
           <div>
@@ -113,7 +145,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate })
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="finalPrice">Precio Final ($)</Label>
-                    <Input id="finalPrice" type="number" value={editableRepair.finalPrice} onChange={handleChange} />
+                    <Input id="finalPrice" type="number" value={editableRepair.finalPrice || ''} onChange={handleChange} />
                 </div>
              </div>
           </div>

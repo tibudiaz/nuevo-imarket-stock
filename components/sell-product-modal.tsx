@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { ref, set, push, get, update, onValue, query, orderByChild, equalTo, remove } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -19,9 +19,10 @@ import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone
 import { toast } from "sonner"
 import { generateSaleReceiptPdf } from "@/lib/pdf-generator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { convertPrice, formatCurrency } from "@/lib/price-converter"
+import { convertPrice, formatCurrency } from "../lib/price-converter"
 import { Separator } from "@/components/ui/separator"
 
+// --- Interfaces para Tipado Fuerte ---
 interface CartProduct {
   id: string;
   name: string;
@@ -47,13 +48,34 @@ interface BundleRule {
   accessories: { id: string; name: string; category: string }[];
 }
 
+interface Sale {
+    id: string;
+    receiptNumber: string;
+    date: string;
+    customerId: string | null;
+    customerName: string;
+    customerDni: string;
+    customerPhone: string;
+    items: any[]; // Se mantiene flexible para los items de la venta
+    paymentMethod: string;
+    totalAmount: number;
+    tradeIn: any;
+    usdRate: number;
+}
 
-export default function SellProductModal({ isOpen, onClose, product, onProductSold }) {
+interface SellProductModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  product: CartProduct | null;
+  onProductSold: () => void;
+}
+
+export default function SellProductModal({ isOpen, onClose, product, onProductSold }: SellProductModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [customer, setCustomer] = useState({ name: "", dni: "", phone: "", email: "" })
   const [paymentMethod, setPaymentMethod] = useState("efectivo")
-  const [completedSale, setCompletedSale] = useState(null)
+  const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false)
   const [receiptNumber, setReceiptNumber] = useState("")
 
@@ -65,12 +87,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [tradeInProduct, setTradeInProduct] = useState({ name: "", imei: "", price: 0, serialNumber: "" });
   const [bundles, setBundles] = useState<BundleRule[]>([]);
   
-  // --- CORRECCIÓN: Nuevo estado para controlar la carga inicial ---
   const [initialProductProcessed, setInitialProductProcessed] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      // Resetea el estado del producto procesado cada vez que se abre el modal
       setInitialProductProcessed(false);
       
       const productsRef = ref(database, "products")
@@ -109,40 +129,22 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
   }, [isOpen]);
 
-  // --- CORRECCIÓN: Nuevo useEffect para manejar la adición del producto inicial ---
-  useEffect(() => {
-    // Se ejecuta solo si el modal está abierto, hay un producto inicial, las dependencias de datos están cargadas, y aún no ha sido procesado.
-    if (isOpen && product && !initialProductProcessed && allProducts.length > 0 && bundles.length > 0) {
-      handleAddProductToCart(product, true);
-      setInitialProductProcessed(true); // Marca como procesado para evitar que se ejecute de nuevo
-    }
-  }, [isOpen, product, allProducts, bundles, initialProductProcessed]);
-
-
   const searchCustomerByDni = async () => {
     if (!customer.dni) {
       toast.error("Por favor, ingrese un DNI para buscar.");
       return;
     }
     
-    const normalizedDni = customer.dni.replace(/\./g, "");
-    
     setIsSearching(true);
     try {
       const customersRef = ref(database, "customers");
-      let foundCustomerData = null;
-      const snapshot = await get(customersRef);
-      if (snapshot.exists()) {
-        snapshot.forEach((childSnapshot) => {
-            const dbDni = (childSnapshot.val().dni || "").replace(/\./g, "");
-            if(dbDni === normalizedDni) {
-                foundCustomerData = childSnapshot.val();
-            }
-        });
-      }
+      // CORRECCIÓN: Se utiliza una consulta (query) para buscar eficientemente en la base de datos.
+      const q = query(customersRef, orderByChild('dni'), equalTo(customer.dni.replace(/\./g, "")));
+      const snapshot = await get(q);
 
-      if (foundCustomerData) {
-          setCustomer({ name: foundCustomerData.name, dni: foundCustomerData.dni, phone: foundCustomerData.phone || "", email: foundCustomerData.email || "" });
+      if (snapshot.exists()) {
+          const customerData = Object.values(snapshot.val())[0] as any;
+          setCustomer({ name: customerData.name, dni: customerData.dni, phone: customerData.phone || "", email: customerData.email || "" });
           toast.success("Cliente encontrado");
       } else {
           toast.info("Cliente no encontrado, puede registrarlo.");
@@ -153,81 +155,92 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         setIsSearching(false);
     }
   };
+  
+  // CORRECCIÓN: Se movió la lógica a una función memoizada con `useCallback` para evitar re-creaciones innecesarias
+  // y se consolidó la lógica de actualización del carrito para prevenir errores de estado.
+  const handleAddProductToCart = useCallback((productToAdd: CartProduct, isInitialProduct = false) => {
+      setCart(prevCart => {
+          let newCart = [...prevCart];
+          const accessoriesToAdd: CartProduct[] = [];
 
-  const handleAddProductToCart = (productToAdd, isInitialProduct = false) => {
-    const existingProductInCart = cart.find(item => item.id === productToAdd.id);
-  
-    setCart(prevCart => {
-      if (existingProductInCart) {
-        return prevCart.map(item => item.id === productToAdd.id ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...prevCart, { ...productToAdd, quantity: 1 }];
-    });
-    
-    if (!isInitialProduct) {
-      setProductSearchTerm("");
-    }
-  
-    const isCellphone = productToAdd.category?.toLowerCase().includes('celular');
-    if (!isCellphone) return;
-  
-    const parseModelFromProductName = (name: string): string => {
-      const match = name.match(/^(\d+\s*(?:pro|max|pro max|plus)?)/i);
-      return match ? match[1].trim().replace(/\s+/g, ' ') : name;
-    };
-  
-    const mainProductModel = parseModelFromProductName(productToAdd.name || "");
-    if (!mainProductModel) return;
-
-    let matchedRule: BundleRule | undefined;
-  
-    for (const rule of bundles) {
-      const { start, end, category } = rule.conditions;
-      const productCategory = productToAdd.category || "";
-      
-      const modelNumber = parseInt(mainProductModel.replace(/[^0-9]/g, ''), 10);
-      const startNumber = start ? parseInt(start.replace(/[^0-9]/g, ''), 10) : 0;
-      const endNumber = end ? parseInt(end.replace(/[^0-9]/g, ''), 10) : 0;
-  
-      if (rule.type === 'category' && productCategory === category) { matchedRule = rule; break; }
-      if (rule.type === 'model_range' && start && end && modelNumber >= startNumber && modelNumber <= endNumber) { matchedRule = rule; break; }
-      if (rule.type === 'model_start' && start && modelNumber >= startNumber) { matchedRule = rule; break; }
-    }
-  
-    if (matchedRule) {
-      const accessoriesToAdd: CartProduct[] = [];
-      matchedRule.accessories.forEach(acc => {
-        const accessoryCategory = acc.category; 
-        
-        const accessoryProduct = allProducts.find(p => 
-          p.category?.toLowerCase() === accessoryCategory?.toLowerCase() &&
-          p.model?.toLowerCase() === mainProductModel.toLowerCase()
-        );
-  
-        if (accessoryProduct) {
-          if (accessoryProduct.stock > 0) {
-            accessoriesToAdd.push({ ...accessoryProduct, quantity: 1, price: 0 });
+          const existingProductInCart = newCart.find(item => item.id === productToAdd.id);
+          if (existingProductInCart) {
+              newCart = newCart.map(item => item.id === productToAdd.id ? { ...item, quantity: item.quantity + 1 } : item);
           } else {
-            toast.warning(`Sin stock`, { description: `El accesorio para "${mainProductModel}" no tiene stock.` });
+              newCart.push({ ...productToAdd, quantity: 1 });
           }
-        } else {
-           toast.error(`Accesorio no encontrado`, { description: `No se encontró un producto de categoría "${accessoryCategory}" para el modelo "${mainProductModel}".` });
-        }
-      });
-      if (accessoriesToAdd.length > 0) {
-        setCart(prevCart => {
-          const newCart = [...prevCart];
-          accessoriesToAdd.forEach(accToAdd => { if (!newCart.find(item => item.id === accToAdd.id)) { newCart.push(accToAdd); } });
-          return newCart;
-        });
-        toast.info(`Combo "${matchedRule.name}" aplicado`, { description: `Se agregaron ${accessoriesToAdd.length} accesorios de regalo.` });
-      }
-    }
-  };
 
-  const handleRemoveProductFromCart = (productId) => setCart(cart.filter(item => item.id !== productId));
-  const handleQuantityChange = (productId, newQuantity) => {
-    if (newQuantity < 1) { handleRemoveProductFromCart(productId); return; }
+          if (!isInitialProduct) {
+              setProductSearchTerm("");
+          }
+
+          const isCellphone = productToAdd.category?.toLowerCase().includes('celular');
+          if (isCellphone) {
+            const parseModelFromProductName = (name: string): string => {
+              const match = name.match(/^(\d+\s*(?:pro|max|pro max|plus)?)/i);
+              return match ? match[1].trim().replace(/\s+/g, ' ') : name;
+            };
+
+            const mainProductModel = parseModelFromProductName(productToAdd.name || "");
+            if (mainProductModel) {
+                let matchedRule: BundleRule | undefined;
+                for (const rule of bundles) {
+                    const { start, end, category } = rule.conditions;
+                    const productCategory = productToAdd.category || "";
+                    const modelNumber = parseInt(mainProductModel.replace(/[^0-9]/g, ''), 10);
+                    const startNumber = start ? parseInt(start.replace(/[^0-9]/g, ''), 10) : 0;
+                    const endNumber = end ? parseInt(end.replace(/[^0-9]/g, ''), 10) : 0;
+
+                    if ((rule.type === 'category' && productCategory === category) ||
+                        (rule.type === 'model_range' && start && end && modelNumber >= startNumber && modelNumber <= endNumber) ||
+                        (rule.type === 'model_start' && start && modelNumber >= startNumber)) {
+                        matchedRule = rule;
+                        break;
+                    }
+                }
+
+                if (matchedRule) {
+                    matchedRule.accessories.forEach(acc => {
+                        const accessoryProduct = allProducts.find(p =>
+                            p.category?.toLowerCase() === acc.category?.toLowerCase() &&
+                            p.model?.toLowerCase() === mainProductModel.toLowerCase()
+                        );
+
+                        if (accessoryProduct) {
+                            if (accessoryProduct.stock > 0 && !newCart.find(item => item.id === accessoryProduct.id)) {
+                                accessoriesToAdd.push({ ...accessoryProduct, quantity: 1, price: 0 });
+                            } else if (accessoryProduct.stock <= 0) {
+                                toast.warning(`Sin stock`, { description: `El accesorio para "${mainProductModel}" no tiene stock.` });
+                            }
+                        } else {
+                            toast.error(`Accesorio no encontrado`, { description: `No se encontró un producto de categoría "${acc.category}" para el modelo "${mainProductModel}".` });
+                        }
+                    });
+
+                    if (accessoriesToAdd.length > 0) {
+                        toast.info(`Combo "${matchedRule.name}" aplicado`, { description: `Se agregaron ${accessoriesToAdd.length} accesorios de regalo.` });
+                    }
+                }
+            }
+          }
+          return [...newCart, ...accessoriesToAdd];
+      });
+  }, [allProducts, bundles]);
+
+  useEffect(() => {
+    if (isOpen && product && !initialProductProcessed && allProducts.length > 0) {
+      handleAddProductToCart(product, true);
+      setInitialProductProcessed(true);
+    }
+  }, [isOpen, product, allProducts, bundles, initialProductProcessed, handleAddProductToCart]);
+
+
+  const handleRemoveProductFromCart = (productId: string) => setCart(cart.filter(item => item.id !== productId));
+  const handleQuantityChange = (productId: string, newQuantity: number) => {
+    if (newQuantity < 1) {
+      handleRemoveProductFromCart(productId);
+      return;
+    }
     setCart(cart.map(item => item.id === productId ? { ...item, quantity: newQuantity } : item));
   };
   const searchedProducts = useMemo(() => {
@@ -256,7 +269,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         const customersRef = ref(database, "customers");
         const q = query(customersRef, orderByChild('dni'), equalTo(customer.dni));
         const customerSnapshot = await get(q);
-        let customerId;
+        let customerId: string | null = null;
 
         if (customerSnapshot.exists()) {
             customerId = Object.keys(customerSnapshot.val())[0];
@@ -279,11 +292,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     throw new Error(`Stock insuficiente para ${item.name}.`);
                 }
 
-                if (newStock === 0) {
-                    await remove(productRef);
-                } else {
-                    await update(productRef, { stock: newStock });
-                }
+                await update(productRef, { stock: newStock });
             }
         }
         
@@ -308,8 +317,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
 
         const newSaleRef = push(ref(database, "sales"));
-        const saleData = {
-            id: newSaleRef.key,
+        const saleData: Sale = {
+            id: newSaleRef.key!,
             receiptNumber,
             date: new Date().toISOString(),
             customerId,
@@ -344,7 +353,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
   };
 
-  const handlePdfDialogClose = async (generatePdfOption) => {
+  const handlePdfDialogClose = async (generatePdfOption: boolean) => {
     setIsPdfDialogOpen(false);
     if (generatePdfOption && completedSale) {
         await generateSaleReceiptPdf(completedSale);

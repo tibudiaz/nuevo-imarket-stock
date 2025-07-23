@@ -136,9 +136,13 @@ export default function SalesPage() {
 
     const productCounts: Record<string, number> = {}
     salesData.forEach((sale) => {
-      sale.items?.forEach(item => {
-        productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity;
-      });
+      if (Array.isArray(sale.items)) {
+        sale.items.forEach(item => {
+          if (item.productName && typeof item.quantity === 'number') {
+            productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity;
+          }
+        });
+      }
     })
 
     let topProductName = ""
@@ -157,9 +161,9 @@ export default function SalesPage() {
 
   const filteredSales = sales.filter(
     (sale) =>
-      sale.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.customerDni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.items?.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()))
+      (sale.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sale.customerDni || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sale.items || []).some(item => (item.productName || "").toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const handleViewDetails = (sale: Sale) => {
@@ -190,40 +194,44 @@ export default function SalesPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                <div className="text-2xl font-bold">${dailySales.total.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">{dailySales.count} ventas hoy</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Ventas de la Semana</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                <div className="text-2xl font-bold">${weeklySales.total.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">{weeklySales.count} ventas esta semana</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Productos Más Vendidos</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                <div className="text-lg font-medium">{topProduct.name || "Sin datos"}</div>
-                <p className="text-xs text-muted-foreground">
-                    {topProduct.count > 0 ? `${topProduct.count} unidades vendidas` : "No hay ventas registradas"}
-                </p>
-                </CardContent>
-            </Card>
-        </div>
+        {/* --- CORRECCIÓN CLAVE --- */}
+        {/* Este bloque de tarjetas solo se renderizará si el rol del usuario es 'admin'. */}
+        {user?.role === 'admin' && (
+          <div className="grid gap-4 md:grid-cols-3 mb-6">
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                  <div className="text-2xl font-bold">${dailySales.total.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">{dailySales.count} ventas hoy</p>
+                  </CardContent>
+              </Card>
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Ventas de la Semana</CardTitle>
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                  <div className="text-2xl font-bold">${weeklySales.total.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">{weeklySales.count} ventas esta semana</p>
+                  </CardContent>
+              </Card>
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Productos Más Vendidos</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                  <div className="text-lg font-medium">{topProduct.name || "Sin datos"}</div>
+                  <p className="text-xs text-muted-foreground">
+                      {topProduct.count > 0 ? `${topProduct.count} unidades vendidas` : "No hay ventas registradas"}
+                  </p>
+                  </CardContent>
+              </Card>
+          </div>
+        )}
 
         <div className="rounded-md border">
           <Table>
@@ -255,7 +263,7 @@ export default function SalesPage() {
                     </TableCell>
                     <TableCell>{sale.customerDni}</TableCell>
                     <TableCell>
-                        {sale.items?.map(item => `${item.quantity}x ${item.productName}`).join(', ')}
+                        {(sale.items || []).map(item => `${item.quantity}x ${item.productName}`).join(', ')}
                     </TableCell>
                     <TableCell>${Number(sale.totalAmount).toFixed(2)}</TableCell>
                     <TableCell>
