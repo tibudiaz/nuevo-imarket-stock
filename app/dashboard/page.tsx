@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShoppingBag, Package, DollarSign, TrendingUp, User, AlertTriangle } from "lucide-react"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -76,21 +77,39 @@ export default function Dashboard() {
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser && firebaseUser.email) {
+        const role = firebaseUser.email.endsWith("@admin.com")
+          ? "admin"
+          : "moderator";
+        const currentUser = {
+          username: firebaseUser.email,
+          role,
+        };
+        setUser(currentUser);
+        localStorage.setItem("user", JSON.stringify(currentUser));
+        setIsLoading(false);
+      } else {
+        const storedUser = localStorage.getItem("user");
+        if (!storedUser) {
+          router.push("/");
+          return;
+        }
 
-    try {
-      const parsedUser = JSON.parse(storedUser)
-      setUser(parsedUser)
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
-    } finally {
-        setIsLoading(false)
-    }
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+        } catch (e) {
+          localStorage.removeItem("user");
+          router.push("/");
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, [router])
 
   useEffect(() => {

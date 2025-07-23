@@ -8,7 +8,12 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth"
 
 export default function LoginForm() {
   const router = useRouter()
@@ -23,9 +28,28 @@ export default function LoginForm() {
     setIsLoading(true)
 
     const auth = getAuth()
-    
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      await setPersistence(auth, browserLocalPersistence)
+      const credentials = await signInWithEmailAndPassword(
+        auth,
+        trimmedEmail,
+        trimmedPassword,
+      )
+
+      if (credentials.user && credentials.user.email) {
+        const role = credentials.user.email.endsWith("@admin.com")
+          ? "admin"
+          : "moderator"
+        const userData = {
+          username: credentials.user.email,
+          role,
+        }
+        localStorage.setItem("user", JSON.stringify(userData))
+      }
+
       // --- CORRECCIÓN CLAVE ---
       // Se redirige directamente al dashboard. El layout se encargará de la carga.
       router.push("/dashboard")
