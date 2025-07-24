@@ -20,9 +20,10 @@ import {
   Store,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getAuth, signOut, onAuthStateChanged } from "firebase/auth"
+import { getAuth, signOut } from "firebase/auth"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { useAuth } from "@/hooks/use-auth"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   DropdownMenu,
@@ -90,51 +91,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [user, setUser] = useState<{ username: string; role: string } | null>(null)
+  const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<string[]>([])
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(true);
   const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
   const [isDolarLoading, setIsDolarLoading] = useState(true);
 
   const { selectedStore, setSelectedStore } = useStore();
 
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser && firebaseUser.email) {
-        let role = "moderator";
-        if (firebaseUser.email.endsWith("@admin.com")) {
-          role = "admin";
-        }
-        
-        const userData = {
-          username: firebaseUser.email,
-          role: role,
-        };
-        
-        setUser(userData);
-        localStorage.setItem("user", JSON.stringify(userData));
-        setIsLoading(false);
-      } else {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-          try {
-            setUser(JSON.parse(storedUser));
-            setIsLoading(false);
-            return;
-          } catch {
-            localStorage.removeItem("user");
-          }
-        }
-        localStorage.removeItem("user");
-        setUser(null);
-        setIsLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [router]);
 
   useEffect(() => {
     const fetchDolarBlue = async () => {
@@ -191,7 +155,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     try {
       localStorage.removeItem("user");
       await signOut(auth);
-      setUser(null);
       router.push("/");
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
@@ -213,12 +176,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!authLoading && !user) {
       router.replace('/');
     }
-  }, [isLoading, user, router]);
+  }, [authLoading, user, router]);
 
-  if (isLoading) {
+  if (authLoading) {
     return (
         <div className="flex h-screen items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
