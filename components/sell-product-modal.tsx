@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone, Mail } from "lucide-react"
+import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone, Mail, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { generateSaleReceiptPdf } from "@/lib/pdf-generator"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -77,6 +77,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [paymentMethod, setPaymentMethod] = useState("efectivo")
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false)
+  const [isReserveDialogOpen, setIsReserveDialogOpen] = useState(false)
+  const [reserveAmount, setReserveAmount] = useState(0)
+  const [reserveExpirationDate, setReserveExpirationDate] = useState("")
   const [receiptNumber, setReceiptNumber] = useState("")
 
   const [cart, setCart] = useState<CartProduct[]>([])
@@ -353,6 +356,80 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
   };
 
+  const handleReserveProduct = async () => {
+    if (!customer.name || !customer.dni || !customer.phone) {
+      toast.error("Faltan datos del cliente", { description: "Por favor, complete nombre, DNI y teléfono." });
+      return;
+    }
+    if (cart.length === 0) {
+      toast.error("El carrito está vacío.");
+      return;
+    }
+    if (!reserveExpirationDate) {
+      toast.error("Seleccione fecha límite de retiro");
+      return;
+    }
+    if (reserveAmount <= 0) {
+      toast.error("Monto de seña inválido");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const customersRef = ref(database, "customers");
+      const q = query(customersRef, orderByChild('dni'), equalTo(customer.dni.replace(/\./g, "")));
+      const customerSnapshot = await get(q);
+      let customerId: string | null = null;
+
+      if (customerSnapshot.exists()) {
+        customerId = Object.keys(customerSnapshot.val())[0];
+        const customerRef = ref(database, `customers/${customerId}`);
+        await update(customerRef, { ...customer, lastPurchase: new Date().toISOString() });
+      } else {
+        const newCustomerRef = push(customersRef);
+        customerId = newCustomerRef.key;
+        await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId });
+      }
+
+      const item = cart[0];
+      const productRef = ref(database, `products/${item.id}`);
+      const productSnapshot = await get(productRef);
+      if (!productSnapshot.exists()) throw new Error('Producto no encontrado');
+      const currentStock = productSnapshot.val().stock || 0;
+      if (currentStock <= 0) throw new Error('Sin stock disponible');
+
+      await update(productRef, { stock: currentStock - 1, reserved: true });
+
+      const newReserveRef = push(ref(database, 'reserves'));
+      const priceARS = convertPrice(item.price, usdRate) * item.quantity;
+      const reserveData = {
+        id: newReserveRef.key,
+        date: new Date().toISOString(),
+        expirationDate: reserveExpirationDate,
+        customerId,
+        customerName: customer.name,
+        customerDni: customer.dni,
+        productName: item.name,
+        productId: item.id,
+        productPrice: priceARS,
+        productStock: currentStock,
+        downPayment: reserveAmount,
+        remainingAmount: priceARS - reserveAmount,
+        status: 'reserved'
+      };
+      await set(newReserveRef, reserveData);
+
+      toast.success('Producto reservado correctamente');
+      setIsReserveDialogOpen(false);
+      onProductSold();
+      onClose();
+    } catch (error) {
+      toast.error('Error al reservar', { description: (error as Error).message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handlePdfDialogClose = async (generatePdfOption: boolean) => {
     setIsPdfDialogOpen(false);
     if (generatePdfOption && completedSale) {
@@ -438,6 +515,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               </div>
               <div className="flex gap-2">
                   <Button variant="outline" onClick={onClose}>Cancelar</Button>
+                  <Button variant="secondary" onClick={() => setIsReserveDialogOpen(true)} disabled={cart.length === 0}>Reservar</Button>
                   <Button onClick={handleSellProduct} disabled={isLoading || cart.length === 0}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Completar Venta</Button>
               </div>
             </div>
@@ -450,6 +528,29 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           <DialogContent><DialogHeader><DialogTitle>Venta Completada</DialogTitle><DialogDescription>¿Deseas generar el comprobante de la venta en PDF?</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => handlePdfDialogClose(false)}>No, gracias</Button><Button onClick={() => handlePdfDialogClose(true)}><FileText className="mr-2 h-4 w-4" />Generar PDF</Button></DialogFooter></DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={isReserveDialogOpen} onOpenChange={setIsReserveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reservar Producto</DialogTitle>
+            <DialogDescription>Ingrese monto de seña y fecha límite para retirar.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reserve-amount">Monto de Seña (ARS)</Label>
+              <Input id="reserve-amount" type="number" value={reserveAmount} onChange={(e) => setReserveAmount(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reserve-date" className="flex items-center gap-1.5"><Calendar className="h-4 w-4"/>Fecha Límite</Label>
+              <Input id="reserve-date" type="date" value={reserveExpirationDate} onChange={(e) => setReserveExpirationDate(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReserveDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleReserveProduct} disabled={isLoading || reserveAmount <= 0 || !reserveExpirationDate}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar Reserva</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -323,6 +323,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </Collapsible>
               
               <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
+              <NavItem href="/dashboard/reserves" icon={ShoppingCart} label="Reservas" active={pathname === "/dashboard/reserves"} />
               <NavItem href="/dashboard/repairs" icon={Wrench} label="Reparaciones" active={pathname === "/dashboard/repairs"} />
               
               {user?.role === 'admin' && (
