@@ -142,30 +142,13 @@ export default function InventoryPage() {
     editingProduct?.category === "Celulares Nuevos";
 
   useEffect(() => {
-    const auth = getAuth();
-
-    if (auth.currentUser) {
-      const role = auth.currentUser.email?.endsWith("@admin.com")
-        ? "admin"
-        : "moderator";
-      const currentUser = {
-        username: auth.currentUser.email || "",
-        role,
-      };
-      setUser(currentUser);
-      localStorage.setItem("user", JSON.stringify(currentUser));
-    } else {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
-        router.push("/");
-        return;
-      }
-
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
-      } catch (e) {
+      } catch {
         localStorage.removeItem("user");
-        router.push("/");
+        setUser(null);
       }
     }
 
@@ -214,7 +197,7 @@ export default function InventoryPage() {
       unsubscribeProducts();
       unsubscribeCategories();
     };
-  }, [router]);
+  }, []);
 
   // --- CORRECCIÓN CLAVE DE RENDIMIENTO ---
   // Se usa `useMemo` para evitar que el filtrado se ejecute en cada renderizado.
