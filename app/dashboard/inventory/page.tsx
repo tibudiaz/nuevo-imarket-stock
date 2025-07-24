@@ -46,7 +46,6 @@ import {
 } from "lucide-react";
 import { ref, onValue, set, push, remove, update } from "firebase/database";
 import { database } from "@/lib/firebase";
-import { getAuth } from "firebase/auth";
 import { toast } from "sonner";
 import SellProductModal from "@/components/sell-product-modal";
 import TransferProductDialog from "@/components/transfer-product-dialog";
@@ -59,6 +58,7 @@ import {
 } from "@/components/ui/select";
 import { useMobile } from "@/hooks/use-mobile";
 import { useStore } from "@/hooks/use-store";
+import { useAuth } from "@/hooks/use-auth";
 
 // --- Interfaces ---
 interface User {
@@ -107,7 +107,7 @@ export default function InventoryPage() {
   const isMobile = useMobile();
   const { selectedStore } = useStore();
 
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -143,31 +143,7 @@ export default function InventoryPage() {
     editingProduct?.category === "Celulares Nuevos";
 
   useEffect(() => {
-    const auth = getAuth();
-    if (auth.currentUser) {
-      const role = auth.currentUser.email?.endsWith("@admin.com")
-        ? "admin"
-        : "moderator";
-      const currentUser = {
-        username: auth.currentUser.email || "",
-        role,
-      };
-      setUser(currentUser);
-      localStorage.setItem("user", JSON.stringify(currentUser));
-    } else {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
-        router.push("/");
-        return;
-      }
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem("user");
-        router.push("/");
-        return;
-      }
-    }
+    if (authLoading || !user) return;
 
     const productsRef = ref(database, "products");
     const unsubscribeProducts = onValue(
@@ -214,7 +190,7 @@ export default function InventoryPage() {
       unsubscribeProducts();
       unsubscribeCategories();
     };
-  }, []);
+  }, [authLoading, user]);
 
   // --- CORRECCIÓN CLAVE DE RENDIMIENTO ---
   // Se usa `useMemo` para evitar que el filtrado se ejecute en cada renderizado.
