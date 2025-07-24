@@ -128,6 +128,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           }
         }
         localStorage.removeItem("user");
+        setIsLoading(false);
         router.push("/");
       }
     });
@@ -210,6 +211,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     local1: 'Local 1',
     local2: 'Local 2'
   };
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/');
+    }
+  }, [isLoading, user, router]);
 
   if (isLoading) {
     return (
