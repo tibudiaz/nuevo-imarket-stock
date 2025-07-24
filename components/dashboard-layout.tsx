@@ -128,8 +128,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           }
         }
         localStorage.removeItem("user");
+        setUser(null);
         setIsLoading(false);
-        router.push("/");
       }
     });
 
