@@ -354,22 +354,50 @@ export default function InventoryPage() {
 
     try {
       const productRef = ref(database, `products/${product.id}`);
+      const existing = products.find(
+        (p) =>
+          p.store === targetStore &&
+          p.name === product.name &&
+          p.brand === product.brand &&
+          p.model === product.model &&
+          p.category === product.category
+      );
 
-      if (quantity >= currentStock) {
-        await update(productRef, {
-          store: targetStore,
+      if (existing) {
+        const existingRef = ref(database, `products/${existing.id}`);
+        await update(existingRef, {
+          stock: (existing.stock || 0) + quantity,
           lastTransfer: new Date().toISOString(),
         });
+
+        if (quantity >= currentStock) {
+          await remove(productRef);
+        } else {
+          await update(productRef, {
+            stock: currentStock - quantity,
+            lastTransfer: new Date().toISOString(),
+          });
+        }
       } else {
-        await update(productRef, { stock: currentStock - quantity });
-        const { id, ...rest } = product;
-        const newProductRef = push(ref(database, "products"));
-        await set(newProductRef, {
-          ...rest,
-          stock: quantity,
-          store: targetStore,
-          lastTransfer: new Date().toISOString(),
-        });
+        if (quantity >= currentStock) {
+          await update(productRef, {
+            store: targetStore,
+            lastTransfer: new Date().toISOString(),
+          });
+        } else {
+          await update(productRef, {
+            stock: currentStock - quantity,
+            lastTransfer: new Date().toISOString(),
+          });
+          const { id, ...rest } = product;
+          const newProductRef = push(ref(database, "products"));
+          await set(newProductRef, {
+            ...rest,
+            stock: quantity,
+            store: targetStore,
+            lastTransfer: new Date().toISOString(),
+          });
+        }
       }
 
       toast.success("Producto transferido", {
