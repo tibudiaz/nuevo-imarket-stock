@@ -10,14 +10,28 @@ export default function Home() {
 
   useEffect(() => {
     const auth = getAuth()
+
+    // Si existe un usuario autenticado en Firebase, redirigir al dashboard
     if (auth.currentUser) {
       router.replace("/dashboard")
       return
     }
 
+    // Verificar usuario almacenado localmente
     const storedUser = localStorage.getItem("user")
     if (storedUser) {
-      router.replace("/dashboard")
+      try {
+        const parsedUser = JSON.parse(storedUser)
+
+        // Solo redirigir si los datos son válidos
+        if (parsedUser && parsedUser.username) {
+          router.replace("/dashboard")
+          return
+        }
+      } catch {
+        // Si los datos no son válidos, eliminarlos
+        localStorage.removeItem("user")
+      }
     }
   }, [router])
 
