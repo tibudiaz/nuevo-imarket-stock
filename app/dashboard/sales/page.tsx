@@ -11,8 +11,8 @@ import { Search, Calendar, ShoppingCart, DollarSign, User, Download, Eye } from 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { getAuth } from "firebase/auth"
 import SaleDetailModal from "@/components/sale-detail-modal"
+import { useAuth } from "@/hooks/use-auth"
 
 // Interfaces
 interface UserType {
@@ -59,7 +59,7 @@ interface TopProductType {
 
 export default function SalesPage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -71,65 +71,46 @@ export default function SalesPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   useEffect(() => {
-    const auth = getAuth();
-    if (auth.currentUser) {
-      const role = auth.currentUser.email?.endsWith("@admin.com") ? "admin" : "moderator";
-      const currentUser = { username: auth.currentUser.email || "", role };
-      setUser(currentUser);
-      localStorage.setItem("user", JSON.stringify(currentUser));
-    } else {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
-        router.push("/");
-        return;
-      }
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem("user");
-        router.push("/");
-        return;
-      }
-    }
+    if (authLoading || !user) return;
 
-    const salesRef = ref(database, "sales")
+    const salesRef = ref(database, "sales");
     const unsubscribeSales = onValue(salesRef, (snapshot) => {
       if (snapshot.exists()) {
-        const salesData: Sale[] = []
+        const salesData: Sale[] = [];
         snapshot.forEach((childSnapshot) => {
           salesData.push({
             id: childSnapshot.key || "",
             ...childSnapshot.val(),
-          })
-        })
+          });
+        });
 
-        salesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        setSales(salesData)
-        calculateSalesStats(salesData)
+        salesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setSales(salesData);
+        calculateSalesStats(salesData);
       } else {
-        setSales([])
-        setDailySales({ count: 0, total: 0 })
-        setWeeklySales({ count: 0, total: 0 })
-        setTopProduct({ name: "", count: 0 })
+        setSales([]);
+        setDailySales({ count: 0, total: 0 });
+        setWeeklySales({ count: 0, total: 0 });
+        setTopProduct({ name: "", count: 0 });
       }
-    })
-    
-    const productsRef = ref(database, "products")
+    });
+
+    const productsRef = ref(database, "products");
     const unsubscribeProducts = onValue(productsRef, (snapshot) => {
-        if(snapshot.exists()) {
-            const productsData: Product[] = [];
-            snapshot.forEach(child => {
-                productsData.push({ id: child.key!, ...child.val() });
-            });
-            setProducts(productsData);
-        }
+      if (snapshot.exists()) {
+        const productsData: Product[] = [];
+        snapshot.forEach((child) => {
+          productsData.push({ id: child.key!, ...child.val() });
+        });
+        setProducts(productsData);
+      }
     });
 
     return () => {
-      unsubscribeSales()
-      unsubscribeProducts()
-    }
-  }, [router])
+      unsubscribeSales();
+      unsubscribeProducts();
+    };
+  }, [authLoading, user]);
 
   const calculateSalesStats = (salesData: Sale[]) => {
     const now = new Date()
