@@ -143,13 +143,29 @@ export default function InventoryPage() {
     editingProduct?.category === "Celulares Nuevos";
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
+    const auth = getAuth();
+    if (auth.currentUser) {
+      const role = auth.currentUser.email?.endsWith("@admin.com")
+        ? "admin"
+        : "moderator";
+      const currentUser = {
+        username: auth.currentUser.email || "",
+        role,
+      };
+      setUser(currentUser);
+      localStorage.setItem("user", JSON.stringify(currentUser));
+    } else {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        router.push("/");
+        return;
+      }
       try {
         setUser(JSON.parse(storedUser));
       } catch {
         localStorage.removeItem("user");
-        setUser(null);
+        router.push("/");
+        return;
       }
     }
 
