@@ -11,6 +11,7 @@ import { Search, Calendar, ShoppingCart, DollarSign, User, Download, Eye } from 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { getAuth } from "firebase/auth"
 import SaleDetailModal from "@/components/sale-detail-modal"
 
 // Interfaces
@@ -70,17 +71,25 @@ export default function SalesPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
-
-    try {
-      setUser(JSON.parse(storedUser))
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
+    const auth = getAuth();
+    if (auth.currentUser) {
+      const role = auth.currentUser.email?.endsWith("@admin.com") ? "admin" : "moderator";
+      const currentUser = { username: auth.currentUser.email || "", role };
+      setUser(currentUser);
+      localStorage.setItem("user", JSON.stringify(currentUser));
+    } else {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        router.push("/");
+        return;
+      }
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        localStorage.removeItem("user");
+        router.push("/");
+        return;
+      }
     }
 
     const salesRef = ref(database, "sales")
