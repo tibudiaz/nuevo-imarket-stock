@@ -188,7 +188,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const handleLogout = async () => {
     const auth = getAuth();
     try {
+      localStorage.removeItem("user");
       await signOut(auth);
+      setUser(null);
+      router.push("/");
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
     }
