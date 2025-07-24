@@ -9,7 +9,8 @@ export default function PathCleaner() {
   useEffect(() => {
     const auth = getAuth()
     const path = window.location.pathname
-    if (path.startsWith("/dashboard") && !auth.currentUser && !localStorage.getItem("user")) {
+    if (path.startsWith("/dashboard") && !auth.currentUser) {
+      localStorage.removeItem("user")
       router.replace("/")
     }
   }, [router])
