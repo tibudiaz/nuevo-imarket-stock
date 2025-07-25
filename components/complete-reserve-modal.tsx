@@ -76,7 +76,13 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
         completedAt: new Date().toISOString(),
       });
 
-      // 3. Notificar al componente padre que la operación fue exitosa
+      // 3. Liberar el producto reservado
+      if (reserve.productId) {
+        const productRef = ref(database, `products/${reserve.productId}`);
+        await update(productRef, { reserved: false });
+      }
+
+      // 4. Notificar al componente padre que la operación fue exitosa
       onReserveCompleted();
 
     } catch (error) {

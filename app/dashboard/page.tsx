@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShoppingBag, Package, DollarSign, TrendingUp, User, AlertTriangle } from "lucide-react"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { Reserve } from "@/components/complete-reserve-modal"
 import { getAuth } from "firebase/auth"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -75,6 +76,7 @@ export default function Dashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
+  const [reserves, setReserves] = useState<Reserve[]>([]);
 
   useEffect(() => {
     const auth = getAuth();
@@ -146,9 +148,11 @@ export default function Dashboard() {
             });
         }
         
+        const activeReserves = reserves.filter(r => r.status === "reserved").length
         setDashboardData((prev) => ({
           ...prev,
-          totalProducts: productsData.reduce((sum, p) => sum + (p.stock || 0), 0),
+          totalProducts:
+            productsData.reduce((sum, p) => sum + (p.stock || 0), 0) + activeReserves,
           totalInvestment: totalInvestment,
           productsGrowth: 12, // Simulado
           investmentGrowth: 5.2, // Simulado
@@ -157,6 +161,33 @@ export default function Dashboard() {
     });
 
     return () => unsubscribeProducts();
+  }, [user]);
+
+  useEffect(() => {
+    if (products.length === 0 && reserves.length === 0) return;
+    const activeReserves = reserves.filter(r => r.status === "reserved").length;
+    setDashboardData((prev) => ({
+      ...prev,
+      totalProducts:
+        products.reduce((sum, p) => sum + (p.stock || 0), 0) + activeReserves,
+    }));
+  }, [products, reserves]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const reservesRef = ref(database, "reserves");
+    const unsubscribeReserves = onValue(reservesRef, (snapshot) => {
+      const reservesData: Reserve[] = [];
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          reservesData.push({ id: child.key || "", ...child.val() });
+        });
+      }
+      setReserves(reservesData);
+    });
+
+    return () => unsubscribeReserves();
   }, [user]);
 
   useEffect(() => {
