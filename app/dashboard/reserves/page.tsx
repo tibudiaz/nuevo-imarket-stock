@@ -13,11 +13,7 @@ import { ref, onValue, update } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import CompleteReserveModal, { Reserve } from "@/components/complete-reserve-modal"
-
-interface User {
-  username: string
-  role: string
-}
+import { useAuth } from "@/hooks/use-auth"
 
 interface ReserveStats {
   active: number
@@ -28,7 +24,7 @@ interface ReserveStats {
 
 export default function ReservesPage() {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [reserves, setReserves] = useState<Reserve[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedReserve, setSelectedReserve] = useState<Reserve | null>(null)
@@ -41,17 +37,10 @@ export default function ReservesPage() {
   })
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
+    if (authLoading) return
+    if (!user) {
       router.push("/")
       return
-    }
-
-    try {
-      setUser(JSON.parse(storedUser))
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
     }
 
     const reservesRef = ref(database, "reserves")
@@ -87,7 +76,7 @@ export default function ReservesPage() {
     return () => {
       unsubscribe()
     }
-  }, [router])
+  }, [router, user, authLoading])
 
   const calculateReserveStats = (reservesData: Reserve[]) => {
     const now = new Date()

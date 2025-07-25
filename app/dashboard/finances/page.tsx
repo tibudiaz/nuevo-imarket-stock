@@ -12,14 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Reserve } from "@/components/complete-reserve-modal"
-import { toast } from "sonner" 
+import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth"
 
 // --- Interfaces de Datos (sin cambios) ---
-interface User {
-  username: string;
-  role: string;
-}
-
 interface Sale {
   id: string;
   date: string;
@@ -69,7 +65,7 @@ interface FinancialData {
 
 export default function FinancesPage() {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [reserves, setReserves] = useState<Reserve[]>([])
@@ -77,22 +73,14 @@ export default function FinancesPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
+    if (authLoading) return
+    if (!user) {
       router.push("/")
       return
     }
-    try {
-      const parsedUser = JSON.parse(storedUser)
-      setUser(parsedUser)
-      if (parsedUser.role !== "admin") {
-        toast.error("Acceso denegado", { description: "No tienes permiso para ver esta página." })
-        router.push("/dashboard")
-        return
-      }
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
+    if (user.role !== "admin") {
+      toast.error("Acceso denegado", { description: "No tienes permiso para ver esta página." })
+      router.push("/dashboard")
       return
     }
 
@@ -142,7 +130,7 @@ export default function FinancesPage() {
       unsubscribeProducts()
       unsubscribeReserves()
     }
-  }, [router])
+  }, [router, user, authLoading])
 
   const financialData = useMemo<FinancialData>(() => {
     if (sales.length === 0 && products.length === 0 && reserves.length === 0) {
