@@ -27,6 +27,7 @@ export interface Reserve {
   productPrice?: number;
   productId?: string;
   productStock?: number;
+  quantity?: number;
   downPayment?: number;
   remainingAmount?: number;
   status: string;
@@ -60,7 +61,7 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
         items: [{
           productId: reserve.productId,
           productName: reserve.productName,
-          quantity: 1,
+          quantity: reserve.quantity || 1,
           price: reserve.productPrice,
         }],
         paymentMethod,
