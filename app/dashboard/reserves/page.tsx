@@ -104,9 +104,11 @@ export default function ReservesPage() {
       })
 
       const productRef = ref(database, `products/${reserve.productId}`)
+      const productSnapshot = await get(productRef)
+      const currentStock = productSnapshot.exists() ? productSnapshot.val().stock || 0 : 0
       await update(productRef, {
         reserved: false,
-        stock: reserve.productStock || 0,
+        stock: currentStock + (reserve.quantity || 1),
       })
       toast.success("Reserva cancelada correctamente")
     } catch (error) {

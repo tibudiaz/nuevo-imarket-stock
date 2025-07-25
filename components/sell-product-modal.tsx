@@ -398,7 +398,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       const currentStock = productSnapshot.val().stock || 0;
       if (currentStock <= 0) throw new Error('Sin stock disponible');
 
-      await update(productRef, { stock: currentStock - 1, reserved: true });
+      const newStock = currentStock - item.quantity;
+      if (newStock < 0) throw new Error('Stock insuficiente');
+
+      await update(productRef, { stock: newStock, reserved: true });
 
       const newReserveRef = push(ref(database, 'reserves'));
       const priceARS = convertPrice(item.price, usdRate) * item.quantity;
@@ -411,6 +414,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         customerDni: customer.dni,
         productName: item.name,
         productId: item.id,
+        quantity: item.quantity,
         productPrice: priceARS,
         productStock: currentStock,
         downPayment: reserveAmount,
