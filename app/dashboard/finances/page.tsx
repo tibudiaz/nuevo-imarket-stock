@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
+import { Reserve } from "@/components/complete-reserve-modal"
 import { toast } from "sonner" 
 
 // --- Interfaces de Datos (sin cambios) ---
@@ -71,6 +72,7 @@ export default function FinancesPage() {
   const [user, setUser] = useState<User | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [reserves, setReserves] = useState<Reserve[]>([])
   const [timeRange, setTimeRange] = useState("month")
   const [isLoading, setIsLoading] = useState(true)
 
@@ -124,14 +126,26 @@ export default function FinancesPage() {
       setIsLoading(false)
     })
 
+    const reservesRef = ref(database, "reserves")
+    const unsubscribeReserves = onValue(reservesRef, (snapshot) => {
+      const reservesData: Reserve[] = []
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          reservesData.push({ id: child.key!, ...child.val() })
+        })
+      }
+      setReserves(reservesData)
+    })
+
     return () => {
       unsubscribeSales()
       unsubscribeProducts()
+      unsubscribeReserves()
     }
   }, [router])
 
   const financialData = useMemo<FinancialData>(() => {
-    if (sales.length === 0 && products.length === 0) {
+    if (sales.length === 0 && products.length === 0 && reserves.length === 0) {
       return { totalIncome: 0, totalCosts: 0, profit: 0, profitMargin: 0, monthlySales: [], productProfitability: [], deviceCount: 0, deviceTotalCost: 0, accessoryCount: 0, accessoryTotalCost: 0 }
     }
 
@@ -223,8 +237,23 @@ export default function FinancesPage() {
         }
     });
 
+    const activeReserves = reserves.filter(r => r.status === "reserved");
+    activeReserves.forEach(reserve => {
+        const prod = productMap.get(reserve.productId || "");
+        if (!prod) return;
+        const cost = Number(prod.cost) || 0;
+        const category = prod.category;
+        if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+            deviceCount += 1;
+            deviceTotalCost += cost;
+        } else {
+            accessoryCount += 1;
+            accessoryTotalCost += cost;
+        }
+    });
+
     return { totalIncome, totalCosts, profit, profitMargin, monthlySales, productProfitability, deviceCount, deviceTotalCost, accessoryCount, accessoryTotalCost }
-  }, [sales, products, timeRange])
+  }, [sales, products, reserves, timeRange])
 
   const handleExportData = () => {
     try {
