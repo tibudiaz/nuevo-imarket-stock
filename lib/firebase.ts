@@ -3,7 +3,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
-import { getAuth, type Auth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, type Auth } from "firebase/auth";
 
 // Lee las variables de entorno
 const firebaseConfig = {
@@ -45,6 +45,10 @@ if (!configError) {
   database = getDatabase(app);
   storage = getStorage(app);
   auth = getAuth(app);
+  // Persist authentication state across refreshes
+  setPersistence(auth, browserLocalPersistence).catch((e) =>
+    console.error("Error setting auth persistence:", e)
+  );
   
   console.log("Firebase se ha inicializado correctamente.");
 } else {
