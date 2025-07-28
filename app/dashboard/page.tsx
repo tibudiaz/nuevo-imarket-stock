@@ -9,18 +9,13 @@ import { ShoppingBag, Package, DollarSign, TrendingUp, User, AlertTriangle } fro
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Reserve } from "@/components/complete-reserve-modal"
-import { getAuth } from "firebase/auth"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth" // Importa el hook de autenticación
 
-// Interfaces
-interface User {
-  username: string
-  role: string
-}
-
+// Interfaces (sin cambios)
 interface SaleItem {
     productId: string;
     productName: string;
@@ -59,8 +54,7 @@ interface DashboardData {
 
 export default function Dashboard() {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, loading: authLoading } = useAuth() // Utiliza el hook de autenticación
   const [sales, setSales] = useState<Sale[]>([]);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalSales: 0,
@@ -78,42 +72,10 @@ export default function Dashboard() {
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
   const [reserves, setReserves] = useState<Reserve[]>([]);
 
-  useEffect(() => {
-    const auth = getAuth();
-
-    if (auth.currentUser) {
-      const role = auth.currentUser.email?.endsWith("@admin.com")
-        ? "admin"
-        : "moderator";
-      const currentUser = {
-        username: auth.currentUser.email || "",
-        role,
-      };
-      setUser(currentUser);
-      localStorage.setItem("user", JSON.stringify(currentUser));
-      setIsLoading(false);
-      return;
-    }
-
-    const storedUser = localStorage.getItem("user");
-    if (!storedUser) {
-      router.push("/");
-      return;
-    }
-
-    try {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-    } catch (e) {
-      localStorage.removeItem("user");
-      router.push("/");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [router])
+  // Se elimina el useEffect que manejaba la autenticación localmente
 
   useEffect(() => {
-    if (!user) return; // Espera a que el usuario esté verificado
+    if (!user) return; // Espera a que el usuario esté verificado por el hook
 
     const productsRef = ref(database, "products")
     const unsubscribeProducts = onValue(productsRef, (snapshot) => {
@@ -131,7 +93,6 @@ export default function Dashboard() {
         
         setProducts(productsData);
 
-        // Filtro para bajo stock excluyendo celulares
         const lowStockAccessories = productsData.filter(p => 
           p.stock !== undefined && 
           p.stock <= 5 && 
@@ -141,7 +102,6 @@ export default function Dashboard() {
         
         setLowStockProducts(lowStockAccessories);
 
-        // Alerta para ambos roles si hay bajo stock de accesorios
         if (lowStockAccessories.length > 0) {
             toast.warning(`${lowStockAccessories.length} productos con bajo stock!`, {
                 description: 'Revisa el inventario de accesorios para reponer stock.',
@@ -161,7 +121,7 @@ export default function Dashboard() {
     });
 
     return () => unsubscribeProducts();
-  }, [user]);
+  }, [user, reserves]); // Se agrega 'reserves' a las dependencias
 
   useEffect(() => {
     if (products.length === 0 && reserves.length === 0) return;
@@ -258,7 +218,7 @@ export default function Dashboard() {
     return () => unsubscribeSales();
   }, [products]);
 
-  if (isLoading || !user) {
+  if (authLoading || !user) { // Se usa el estado de carga del hook
     return <div className="flex h-screen items-center justify-center">Cargando...</div>
   }
 
@@ -404,7 +364,6 @@ export default function Dashboard() {
                               {dailySalesData.length > 0 ? (
                                   dailySalesData.map(sale => (
                                       <TableRow key={sale.id}>
-                                          {/* --- CORRECCIÓN 1: Verificamos si la fecha existe --- */}
                                           <TableCell>{sale.date ? new Date(sale.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</TableCell>
                                           <TableCell>
                                               <div className="flex items-center gap-2">
@@ -413,7 +372,6 @@ export default function Dashboard() {
                                               </div>
                                           </TableCell>
                                           <TableCell>{sale.items.map(item => item.productName).join(', ')}</TableCell>
-                                           {/* --- CORRECCIÓN 2: Verificamos si el monto existe y lo formateamos --- */}
                                           <TableCell className="text-right">${(sale.totalAmount || 0).toFixed(2)}</TableCell>
                                       </TableRow>
                                   ))

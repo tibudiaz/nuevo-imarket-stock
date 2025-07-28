@@ -11,11 +11,12 @@ import { Search, Mail, Bell, Send, CheckCircle, AlertCircle, Clock } from "lucid
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue, update, push, set } from "firebase/database"
 import { database } from "@/lib/firebase"
-import { toast } from "sonner" // CORRECCIÓN: Se importa directamente de sonner
+import { toast } from "sonner" 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import CreateNotificationModal from "@/components/create-notification-modal"
+import { useAuth } from "@/hooks/use-auth" // Importa el hook
 
-// Definir interfaces para los tipos
+// Interfaces (sin cambios)
 interface User {
   username: string
   role: string
@@ -58,8 +59,7 @@ interface NotificationData {
 
 export default function NotificationsPage() {
   const router = useRouter()
-  // Se elimina la línea: const { toast } = useToast()
-  const [user, setUser] = useState<User | null>(null)
+  const { user, loading: authLoading } = useAuth() // Usa el hook
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -73,19 +73,9 @@ export default function NotificationsPage() {
   })
 
   useEffect(() => {
-    // Verificar autenticación
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
+    // La lógica de autenticación se elimina de aquí
+    if (authLoading || !user) return;
 
-    try {
-      setUser(JSON.parse(storedUser))
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
-    }
 
     // Cargar notificaciones desde Firebase
     const notificationsRef = ref(database, "notifications")
@@ -99,7 +89,6 @@ export default function NotificationsPage() {
           })
         })
 
-        // Ordenar por fecha (más reciente primero)
         notificationsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
         setNotifications(notificationsData)
@@ -136,7 +125,7 @@ export default function NotificationsPage() {
       unsubscribeNotifications()
       unsubscribeCustomers()
     }
-  }, [router])
+  }, [router, user, authLoading])
 
   const calculateNotificationStats = (notificationsData: Notification[]) => {
     const sent = notificationsData.filter((notification) => notification.status === "sent").length
@@ -153,15 +142,12 @@ export default function NotificationsPage() {
 
   const handleResendNotification = async (notification: Notification) => {
     try {
-      // Actualizar el estado de la notificación
       const notificationRef = ref(database, `notifications/${notification.id}`)
       await update(notificationRef, {
         status: "pending",
         resendDate: new Date().toISOString(),
       })
 
-      // En una implementación real, aquí se enviaría la notificación
-      // Para este ejemplo, simulamos el envío exitoso después de 2 segundos
       setTimeout(async () => {
         await update(notificationRef, {
           status: "sent",
@@ -191,8 +177,6 @@ export default function NotificationsPage() {
         status: "pending",
       })
 
-      // En una implementación real, aquí se enviaría la notificación
-      // Para este ejemplo, simulamos el envío exitoso después de 2 segundos
       setTimeout(async () => {
         await update(newNotificationRef, {
           status: "sent",
@@ -214,13 +198,11 @@ export default function NotificationsPage() {
   }
 
   const filteredNotifications = notifications.filter((notification) => {
-    // Filtrar por término de búsqueda
     const matchesSearch =
       notification.recipient?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       notification.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       notification.message?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    // Filtrar por pestaña activa
     if (activeTab === "all") return matchesSearch
     if (activeTab === "sent") return matchesSearch && notification.status === "sent"
     if (activeTab === "pending") return matchesSearch && notification.status === "pending"

@@ -12,14 +12,14 @@ import { Search, User, Phone, ShoppingBag, Eye } from "lucide-react"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import CustomerDetailModal from "@/components/customer-detail-modal"
+import { useAuth } from "@/hooks/use-auth" // Importa el hook
 
-// --- Interfaces Corregidas y Exportadas ---
 export interface Purchase {
   id: string;
   date?: string;
   items: { productName: string }[];
   totalAmount: number;
-  customerId?: string; // Propiedad añadida que faltaba
+  customerId?: string;
 }
 
 export interface CustomerWithPurchases extends Customer {
@@ -46,7 +46,7 @@ interface UserType {
 
 export default function CustomersPage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, loading: authLoading } = useAuth() // Usa el hook
   const [customers, setCustomers] = useState<Customer[]>([])
   const [sales, setSales] = useState<Purchase[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -54,18 +54,9 @@ export default function CustomersPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
+    // La lógica de autenticación se elimina de aquí
+    if (authLoading || !user) return;
 
-    try {
-      setUser(JSON.parse(storedUser))
-    } catch (e) {
-      localStorage.removeItem("user")
-      router.push("/")
-    }
 
     const customersRef = ref(database, "customers")
     const unsubscribeCustomers = onValue(customersRef, (snapshot) => {
@@ -103,7 +94,7 @@ export default function CustomersPage() {
       unsubscribeCustomers()
       unsubscribeSales()
     }
-  }, [router])
+  }, [router, user, authLoading])
 
   const customersWithPurchases = useMemo<CustomerWithPurchases[]>(() => {
     return customers.map((customer) => {

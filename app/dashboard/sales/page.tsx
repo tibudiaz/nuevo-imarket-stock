@@ -184,8 +184,6 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* --- CORRECCIÓN CLAVE --- */}
-        {/* Este bloque de tarjetas solo se renderizará si el rol del usuario es 'admin'. */}
         {user?.role === 'admin' && (
           <div className="grid gap-4 md:grid-cols-3 mb-6">
               <Card>

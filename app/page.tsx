@@ -13,8 +13,6 @@ export default function Home() {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         router.replace("/dashboard")
-      } else {
-        localStorage.removeItem("user")
       }
     })
 

@@ -29,17 +29,13 @@ export default function LoginForm() {
     try {
       await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword)
 
-      const currentUser = auth.currentUser
-      if (currentUser && currentUser.email) {
-        const role = currentUser.email.endsWith("@admin.com") ? "admin" : "moderator"
-        const userData = { username: currentUser.email, role }
-        localStorage.setItem("user", JSON.stringify(userData))
-      }
+      // La redirección será manejada por el listener en `app/page.tsx`
+      // y la protección de rutas en `DashboardLayout`.
 
-      router.push("/dashboard")
     } catch (authError: any) {
       console.error("Error de Firebase Auth:", authError)
       setError("Usuario o contraseña incorrectos. Verifique sus credenciales.")
+    } finally {
       setIsLoading(false)
     }
   }
