@@ -23,9 +23,12 @@ export default function PriceListPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [background, setBackground] = useState<HTMLImageElement | null>(null);
   const [fontSize, setFontSize] = useState<number>(20);
+  const [fontFamily, setFontFamily] = useState<string>("Arial");
   const [textColor, setTextColor] = useState<string>("#000000");
   const [posX, setPosX] = useState<number>(20);
   const [posY, setPosY] = useState<number>(40);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -71,7 +74,7 @@ export default function PriceListPage() {
     canvas.height = image.height;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(image, 0, 0);
-    ctx.font = `${fontSize}px sans-serif`;
+    ctx.font = `${fontSize}px ${fontFamily}`;
     ctx.fillStyle = textColor;
     ctx.textBaseline = "top";
     const lines = products.map((p) => `${p.name} - $${p.price}`);
@@ -82,7 +85,7 @@ export default function PriceListPage() {
 
   useEffect(() => {
     drawCanvas();
-  }, [products, fontSize, textColor, posX, posY]);
+  }, [products, fontSize, fontFamily, textColor, posX, posY]);
 
   const downloadImage = () => {
     const canvas = canvasRef.current;
@@ -91,6 +94,30 @@ export default function PriceListPage() {
     link.download = "price-list.png";
     link.href = canvas.toDataURL();
     link.click();
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    dragOffset.current = {
+      x: e.clientX - rect.left - posX,
+      y: e.clientY - rect.top - posY,
+    };
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    setPosX(e.clientX - rect.left - dragOffset.current.x);
+    setPosY(e.clientY - rect.top - dragOffset.current.y);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   if (authLoading) {
@@ -119,6 +146,25 @@ export default function PriceListPage() {
             onChange={(e) => setFontSize(Number(e.target.value))}
             placeholder="Tamaño"
           />
+          <Select onValueChange={setFontFamily} value={fontFamily}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Fuente" />
+            </SelectTrigger>
+            <SelectContent>
+              {[
+                "Arial",
+                "Courier New",
+                "Georgia",
+                "Times New Roman",
+                "Comic Sans MS",
+                "Impact",
+              ].map((f) => (
+                <SelectItem key={f} value={f} style={{ fontFamily: f }}>
+                  {f}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Input
             type="color"
             className="w-20"
@@ -130,7 +176,14 @@ export default function PriceListPage() {
           <Button onClick={() => drawCanvas()}>Actualizar</Button>
           <Button onClick={downloadImage}>Descargar</Button>
         </div>
-        <canvas ref={canvasRef} className="border" />
+        <canvas
+          ref={canvasRef}
+          className="border"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        />
       </div>
     </DashboardLayout>
   );
