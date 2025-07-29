@@ -1,3 +1,5 @@
+// components/dashboard-layout.tsx
+
 "use client"
 
 import * as React from "react"
@@ -43,6 +45,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import MobileMenu from "@/components/mobile-menu"
 import { useStore } from "@/hooks/use-store"
 import { Reserve } from "@/components/complete-reserve-modal"
+import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -346,6 +349,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </AnimatePresence>
           </div>
         </div>
+        
+        {/* --- WIDGET DE CHAT AÑADIDO AQUÍ --- */}
+        <ChatWidget />
       </div>
     </TooltipProvider>
   )
