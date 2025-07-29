@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,16 +14,19 @@ import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import CompleteReserveModal, { Reserve } from "@/components/complete-reserve-modal"
 import { useAuth } from "@/hooks/use-auth"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface ReserveStats {
   active: number
-  expired: number
+  expiringSoon: number;
   completed: number
-  total: number
+  cancelled: number;
 }
 
 export default function ReservesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams();
+  const statusFilter = searchParams.get('status');
   const { user, loading: authLoading } = useAuth()
   const [reserves, setReserves] = useState<Reserve[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -31,9 +34,9 @@ export default function ReservesPage() {
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false)
   const [reserveStats, setReserveStats] = useState<ReserveStats>({
     active: 0,
-    expired: 0,
+    expiringSoon: 0,
     completed: 0,
-    total: 0,
+    cancelled: 0,
   })
 
   useEffect(() => {
@@ -60,15 +63,15 @@ export default function ReservesPage() {
             return dateB - dateA;
         });
 
-        setReserves(reservesData)
-        calculateReserveStats(reservesData)
+        setReserves(reservesData);
+        calculateReserveStats(reservesData);
       } else {
         setReserves([])
         setReserveStats({
-          active: 0,
-          expired: 0,
-          completed: 0,
-          total: 0,
+            active: 0,
+            expiringSoon: 0,
+            completed: 0,
+            cancelled: 0,
         })
       }
     })
@@ -79,16 +82,17 @@ export default function ReservesPage() {
   }, [router, user, authLoading])
 
   const calculateReserveStats = (reservesData: Reserve[]) => {
-    const now = new Date()
-    const active = reservesData.filter(
-      (reserve) => reserve.status === "reserved" && reserve.expirationDate && new Date(reserve.expirationDate) > now,
-    ).length
-    const expired = reservesData.filter(
-      (reserve) => reserve.status === "reserved" && reserve.expirationDate && new Date(reserve.expirationDate) <= now,
-    ).length
-    const completed = reservesData.filter((reserve) => reserve.status === "completed").length
-    setReserveStats({ active, expired, completed, total: reservesData.length })
-  }
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(now.getDate() + 3);
+
+    const active = reservesData.filter(r => r.status === "reserved").length;
+    const expiringSoon = reservesData.filter(r => r.status === "reserved" && r.expirationDate && new Date(r.expirationDate) <= threeDaysFromNow).length;
+    const completed = reservesData.filter(r => r.status === "completed").length;
+    const cancelled = reservesData.filter(r => r.status === "cancelled").length;
+
+    setReserveStats({ active, expiringSoon, completed, cancelled });
+  };
 
   const isReserveExpired = (reserve: Reserve): boolean => {
     if (!reserve.expirationDate) return false;
@@ -107,7 +111,6 @@ export default function ReservesPage() {
       const productSnapshot = await get(productRef)
       const currentStock = productSnapshot.exists() ? productSnapshot.val().stock || 0 : 0
       await update(productRef, {
-        reserved: false,
         stock: currentStock + (reserve.quantity || 1),
       })
       toast.success("Reserva cancelada correctamente")
@@ -127,12 +130,35 @@ export default function ReservesPage() {
     toast.success("Venta completada con éxito.")
   }
 
-  const filteredReserves = reserves.filter(
-    (reserve) =>
-      (reserve.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (reserve.customerDni || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (reserve.productName || "").toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredReserves = useMemo(() => {
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
+    
+    return reserves.filter(reserve => {
+        const matchesSearch =
+            (reserve.customerName || "").toLowerCase().includes(lowercasedSearchTerm) ||
+            (reserve.customerDni || "").toLowerCase().includes(lowercasedSearchTerm) ||
+            (reserve.productName || "").toLowerCase().includes(lowercasedSearchTerm);
+
+        if (!statusFilter || statusFilter === 'todas') {
+            return matchesSearch;
+        }
+        
+        const now = new Date();
+        const threeDaysFromNow = new Date();
+        threeDaysFromNow.setDate(now.getDate() + 3);
+
+        if (statusFilter === 'activas') {
+            return matchesSearch && reserve.status === 'reserved';
+        }
+        if (statusFilter === 'proximas-a-vencer') {
+            return matchesSearch && reserve.status === 'reserved' && reserve.expirationDate && new Date(reserve.expirationDate) <= threeDaysFromNow;
+        }
+        if (statusFilter === 'canceladas') {
+            return matchesSearch && reserve.status === 'cancelled';
+        }
+        return matchesSearch;
+    });
+  }, [reserves, searchTerm, statusFilter]);
 
   return (
     <DashboardLayout>
@@ -166,12 +192,12 @@ export default function ReservesPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Reservas Vencidas</CardTitle>
+              <CardTitle className="text-sm font-medium">Próximas a Vencer</CardTitle>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reserveStats.expired}</div>
-              <p className="text-xs text-muted-foreground">Productos con señas vencidas</p>
+              <div className="text-2xl font-bold">{reserveStats.expiringSoon}</div>
+              <p className="text-xs text-muted-foreground">Vencen en los próximos 3 días</p>
             </CardContent>
           </Card>
           <Card>
@@ -186,12 +212,12 @@ export default function ReservesPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Reservas</CardTitle>
+              <CardTitle className="text-sm font-medium">Canceladas</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reserveStats.total}</div>
-              <p className="text-xs text-muted-foreground">Histórico de reservas</p>
+              <div className="text-2xl font-bold">{reserveStats.cancelled}</div>
+              <p className="text-xs text-muted-foreground">Histórico de reservas canceladas</p>
             </CardContent>
           </Card>
         </div>
@@ -241,16 +267,20 @@ export default function ReservesPage() {
                         variant={
                           reserve.status === "completed"
                             ? "default"
-                            : isReserveExpired(reserve)
+                            : reserve.status === "cancelled"
                               ? "destructive"
-                              : "secondary"
+                              : isReserveExpired(reserve)
+                                ? "destructive"
+                                : "secondary"
                         }
                       >
                         {reserve.status === "completed"
                           ? "Completada"
-                          : isReserveExpired(reserve)
-                            ? "Vencida"
-                            : "Activa"}
+                          : reserve.status === "cancelled"
+                            ? "Cancelada"
+                            : isReserveExpired(reserve)
+                              ? "Vencida"
+                              : "Activa"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

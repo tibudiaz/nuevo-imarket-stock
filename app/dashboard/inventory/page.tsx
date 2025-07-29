@@ -79,7 +79,6 @@ interface Product {
   provider?: string;
   store?: "local1" | "local2";
   lastTransfer?: string;
-  reserved?: boolean;
   [key: string]: any;
 }
 interface NewProduct {
@@ -222,8 +221,7 @@ export default function InventoryPage() {
           .includes(searchTerm.toLowerCase()) ||
         (product.imei || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-      const notReserved = !product.reserved;
-      return storeMatch && categoryMatch && searchMatch && notReserved;
+      return storeMatch && categoryMatch && searchMatch;
     });
   }, [products, selectedStore, categorySearch, searchTerm]);
 

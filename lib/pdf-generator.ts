@@ -49,6 +49,24 @@ interface Repair {
     customerPhone?: string;
 }
 
+interface Reserve {
+    id: string;
+    receiptNumber: string;
+    date: string;
+    expirationDate: string;
+    customerId: string;
+    customerName: string;
+    customerDni: string;
+    customerPhone: string;
+    productName: string;
+    productId: string;
+    quantity: number;
+    productPrice: number;
+    downPayment: number;
+    remainingAmount: number;
+    status: 'reserved' | 'completed' | 'cancelled';
+}
+
 interface Customer {
     name: string;
     dni: string;
@@ -61,12 +79,24 @@ interface Fonts {
 }
 
 
-// --- NUEVA FUNCIÓN DE FORMATO DE MONEDA (MÁS SEGURA) ---
+// --- FUNCIONES DE FORMATO ---
 const formatCurrencyForPdf = (amount: number | undefined | null): string => {
   const numAmount = Number(amount || 0);
   const roundedAmount = Math.round(numAmount);
   return `$${roundedAmount.toLocaleString('es-AR')}`;
 };
+
+const formatDateForPdf = (dateString: string | undefined | null): string => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    // Sumar un día a la fecha para corregir el desfase de zona horaria al crearla desde un input type="date"
+    date.setDate(date.getDate() + 1);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
 
 // Función para verificar si una plantilla PDF existe en Firebase Storage
 const checkPdfExists = async (path: string): Promise<boolean> => {
@@ -169,7 +199,6 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     let currentY = positions.itemStartY;
     const itemLineHeight = 15;
 
-    // --- CORRECCIÓN: Se asegura de que `items` sea un array antes de iterar ---
     (saleData.items || []).forEach(item => {
         const itemPrice = (item.price || 0) * (item.currency === 'USD' ? (saleData.usdRate || 1) : 1);
         const totalPrice = itemPrice * (item.quantity || 1);
@@ -197,7 +226,6 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
 
     const finalAmount = saleData.totalAmount || 0;
     
-    // --- CORRECCIÓN: Se verifica que `tradeIn` y sus propiedades existan ---
     if (saleData.tradeIn && saleData.tradeIn.price > 0) {
         const cartTotal = (saleData.items || []).reduce((sum, item) => {
             const priceInArs = (item.price || 0) * (item.currency === 'USD' ? (saleData.usdRate || 1) : 1);
@@ -425,4 +453,104 @@ const drawDeliveryPdfContent = (page: any, repair: Repair, fonts: Fonts) => {
     const priceText = formatCurrencyForPdf(repair.finalPrice || repair.estimatedPrice);
     page.drawText("Total:", { x: positions.priceStartX - 40, y: positions.priceFinalY, size: 12, font: helveticaBold });
     page.drawText(priceText, { x: positions.priceStartX, y: positions.priceFinalY, size: 12, font: helveticaBold });
+};
+
+// --- Generador de PDF para Reservas (Señas) ---
+export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
+  if (!reserveData) {
+    toast.error("Error", { description: "No hay datos de la reserva para generar el PDF." });
+    return;
+  }
+
+  const toastId = toast.loading("Generando PDF de seña...", {
+    description: "Espere mientras se prepara el comprobante.",
+  });
+
+  try {
+    let pdfDoc: PDFDocument;
+    const pdfTemplatePath = "templates/reserve-template.pdf";
+    const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
+
+    if (pdfTemplateExists) {
+      try {
+        const pdfTemplateUrl = await getDownloadURL(storageRef(storage, pdfTemplatePath));
+        const pdfArrayBuffer = await fetch(pdfTemplateUrl).then(res => res.arrayBuffer());
+        pdfDoc = await PDFDocument.load(pdfArrayBuffer);
+      } catch (e) {
+        console.error("Error al cargar la plantilla de reserva, creando uno desde cero.", e);
+        pdfDoc = await PDFDocument.create();
+        pdfDoc.addPage([595, 842]);
+        toast.info("Plantilla no encontrada", { description: "Se ha creado un comprobante básico." });
+      }
+    } else {
+      pdfDoc = await PDFDocument.create();
+      pdfDoc.addPage([595, 842]);
+    }
+
+    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const firstPage = pdfDoc.getPages()[0];
+    
+    drawReservePdfContent(firstPage, reserveData, { helveticaFont, helveticaBold });
+
+    if (pdfDoc.getPageCount() > 1) {
+        const secondPage = pdfDoc.getPages()[1];
+        drawReservePdfContent(secondPage, reserveData, { helveticaFont, helveticaBold });
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Reserva-${reserveData.receiptNumber || 'reserva'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success("PDF de reserva generado", { id: toastId, description: "El comprobante se ha descargado." });
+  } catch (error) {
+    console.error("Error al generar el PDF de reserva:", error);
+    toast.error("Error de PDF", { id: toastId, description: `No se pudo generar el comprobante: ${(error as Error).message}` });
+  }
+};
+
+const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts) => {
+    const { helveticaFont, helveticaBold } = fonts;
+    const positions = {
+        numeroRecibo: { x: 430, y: 697 },
+        fecha: { x: 430, y: 710 },
+        nombreCliente: { x: 110, y: 657 },
+        dniCliente: { x: 110, y: 643 },
+        celCliente: { x: 110, y: 630 },
+        itemStartY: 548,
+        itemStartX: 65,
+        priceStartX: 455,
+        total: { x: 400, y: 320 },
+        entrega: { x: 400, y: 300 },
+        saldo: { x: 455, y: 290 },
+        fechaRetiro1: { x: 65, y: 450 },
+        fechaRetiro2: { x: 65, y: 200 }
+    };
+
+    const formattedDate = reserve.date ? new Date(reserve.date).toLocaleDateString() : 'N/A';
+    const formattedExpirationDate = formatDateForPdf(reserve.expirationDate);
+
+    page.drawText(String(reserve.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
+    page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
+    page.drawText(String(reserve.customerName || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
+    page.drawText(String(reserve.customerDni || ''), { ...positions.dniCliente, size: 10, font: helveticaFont });
+    page.drawText(String(reserve.customerPhone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
+
+    page.drawText(reserve.productName || 'Producto sin nombre', { x: positions.itemStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
+    page.drawText(formatCurrencyForPdf(reserve.productPrice), { x: positions.priceStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
+    
+    page.drawText(`Total: ${formatCurrencyForPdf(reserve.productPrice)}`, { ...positions.total, size: 10, font: helveticaFont });
+    page.drawText(`Entrega: ${formatCurrencyForPdf(reserve.downPayment)}`, { ...positions.entrega, size: 10, font: helveticaFont });
+    page.drawText(`${formatCurrencyForPdf(reserve.remainingAmount)}`, { ...positions.saldo, size: 12, font: helveticaBold });
+
+    // Imprimir fecha de retiro
+    page.drawText(`Fecha límite para retirar el producto: ${formattedExpirationDate}`, { ...positions.fechaRetiro1, size: 12, font: helveticaFont });
+    page.drawText(`Fecha límite para retirar el producto: ${formattedExpirationDate}`, { ...positions.fechaRetiro2, size: 12, font: helveticaFont });
 };

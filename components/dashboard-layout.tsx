@@ -18,6 +18,7 @@ import {
   DollarSign,
   Wrench,
   Store,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -41,14 +42,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { motion, AnimatePresence } from "framer-motion"
 import MobileMenu from "@/components/mobile-menu"
 import { useStore } from "@/hooks/use-store"
+import { Reserve } from "@/components/complete-reserve-modal"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-// --- VERSIÓN CORREGIDA Y ROBUSTA DE NavItem ---
-// Esta nueva implementación soluciona el problema de alineación visual.
-const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = false }) => {
+const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = false, alert = false }) => {
   const commonClasses = cn(
     "flex items-center h-10 w-full justify-center group-hover:justify-start group-hover:px-4 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
     active && "bg-accent text-accent-foreground"
@@ -56,7 +56,10 @@ const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = fa
 
   const itemContent = (
     <>
-      <Icon className="h-5 w-5 shrink-0" />
+      <div className="relative">
+        <Icon className="h-5 w-5 shrink-0" />
+        {alert && <AlertTriangle className="absolute -top-1 -right-1 h-3 w-3 text-red-500 fill-red-500" />}
+      </div>
       <div className="ml-4 flex-1 overflow-hidden opacity-0 transition-opacity duration-200 group-hover:opacity-100">
         <span className="whitespace-nowrap">{label}</span>
       </div>
@@ -94,11 +97,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<string[]>([])
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
+  const [isReservesOpen, setIsReservesOpen] = useState(false);
   const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
   const [isDolarLoading, setIsDolarLoading] = useState(true);
+  const [expiringReserves, setExpiringReserves] = useState(false);
 
   const { selectedStore, setSelectedStore } = useStore();
-
 
   useEffect(() => {
     const fetchDolarBlue = async () => {
@@ -137,18 +141,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     })
 
+    const reservesRef = ref(database, "reserves");
+    const unsubscribeReserves = onValue(reservesRef, (snapshot) => {
+        if (snapshot.exists()) {
+            const reservesData: Reserve[] = [];
+            snapshot.forEach((child) => {
+                reservesData.push({ id: child.key!, ...child.val() });
+            });
+            
+            const now = new Date();
+            const threeDaysFromNow = new Date();
+            threeDaysFromNow.setDate(now.getDate() + 3);
+            
+            const hasExpiring = reservesData.some(r => r.status === 'reserved' && r.expirationDate && new Date(r.expirationDate) <= threeDaysFromNow);
+            setExpiringReserves(hasExpiring);
+        } else {
+            setExpiringReserves(false);
+        }
+    });
+
     return () => {
         unsubscribeCategories();
+        unsubscribeReserves();
     }
   }, []);
 
   useEffect(() => {
-    if (pathname.startsWith("/dashboard/inventory")) {
-      setIsInventoryOpen(true)
-    } else {
-      setIsInventoryOpen(false)
-    }
-  }, [pathname])
+    setIsInventoryOpen(pathname.startsWith("/dashboard/inventory"));
+    setIsReservesOpen(pathname.startsWith("/dashboard/reserves"));
+  }, [pathname]);
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -162,6 +183,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
   
   const currentCategory = searchParams.get('category')
+  const currentReserveStatus = searchParams.get('status');
 
   const pageVariants = {
     initial: { opacity: 0, y: 5 },
@@ -286,7 +308,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </Collapsible>
               
               <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
-              <NavItem href="/dashboard/reserves" icon={ShoppingCart} label="Reservas" active={pathname === "/dashboard/reserves"} />
+
+              <Collapsible open={isReservesOpen} onOpenChange={setIsReservesOpen} className="w-full">
+                  <NavItem icon={ShoppingCart} label="Reservas" active={pathname.startsWith("/dashboard/reserves")} isCollapsible alert={expiringReserves}>
+                      <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", isReservesOpen && "rotate-180")}/>
+                  </NavItem>
+                  <CollapsibleContent className="space-y-1 pt-1 hidden group-hover:block">
+                      <Link href="/dashboard/reserves?status=todas" className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", (!currentReserveStatus || currentReserveStatus === 'todas') && "bg-slate-200 font-semibold")}>Todas</Link>
+                      <Link href="/dashboard/reserves?status=activas" className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", currentReserveStatus === 'activas' && "bg-slate-200 font-semibold")}>Activas</Link>
+                      <Link href="/dashboard/reserves?status=proximas-a-vencer" className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", currentReserveStatus === 'proximas-a-vencer' && "bg-slate-200 font-semibold")}>Próximas a Vencer</Link>
+                      <Link href="/dashboard/reserves?status=canceladas" className={cn("flex items-center rounded-md py-2 pl-12 pr-3 text-sm text-slate-700 hover:bg-slate-100", currentReserveStatus === 'canceladas' && "bg-slate-200 font-semibold")}>Canceladas</Link>
+                  </CollapsibleContent>
+              </Collapsible>
+
               <NavItem href="/dashboard/repairs" icon={Wrench} label="Reparaciones" active={pathname === "/dashboard/repairs"} />
               
               {user?.role === 'admin' && (

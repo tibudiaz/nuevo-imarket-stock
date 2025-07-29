@@ -17,7 +17,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone, Mail, Calendar } from "lucide-react"
 import { toast } from "sonner"
-import { generateSaleReceiptPdf } from "@/lib/pdf-generator"
+import { generateSaleReceiptPdf, generateReserveReceiptPdf } from "@/lib/pdf-generator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { convertPrice, formatCurrency } from "../lib/price-converter"
 import { Separator } from "@/components/ui/separator"
@@ -63,6 +63,25 @@ interface Sale {
     usdRate: number;
 }
 
+// Interfaz para los datos de la reserva
+interface Reserve {
+    id: string;
+    receiptNumber: string;
+    date: string;
+    expirationDate: string;
+    customerId: string;
+    customerName: string;
+    customerDni: string;
+    productName: string;
+    productId: string;
+    quantity: number;
+    productPrice: number;
+    downPayment: number;
+    remainingAmount: number;
+    status: 'reserved' | 'completed' | 'cancelled';
+}
+
+
 interface SellProductModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -76,7 +95,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [customer, setCustomer] = useState({ name: "", dni: "", phone: "", email: "" })
   const [paymentMethod, setPaymentMethod] = useState("efectivo")
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
+  const [completedReserve, setCompletedReserve] = useState<Reserve | null>(null)
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false)
+  const [isReservePdfDialogOpen, setIsReservePdfDialogOpen] = useState(false)
   const [isReserveDialogOpen, setIsReserveDialogOpen] = useState(false)
   const [reserveAmount, setReserveAmount] = useState(0)
   const [reserveExpirationDate, setReserveExpirationDate] = useState("")
@@ -141,7 +162,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     setIsSearching(true);
     try {
       const customersRef = ref(database, "customers");
-      // CORRECCIÓN: Se utiliza una consulta (query) para buscar eficientemente en la base de datos.
       const q = query(customersRef, orderByChild('dni'), equalTo(customer.dni.replace(/\./g, "")));
       const snapshot = await get(q);
 
@@ -159,8 +179,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
   };
   
-  // CORRECCIÓN: Se movió la lógica a una función memoizada con `useCallback` para evitar re-creaciones innecesarias
-  // y se consolidó la lógica de actualización del carrito para prevenir errores de estado.
   const handleAddProductToCart = useCallback((productToAdd: CartProduct, isInitialProduct = false) => {
       setCart(prevCart => {
           let newCart = [...prevCart];
@@ -358,79 +376,83 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
   const handleReserveProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
-      toast.error("Faltan datos del cliente", { description: "Por favor, complete nombre, DNI y teléfono." });
-      return;
+        toast.error("Faltan datos del cliente", { description: "Por favor, complete nombre, DNI y teléfono." });
+        return;
     }
     if (cart.length === 0) {
-      toast.error("El carrito está vacío.");
-      return;
+        toast.error("El carrito está vacío.");
+        return;
     }
     if (!reserveExpirationDate) {
-      toast.error("Seleccione fecha límite de retiro");
-      return;
+        toast.error("Seleccione fecha límite de retiro");
+        return;
     }
     if (reserveAmount <= 0) {
-      toast.error("Monto de seña inválido");
-      return;
+        toast.error("Monto de seña inválido");
+        return;
     }
 
     setIsLoading(true);
     try {
-      const customersRef = ref(database, "customers");
-      const q = query(customersRef, orderByChild('dni'), equalTo(customer.dni.replace(/\./g, "")));
-      const customerSnapshot = await get(q);
-      let customerId: string | null = null;
+        const customersRef = ref(database, "customers");
+        const q = query(customersRef, orderByChild('dni'), equalTo(customer.dni.replace(/\./g, "")));
+        const customerSnapshot = await get(q);
+        let customerId: string | null = null;
 
-      if (customerSnapshot.exists()) {
-        customerId = Object.keys(customerSnapshot.val())[0];
-        const customerRef = ref(database, `customers/${customerId}`);
-        await update(customerRef, { ...customer, lastPurchase: new Date().toISOString() });
-      } else {
-        const newCustomerRef = push(customersRef);
-        customerId = newCustomerRef.key;
-        await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId });
-      }
+        if (customerSnapshot.exists()) {
+            customerId = Object.keys(customerSnapshot.val())[0];
+            const customerRef = ref(database, `customers/${customerId}`);
+            await update(customerRef, { ...customer, lastPurchase: new Date().toISOString() });
+        } else {
+            const newCustomerRef = push(customersRef);
+            customerId = newCustomerRef.key;
+            await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId });
+        }
 
-      const item = cart[0];
-      const productRef = ref(database, `products/${item.id}`);
-      const productSnapshot = await get(productRef);
-      if (!productSnapshot.exists()) throw new Error('Producto no encontrado');
-      const currentStock = productSnapshot.val().stock || 0;
-      if (currentStock <= 0) throw new Error('Sin stock disponible');
+        const item = cart[0];
+        const productRef = ref(database, `products/${item.id}`);
+        const productSnapshot = await get(productRef);
+        if (!productSnapshot.exists()) throw new Error('Producto no encontrado');
+        
+        const currentStock = productSnapshot.val().stock || 0;
+        const reservedQuantity = item.quantity;
 
-      const newStock = currentStock - item.quantity;
-      if (newStock < 0) throw new Error('Stock insuficiente');
+        if (currentStock < reservedQuantity) {
+            throw new Error('Stock insuficiente para reservar.');
+        }
 
-      await update(productRef, { stock: newStock, reserved: true });
+        const newStock = currentStock - reservedQuantity;
+        await update(productRef, { stock: newStock });
 
-      const newReserveRef = push(ref(database, 'reserves'));
-      const priceARS = convertPrice(item.price, usdRate) * item.quantity;
-      const reserveData = {
-        id: newReserveRef.key,
-        date: new Date().toISOString(),
-        expirationDate: reserveExpirationDate,
-        customerId,
-        customerName: customer.name,
-        customerDni: customer.dni,
-        productName: item.name,
-        productId: item.id,
-        quantity: item.quantity,
-        productPrice: priceARS,
-        productStock: currentStock,
-        downPayment: reserveAmount,
-        remainingAmount: priceARS - reserveAmount,
-        status: 'reserved'
-      };
-      await set(newReserveRef, reserveData);
+        const newReserveRef = push(ref(database, 'reserves'));
+        const priceARS = convertPrice(item.price, usdRate) * item.quantity;
+        const reserveData: Reserve = {
+            id: newReserveRef.key!,
+            receiptNumber,
+            date: new Date().toISOString(),
+            expirationDate: reserveExpirationDate,
+            customerId: customerId!,
+            customerName: customer.name,
+            customerDni: customer.dni,
+            productName: item.name,
+            productId: item.id,
+            quantity: reservedQuantity,
+            productPrice: priceARS,
+            downPayment: reserveAmount,
+            remainingAmount: priceARS - reserveAmount,
+            status: 'reserved'
+        };
+        await set(newReserveRef, reserveData);
+        
+        setCompletedReserve(reserveData);
 
-      toast.success('Producto reservado correctamente');
-      setIsReserveDialogOpen(false);
-      onProductSold();
-      onClose();
+        toast.success('Producto reservado correctamente');
+        setIsReserveDialogOpen(false);
+        setIsReservePdfDialogOpen(true);
     } catch (error) {
-      toast.error('Error al reservar', { description: (error as Error).message });
+        toast.error('Error al reservar', { description: (error as Error).message });
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
@@ -439,6 +461,15 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     if (generatePdfOption && completedSale) {
         await generateSaleReceiptPdf(completedSale);
     }
+    onClose();
+  };
+  
+  const handleReservePdfDialogClose = async (generatePdfOption: boolean) => {
+    setIsReservePdfDialogOpen(false);
+    if (generatePdfOption && completedReserve) {
+      await generateReserveReceiptPdf(completedReserve);
+    }
+    onProductSold();
     onClose();
   };
 
@@ -530,6 +561,21 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       {completedSale && (
         <Dialog open={isPdfDialogOpen} onOpenChange={() => setIsPdfDialogOpen(false)}>
           <DialogContent><DialogHeader><DialogTitle>Venta Completada</DialogTitle><DialogDescription>¿Deseas generar el comprobante de la venta en PDF?</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => handlePdfDialogClose(false)}>No, gracias</Button><Button onClick={() => handlePdfDialogClose(true)}><FileText className="mr-2 h-4 w-4" />Generar PDF</Button></DialogFooter></DialogContent>
+        </Dialog>
+      )}
+
+      {completedReserve && (
+        <Dialog open={isReservePdfDialogOpen} onOpenChange={() => setIsReservePdfDialogOpen(false)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Reserva Completada</DialogTitle>
+                    <DialogDescription>¿Deseas generar el comprobante de la reserva en PDF?</DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => handleReservePdfDialogClose(false)}>No, gracias</Button>
+                    <Button onClick={() => handleReservePdfDialogClose(true)}><FileText className="mr-2 h-4 w-4" />Generar PDF</Button>
+                </DialogFooter>
+            </DialogContent>
         </Dialog>
       )}
 
