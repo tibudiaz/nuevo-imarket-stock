@@ -10,6 +10,9 @@ import { database } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
 import { useAuth } from "@/hooks/use-auth";
 
+const IG_WIDTH = 1080;
+const IG_HEIGHT = 1920;
+
 interface Product {
   id: string;
   name?: string;
@@ -31,9 +34,16 @@ export default function PriceListPage() {
   const [scale, setScale] = useState<number>(1);
   const [aspectRatio, setAspectRatio] = useState<string>("original");
   const [quality, setQuality] = useState<number>(0.92);
+  const [sizePreset, setSizePreset] = useState<string>("ig-story");
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (sizePreset === "ig-story") {
+      setAspectRatio("9:16");
+    }
+  }, [sizePreset]);
 
   useEffect(() => {
     const categoriesRef = ref(database, "categories");
@@ -93,22 +103,34 @@ export default function PriceListPage() {
     const sy = (image.height - cropHeight) / 2;
     const width = cropWidth * scale;
     const height = cropHeight * scale;
-    canvas.width = width;
-    canvas.height = height;
-    ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(image, sx, sy, cropWidth, cropHeight, 0, 0, width, height);
+    const canvasWidth = sizePreset === "ig-story" ? IG_WIDTH : width;
+    const canvasHeight = sizePreset === "ig-story" ? IG_HEIGHT : height;
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    if (sizePreset === "ig-story" && (width < canvasWidth || height < canvasHeight)) {
+      ctx.filter = "blur(20px)";
+      ctx.drawImage(image, sx, sy, cropWidth, cropHeight, 0, 0, canvasWidth, canvasHeight);
+      ctx.filter = "none";
+    }
+
+    const x = (canvasWidth - width) / 2;
+    const y = (canvasHeight - height) / 2;
+    ctx.drawImage(image, sx, sy, cropWidth, cropHeight, x, y, width, height);
     ctx.font = `${fontSize}px ${fontFamily}`;
     ctx.fillStyle = textColor;
     ctx.textBaseline = "top";
     const lines = products.map((p) => `${p.name} - $${p.price}`);
     lines.forEach((line, i) => {
-      ctx.fillText(line, posX, posY + i * (fontSize + 4));
+      ctx.fillText(line, x + posX, y + posY + i * (fontSize + 4));
     });
   };
 
   useEffect(() => {
     drawCanvas();
-  }, [products, fontSize, fontFamily, textColor, posX, posY, aspectRatio, scale]);
+  }, [products, fontSize, fontFamily, textColor, posX, posY, aspectRatio, scale, sizePreset]);
 
 
   const downloadImage = () => {
@@ -177,10 +199,11 @@ export default function PriceListPage() {
             <SelectContent>
               {[
                 "Arial",
-                "Courier New",
+                "Helvetica",
                 "Georgia",
                 "Times New Roman",
                 "Comic Sans MS",
+                "Courier New",
                 "Impact",
               ].map((f) => (
                 <SelectItem key={f} value={f} style={{ fontFamily: f }}>
@@ -195,6 +218,15 @@ export default function PriceListPage() {
             value={textColor}
             onChange={(e) => setTextColor(e.target.value)}
           />
+          <Select onValueChange={setSizePreset} value={sizePreset}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Tamaño" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Auto</SelectItem>
+              <SelectItem value="ig-story">Historia IG</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-2">
             <span>Zoom</span>
             <Slider
