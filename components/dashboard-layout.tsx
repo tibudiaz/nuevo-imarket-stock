@@ -21,6 +21,7 @@ import {
   Wrench,
   Store,
   AlertTriangle,
+  Image,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -329,6 +330,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {user?.role === 'admin' && (
                 <NavItem href="/dashboard/customers" icon={Users} label="Clientes" active={pathname === "/dashboard/customers"} />
               )}
+
+              <NavItem href="/dashboard/pricelist" icon={Image} label="Lista Precios" active={pathname === "/dashboard/pricelist"} />
 
             </nav>
           </aside>
