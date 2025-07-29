@@ -200,7 +200,7 @@ export default function ChatWidget() {
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {isOpen ? (
-        <Card className={cn("w-80 h-96 flex flex-col shadow-lg bg-background/90 backdrop-blur-sm border-border/50")}>
+        <Card className={cn("w-80 h-96 flex flex-col shadow-lg bg-black/80 backdrop-blur-sm border-border/50")}>
           <CardHeader className="flex flex-row items-center justify-between p-4 border-b">
             <CardTitle className="text-lg">Chat Interno</CardTitle>
             <Button variant="ghost" size="icon" onClick={() => { setIsOpen(false); handleCancelRecording(); }}>
