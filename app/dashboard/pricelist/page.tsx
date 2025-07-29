@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { database } from "@/lib/firebase";
 import { ref, onValue } from "firebase/database";
@@ -27,8 +28,7 @@ export default function PriceListPage() {
   const [textColor, setTextColor] = useState<string>("#000000");
   const [posX, setPosX] = useState<number>(20);
   const [posY, setPosY] = useState<number>(40);
-  const [outputWidth, setOutputWidth] = useState<number>(0);
-  const [outputHeight, setOutputHeight] = useState<number>(0);
+  const [scale, setScale] = useState<number>(1);
   const [aspectRatio, setAspectRatio] = useState<string>("original");
   const [quality, setQuality] = useState<number>(0.92);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -62,8 +62,6 @@ export default function PriceListPage() {
     const img = new Image();
     img.onload = () => {
       setBackground(img);
-      setOutputWidth(img.width);
-      setOutputHeight(img.height);
       drawCanvas(img);
     };
     img.src = URL.createObjectURL(file);
@@ -76,12 +74,29 @@ export default function PriceListPage() {
     if (!ctx) return;
     const image = img || background;
     if (!image) return;
-    const width = outputWidth || image.width;
-    const height = outputHeight || image.height;
+    let cropWidth = image.width;
+    let cropHeight = image.height;
+    if (aspectRatio !== "original") {
+      const [w, h] = aspectRatio.split(":" ).map(Number);
+      if (w && h) {
+        const ratio = w / h;
+        if (image.width / image.height > ratio) {
+          cropHeight = image.height;
+          cropWidth = cropHeight * ratio;
+        } else {
+          cropWidth = image.width;
+          cropHeight = cropWidth / ratio;
+        }
+      }
+    }
+    const sx = (image.width - cropWidth) / 2;
+    const sy = (image.height - cropHeight) / 2;
+    const width = cropWidth * scale;
+    const height = cropHeight * scale;
     canvas.width = width;
     canvas.height = height;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, 0, 0, width, height);
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(image, sx, sy, cropWidth, cropHeight, 0, 0, width, height);
     ctx.font = `${fontSize}px ${fontFamily}`;
     ctx.fillStyle = textColor;
     ctx.textBaseline = "top";
@@ -93,15 +108,8 @@ export default function PriceListPage() {
 
   useEffect(() => {
     drawCanvas();
-  }, [products, fontSize, fontFamily, textColor, posX, posY, outputWidth, outputHeight]);
+  }, [products, fontSize, fontFamily, textColor, posX, posY, aspectRatio, scale]);
 
-  useEffect(() => {
-    if (aspectRatio === "original" || !outputWidth) return;
-    const [w, h] = aspectRatio.split(":" ).map(Number);
-    if (w && h) {
-      setOutputHeight(Math.round((outputWidth * h) / w));
-    }
-  }, [aspectRatio, outputWidth]);
 
   const downloadImage = () => {
     const canvas = canvasRef.current;
@@ -187,20 +195,17 @@ export default function PriceListPage() {
             value={textColor}
             onChange={(e) => setTextColor(e.target.value)}
           />
-          <Input
-            type="number"
-            className="w-24"
-            value={outputWidth}
-            onChange={(e) => setOutputWidth(Number(e.target.value))}
-            placeholder="Ancho"
-          />
-          <Input
-            type="number"
-            className="w-24"
-            value={outputHeight}
-            onChange={(e) => setOutputHeight(Number(e.target.value))}
-            placeholder="Alto"
-          />
+          <div className="flex items-center gap-2">
+            <span>Zoom</span>
+            <Slider
+              min={0.5}
+              max={2}
+              step={0.1}
+              value={[scale]}
+              onValueChange={(val) => setScale(val[0])}
+              className="w-40"
+            />
+          </div>
           <Select onValueChange={setAspectRatio} value={aspectRatio}>
             <SelectTrigger className="w-[100px]">
               <SelectValue placeholder="Ratio" />
@@ -210,6 +215,7 @@ export default function PriceListPage() {
               <SelectItem value="16:9">16:9</SelectItem>
               <SelectItem value="4:3">4:3</SelectItem>
               <SelectItem value="1:1">1:1</SelectItem>
+              <SelectItem value="9:16">9:16</SelectItem>
             </SelectContent>
           </Select>
           <Input
