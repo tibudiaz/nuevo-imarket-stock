@@ -27,6 +27,10 @@ export default function PriceListPage() {
   const [textColor, setTextColor] = useState<string>("#000000");
   const [posX, setPosX] = useState<number>(20);
   const [posY, setPosY] = useState<number>(40);
+  const [outputWidth, setOutputWidth] = useState<number>(0);
+  const [outputHeight, setOutputHeight] = useState<number>(0);
+  const [aspectRatio, setAspectRatio] = useState<string>("original");
+  const [quality, setQuality] = useState<number>(0.92);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -58,6 +62,8 @@ export default function PriceListPage() {
     const img = new Image();
     img.onload = () => {
       setBackground(img);
+      setOutputWidth(img.width);
+      setOutputHeight(img.height);
       drawCanvas(img);
     };
     img.src = URL.createObjectURL(file);
@@ -70,10 +76,12 @@ export default function PriceListPage() {
     if (!ctx) return;
     const image = img || background;
     if (!image) return;
-    canvas.width = image.width;
-    canvas.height = image.height;
+    const width = outputWidth || image.width;
+    const height = outputHeight || image.height;
+    canvas.width = width;
+    canvas.height = height;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, 0, 0);
+    ctx.drawImage(image, 0, 0, width, height);
     ctx.font = `${fontSize}px ${fontFamily}`;
     ctx.fillStyle = textColor;
     ctx.textBaseline = "top";
@@ -85,14 +93,22 @@ export default function PriceListPage() {
 
   useEffect(() => {
     drawCanvas();
-  }, [products, fontSize, fontFamily, textColor, posX, posY]);
+  }, [products, fontSize, fontFamily, textColor, posX, posY, outputWidth, outputHeight]);
+
+  useEffect(() => {
+    if (aspectRatio === "original" || !outputWidth) return;
+    const [w, h] = aspectRatio.split(":" ).map(Number);
+    if (w && h) {
+      setOutputHeight(Math.round((outputWidth * h) / w));
+    }
+  }, [aspectRatio, outputWidth]);
 
   const downloadImage = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = "price-list.png";
-    link.href = canvas.toDataURL();
+    link.download = "price-list.jpg";
+    link.href = canvas.toDataURL("image/jpeg", quality);
     link.click();
   };
 
@@ -170,6 +186,41 @@ export default function PriceListPage() {
             className="w-20"
             value={textColor}
             onChange={(e) => setTextColor(e.target.value)}
+          />
+          <Input
+            type="number"
+            className="w-24"
+            value={outputWidth}
+            onChange={(e) => setOutputWidth(Number(e.target.value))}
+            placeholder="Ancho"
+          />
+          <Input
+            type="number"
+            className="w-24"
+            value={outputHeight}
+            onChange={(e) => setOutputHeight(Number(e.target.value))}
+            placeholder="Alto"
+          />
+          <Select onValueChange={setAspectRatio} value={aspectRatio}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Ratio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="original">Original</SelectItem>
+              <SelectItem value="16:9">16:9</SelectItem>
+              <SelectItem value="4:3">4:3</SelectItem>
+              <SelectItem value="1:1">1:1</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            className="w-20"
+            value={quality}
+            onChange={(e) => setQuality(Number(e.target.value))}
+            placeholder="Calidad"
           />
           <Input type="number" className="w-20" value={posX} onChange={(e) => setPosX(Number(e.target.value))} placeholder="X" />
           <Input type="number" className="w-20" value={posY} onChange={(e) => setPosY(Number(e.target.value))} placeholder="Y" />
