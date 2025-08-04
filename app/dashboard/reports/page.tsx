@@ -22,6 +22,7 @@ interface SaleItem {
     productId: string;
     quantity: number;
     price: number;
+    category?: string;
 }
 
 interface Sale {

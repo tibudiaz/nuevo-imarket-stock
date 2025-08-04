@@ -396,6 +396,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 imei: item.imei || null,
                 barcode: item.barcode || null,
                 provider: item.provider || null,
+                category: item.category || null,
             })),
             paymentMethod,
             totalAmount: finalTotal,
