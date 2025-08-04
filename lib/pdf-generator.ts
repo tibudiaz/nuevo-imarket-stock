@@ -12,6 +12,7 @@ interface SaleItem {
   currency?: 'USD' | 'ARS';
   imei?: string;
   barcode?: string;
+  category?: string;
 }
 
 interface TradeIn {
@@ -126,8 +127,16 @@ export const generateSaleReceiptPdf = async (completedSale: Sale) => {
 
   try {
     let pdfDoc: PDFDocument;
-    const pdfTemplatePath = "templates/factura.pdf";
-    const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
+    const hasNewCellphone = completedSale.items?.some(
+      item => (item.category || '').toLowerCase() === 'celulares nuevos'
+    );
+    let pdfTemplatePath = hasNewCellphone ? 'templates/receipt_nuevos.pdf' : 'templates/factura.pdf';
+    let pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
+
+    if (!pdfTemplateExists && hasNewCellphone) {
+      pdfTemplatePath = 'templates/factura.pdf';
+      pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
+    }
 
     if (pdfTemplateExists) {
       try {
@@ -135,10 +144,10 @@ export const generateSaleReceiptPdf = async (completedSale: Sale) => {
         const pdfArrayBuffer = await fetch(pdfTemplateUrl).then(res => res.arrayBuffer());
         pdfDoc = await PDFDocument.load(pdfArrayBuffer);
       } catch (e) {
-        console.error("Error al cargar la plantilla PDF, creando uno desde cero.", e);
+        console.error('Error al cargar la plantilla PDF, creando uno desde cero.', e);
         pdfDoc = await PDFDocument.create();
         pdfDoc.addPage([595, 842]);
-        toast.info("Plantilla no encontrada", { description: "Se ha creado un comprobante básico." });
+        toast.info('Plantilla no encontrada', { description: 'Se ha creado un comprobante básico.' });
       }
     } else {
       pdfDoc = await PDFDocument.create();

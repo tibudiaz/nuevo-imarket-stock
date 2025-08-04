@@ -30,6 +30,7 @@ interface SaleItem {
   quantity: number;
   price: number;
   currency: 'USD' | 'ARS';
+  category?: string;
 }
 
 interface Product {
