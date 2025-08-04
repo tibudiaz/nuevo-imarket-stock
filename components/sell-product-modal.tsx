@@ -214,11 +214,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   };
   
   const handleAddProductToCart = useCallback((productToAdd: CartProduct, isInitialProduct = false) => {
-      if (!saleStore) {
-          toast.error("Seleccione un local antes de agregar productos.");
-          return;
-      }
-      if (productToAdd.store && productToAdd.store !== saleStore) {
+      if (!saleStore && productToAdd.store) {
+          setSaleStore(productToAdd.store);
+      } else if (saleStore && productToAdd.store && productToAdd.store !== saleStore) {
           toast.error(`El producto pertenece a ${productToAdd.store === 'local1' ? 'Local 1' : 'Local 2'}`);
           return;
       }
@@ -291,15 +289,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   }, [allProducts, bundles, saleStore]);
 
   useEffect(() => {
-    if (isOpen && product && saleStore && !initialProductProcessed && allProducts.length > 0) {
-      if (product.store && product.store !== saleStore) {
-        toast.error(`El producto pertenece a ${product.store === 'local1' ? 'Local 1' : 'Local 2'}`);
-      } else {
-        handleAddProductToCart(product, true);
-        setInitialProductProcessed(true);
-      }
+    if (isOpen && product && !initialProductProcessed && allProducts.length > 0) {
+      handleAddProductToCart(product, true);
+      setInitialProductProcessed(true);
     }
-  }, [isOpen, product, saleStore, allProducts, bundles, initialProductProcessed, handleAddProductToCart]);
+  }, [isOpen, product, allProducts, bundles, initialProductProcessed, handleAddProductToCart]);
 
 
   const handleRemoveProductFromCart = (productId: string) => setCart(cart.filter(item => item.id !== productId));
@@ -312,8 +306,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   };
   const searchedProducts = useMemo(() => {
     if (!productSearchTerm) return [];
-    return allProducts.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()) && p.stock > 0);
-  }, [productSearchTerm, allProducts]);
+    return allProducts.filter(
+      (p) =>
+        p.name.toLowerCase().includes(productSearchTerm.toLowerCase()) &&
+        p.stock > 0 &&
+        (!saleStore || !p.store || p.store === saleStore)
+    );
+  }, [productSearchTerm, allProducts, saleStore]);
   
   const totalAmountInARS = useMemo(() => {
     const cartTotal = cart.reduce((sum, item) => sum + (convertPrice(item.price, usdRate) * item.quantity), 0);
@@ -341,7 +340,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         return;
     }
     if (!saleStore) {
-        toast.error("Seleccione un local");
+        toast.error("No se detectó el local");
         return;
     }
     setIsLoading(true);
@@ -373,7 +372,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     throw new Error(`Stock insuficiente para ${item.name}.`);
                 }
 
-                await update(productRef, { stock: newStock });
+                if (newStock <= 0) {
+                    await remove(productRef);
+                } else {
+                    await update(productRef, { stock: newStock });
+                }
             }
         }
         
@@ -473,7 +476,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         return;
     }
     if (!saleStore) {
-        toast.error("Seleccione un local");
+        toast.error("No se detectó el local");
         return;
     }
 
@@ -507,7 +510,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
 
         const newStock = currentStock - reservedQuantity;
-        await update(productRef, { stock: newStock });
+        if (newStock <= 0) {
+            await remove(productRef);
+        } else {
+            await update(productRef, { stock: newStock });
+        }
 
         const newReserveRef = push(ref(database, 'reserves'));
         const priceARS = convertPrice(item.price, usdRate) * item.quantity;
@@ -614,15 +621,17 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <Label htmlFor="sale-store">Local</Label>
-                    <Select value={saleStore || undefined} onValueChange={(value: "local1" | "local2") => setSaleStore(value)}>
-                      <SelectTrigger id="sale-store">
-                        <SelectValue placeholder="Seleccionar local" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="local1">Local 1</SelectItem>
-                        <SelectItem value="local2">Local 2</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="sale-store"
+                      value={
+                        saleStore
+                          ? saleStore === "local2"
+                            ? "Local 2"
+                            : "Local 1"
+                          : ""
+                      }
+                      disabled
+                    />
                   </div>
                   <div className="space-y-2"><Label htmlFor="usdRate" className="flex items-center gap-1.5"><DollarSign className="h-4 w-4"/> Cotización Dólar</Label><Input id="usdRate" type="number" value={usdRate} onChange={(e) => setUsdRate(Number(e.target.value) || 0)}/></div>
                   <div className="space-y-2"><Label htmlFor="customerDni" className="flex items-center gap-1.5"><User className="h-4 w-4"/>DNI Cliente</Label><div className="flex gap-2"><Input id="customerDni" value={customer.dni} onChange={(e) => setCustomer({...customer, dni: e.target.value})} /><Button variant="outline" size="icon" onClick={searchCustomerByDni} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}</Button></div></div>

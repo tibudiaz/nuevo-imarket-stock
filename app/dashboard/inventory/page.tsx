@@ -126,7 +126,7 @@ export default function InventoryPage() {
     barcode: "",
     imei: "",
     provider: "",
-    store: "local1",
+    store: selectedStore === "local2" ? "local2" : "local1",
   });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
@@ -134,12 +134,26 @@ export default function InventoryPage() {
     newProduct.category === "Celulares" ||
     newProduct.category === "Celulares Usados" ||
     newProduct.category === "Celulares Nuevos";
-  const isUsedCellphoneCategory = newProduct.category === "Celulares Usados";
+  const isCellphoneWithoutModelCategory =
+    newProduct.category === "Celulares Usados" ||
+    newProduct.category === "Celulares Nuevos";
 
   const isEditingCellphoneCategory =
     editingProduct?.category === "Celulares" ||
     editingProduct?.category === "Celulares Usados" ||
     editingProduct?.category === "Celulares Nuevos";
+  const isEditingCellphoneWithoutModelCategory =
+    editingProduct?.category === "Celulares Usados" ||
+    editingProduct?.category === "Celulares Nuevos";
+
+  useEffect(() => {
+    if (isAddDialogOpen) {
+      setNewProduct((prev) => ({
+        ...prev,
+        store: selectedStore === "local2" ? "local2" : "local1",
+      }));
+    }
+  }, [isAddDialogOpen, selectedStore]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -221,15 +235,23 @@ export default function InventoryPage() {
           .includes(searchTerm.toLowerCase()) ||
         (product.imei || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-      return storeMatch && categoryMatch && searchMatch;
+      const stockMatch = (product.stock || 0) > 0;
+
+      return storeMatch && categoryMatch && searchMatch && stockMatch;
     });
   }, [products, selectedStore, categorySearch, searchTerm]);
 
   const handleAddProduct = async () => {
+    if (selectedStore === "all") {
+      toast.error("Seleccione un local", {
+        description: "Debe elegir un local antes de agregar productos.",
+      });
+      return;
+    }
     if (
       !newProduct.name ||
       !newProduct.brand ||
-      (!newProduct.model && !isUsedCellphoneCategory) ||
+      (!newProduct.model && !isCellphoneWithoutModelCategory) ||
       !newProduct.category
     ) {
       toast.error("Campos incompletos", {
@@ -249,6 +271,7 @@ export default function InventoryPage() {
       const newProductRef = push(productsRef);
       await set(newProductRef, {
         ...newProduct,
+        store: selectedStore === "local2" ? "local2" : "local1",
         createdAt: new Date().toISOString(),
       });
       setNewProduct({
@@ -262,7 +285,7 @@ export default function InventoryPage() {
         barcode: "",
         imei: "",
         provider: "",
-        store: "local1",
+        store: selectedStore === "local2" ? "local2" : "local1",
       });
       setIsAddDialogOpen(false);
       toast.success("Producto agregado", {
@@ -330,13 +353,14 @@ export default function InventoryPage() {
   const handleCategoryChange = (value: string) => {
     const isUsed = value === "Celulares Usados";
     const isNew = value === "Celulares Nuevos";
-    const isCellphone = isUsed || isNew;
+    const withoutModel = isUsed || isNew;
+    const isCellphone = value === "Celulares" || withoutModel;
 
     setNewProduct((prev) => ({
       ...prev,
       category: value,
       stock: isCellphone ? 1 : prev.stock,
-      model: isUsed ? "Celular" : prev.model,
+      model: withoutModel ? "Celular" : prev.model,
     }));
   };
 
@@ -450,21 +474,13 @@ export default function InventoryPage() {
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="store">Local</Label>
-                      <Select
-                        value={newProduct.store}
-                        onValueChange={(value: "local1" | "local2") =>
-                          setNewProduct({ ...newProduct, store: value })
+                      <Label>Local</Label>
+                      <Input
+                        value={
+                          selectedStore === "local2" ? "Local 2" : "Local 1"
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar local" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="local1">Local 1</SelectItem>
-                          <SelectItem value="local2">Local 2</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        disabled
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -513,7 +529,7 @@ export default function InventoryPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      {!isUsedCellphoneCategory && (
+                      {!isCellphoneWithoutModelCategory && (
                         <div className="space-y-2">
                           <Label htmlFor="model">Modelo</Label>
                           <Input
@@ -810,21 +826,13 @@ export default function InventoryPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-store">Local</Label>
-                <Select
-                  value={editingProduct.store}
-                  onValueChange={(value: "local1" | "local2") =>
-                    setEditingProduct({ ...editingProduct, store: value })
+                <Label>Local</Label>
+                <Input
+                  value={
+                    editingProduct.store === "local2" ? "Local 2" : "Local 1"
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar local" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="local1">Local 1</SelectItem>
-                    <SelectItem value="local2">Local 2</SelectItem>
-                  </SelectContent>
-                </Select>
+                  disabled
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -854,20 +862,26 @@ export default function InventoryPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="model">Modelo</Label>
-                  <Input
-                    id="model"
-                    value={editingProduct.model}
-                    onChange={(e) =>
-                      setEditingProduct({
-                        ...editingProduct,
-                        model: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+              <div
+                className={`grid gap-4 ${
+                  isEditingCellphoneWithoutModelCategory ? "grid-cols-1" : "grid-cols-2"
+                }`}
+              >
+                {!isEditingCellphoneWithoutModelCategory && (
+                  <div className="space-y-2">
+                    <Label htmlFor="model">Modelo</Label>
+                    <Input
+                      id="model"
+                      value={editingProduct.model}
+                      onChange={(e) =>
+                        setEditingProduct({
+                          ...editingProduct,
+                          model: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="category">Categoría</Label>
                   <Select
