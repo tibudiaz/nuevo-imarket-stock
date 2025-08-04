@@ -40,6 +40,7 @@ interface Sale {
 
 interface Repair {
     receiptNumber: string;
+    deliveryReceiptNumber?: string;
     entryDate: string;
     productName: string;
     imei?: string;
@@ -390,7 +391,7 @@ const drawRepairPdfContent = (page: any, repair: Repair, customer: Customer, fon
 
     const formattedDate = repair.entryDate ? new Date(repair.entryDate).toLocaleDateString() : 'N/A';
 
-    page.drawText(String(repair.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
+    page.drawText(String(repair.deliveryReceiptNumber || repair.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
     page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
     page.drawText(String(customer.name || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
     page.drawText(String(customer.dni || ''), { ...positions.dniCliente, size: 10, font: helveticaFont });
@@ -461,7 +462,7 @@ export const generateDeliveryReceiptPdf = async (repairData: Repair, store: 'loc
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Entrega-${repairData.receiptNumber || 'reparacion'}.pdf`;
+    link.download = `Entrega-${repairData.deliveryReceiptNumber || repairData.receiptNumber || 'reparacion'}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -495,7 +496,7 @@ const drawDeliveryPdfContent = (page: any, repair: Repair, fonts: Fonts) => {
 
     const customerDni = (repair as any).customerDni || (repair as any).customerDNI || (repair as any).dni || '';
 
-    page.drawText(String(repair.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
+    page.drawText(String(repair.deliveryReceiptNumber || repair.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
     page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
     page.drawText(String(repair.customerName || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
     page.drawText(String(customerDni), { ...positions.dniCliente, size: 10, font: helveticaFont });
