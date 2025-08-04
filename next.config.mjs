@@ -43,6 +43,13 @@ const nextConfig = {
       ],
     });
 
+    // Asegura que se use la versión para navegador de Konva
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      'konva$': 'konva/lib/index.js',
+    };
+
     return config;
   },
 

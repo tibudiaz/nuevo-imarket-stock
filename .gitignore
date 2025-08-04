@@ -3,6 +3,9 @@
 # dependencies
 /node_modules
 
+# lockfiles
+package-lock.json
+
 # next.js
 /.next/
 /out/
