@@ -533,7 +533,7 @@ export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
-        drawReservePdfContent(secondPage, reserveData, { helveticaFont, helveticaBold });
+        drawReservePdfContent(secondPage, reserveData, { helveticaFont, helveticaBold }, true);
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -554,7 +554,7 @@ export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
   }
 };
 
-const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts) => {
+const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts, isSecondPage = false) => {
     const { helveticaFont, helveticaBold } = fonts;
     const fromTop = (y: number) => page.getHeight() - y;
     const positions = {
@@ -569,8 +569,8 @@ const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts) => {
         total: { x: 436, y: fromTop(365) },
         entrega: { x: 436, y: fromTop(390) },
         saldo: { x: 436, y: fromTop(420) },
-        fechaRetiro1: { x: 137, y: fromTop(524) },
-        fechaRetiro2: { x: 340, y: fromTop(617) }
+        fechaRetiro1: { x: isSecondPage ? 133 : 137, y: fromTop(527) },
+        fechaRetiro2: { x: isSecondPage ? 336 : 340, y: fromTop(621) }
     };
 
     const formattedDate = reserve.date ? new Date(reserve.date).toLocaleDateString() : 'N/A';
