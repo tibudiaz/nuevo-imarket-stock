@@ -206,7 +206,8 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         itemStartX: 65,
         imeiStartX: 280,
         priceStartX: 455,
-        subtotal: { x: 430, y: fromTop(hasItems ? 495 : 521) },
+        // El valor X permanece, se ajusta la posición Y del subtotal a 495
+        subtotal: { x: 430, y: 495 },
         parteDePago: { x: 430, y: fromTop(hasItems ? 475 : 501) },
         precioFinal: { x: 455, y: 290 },
     };
