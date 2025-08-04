@@ -559,8 +559,7 @@ export default function InventoryPage() {
                             />
                             {isMobile && (
                               <p className="text-xs text-muted-foreground pt-1">
-                                Mantén presionado para "Escanear texto" con la
-                                cámara.
+                                Mantén presionado para &quot;Escanear texto&quot; con la cámara.
                               </p>
                             )}
                           </div>
@@ -907,7 +906,7 @@ export default function InventoryPage() {
                       />
                       {isMobile && (
                         <p className="text-xs text-muted-foreground pt-1">
-                          Mantén presionado para "Escanear texto" con la cámara.
+                          Mantén presionado para &quot;Escanear texto&quot; con la cámara.
                         </p>
                       )}
                     </div>

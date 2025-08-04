@@ -64,6 +64,7 @@ interface Sale {
     usdRate: number;
     pointsUsed?: number;
     pointsEarned?: number;
+    pointsAccumulated?: number;
 }
 
 // Interfaz para los datos de la reserva
@@ -371,6 +372,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
 
         const newSaleRef = push(ref(database, "sales"));
+        const updatedPoints = availablePoints - pointsToUse + pointsEarned;
         const saleData: Sale = {
             id: newSaleRef.key!,
             receiptNumber,
@@ -394,12 +396,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             usdRate,
             pointsUsed: pointsToUse,
             pointsEarned,
+            pointsAccumulated: updatedPoints,
         };
         await set(newSaleRef, saleData);
 
         if (customerId) {
             const customerRef = ref(database, `customers/${customerId}`);
-            const updatedPoints = availablePoints - pointsToUse + pointsEarned;
             await update(customerRef, { points: updatedPoints, lastPurchase: new Date().toISOString() });
             setAvailablePoints(updatedPoints);
         }
