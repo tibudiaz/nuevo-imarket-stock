@@ -84,7 +84,8 @@ interface Reserve {
     status: 'reserved' | 'completed' | 'cancelled';
 }
 
-const POINT_THRESHOLD = 50000;
+const DEFAULT_POINT_EARN_RATE = 50000;
+const DEFAULT_POINT_VALUE = 50000;
 
 interface SellProductModalProps {
   isOpen: boolean;
@@ -118,6 +119,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [initialProductProcessed, setInitialProductProcessed] = useState(false);
   const [availablePoints, setAvailablePoints] = useState(0);
   const [usePoints, setUsePoints] = useState(false);
+  const [pointEarnRate, setPointEarnRate] = useState(DEFAULT_POINT_EARN_RATE);
+  const [pointValue, setPointValue] = useState(DEFAULT_POINT_VALUE);
 
   useEffect(() => {
     if (isOpen) {
@@ -140,6 +143,15 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         const bundleList: BundleRule[] = data ? Object.values(data) : [];
         setBundles(bundleList);
       });
+
+      const pointsRef = ref(database, 'config/points');
+      const unsubscribePoints = onValue(pointsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          setPointEarnRate(data.earnRate ?? DEFAULT_POINT_EARN_RATE);
+          setPointValue(data.value ?? DEFAULT_POINT_VALUE);
+        }
+      });
       
       const date = new Date()
       const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
@@ -149,6 +161,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         unsubscribeProducts();
         unsubscribeCurrency();
         unsubscribeBundles();
+        unsubscribePoints();
       }
     } else {
       setCart([])
@@ -287,12 +300,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
   const discount = useMemo(() => {
     if (!usePoints) return 0;
-    const maxUsablePoints = Math.min(availablePoints, Math.floor(totalAmountInARS / POINT_THRESHOLD));
-    return maxUsablePoints * POINT_THRESHOLD;
-  }, [usePoints, availablePoints, totalAmountInARS]);
+    const maxUsablePoints = Math.min(availablePoints, Math.floor(totalAmountInARS / pointValue));
+    return maxUsablePoints * pointValue;
+  }, [usePoints, availablePoints, totalAmountInARS, pointValue]);
 
-  const pointsToUse = useMemo(() => discount / POINT_THRESHOLD, [discount]);
+  const pointsToUse = useMemo(() => discount / pointValue, [discount, pointValue]);
   const finalTotal = useMemo(() => totalAmountInARS - discount, [totalAmountInARS, discount]);
+  const pointsEarned = useMemo(() => Math.floor(finalTotal / pointEarnRate), [finalTotal, pointEarnRate]);
 
   const handleSellProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
@@ -356,7 +370,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${tradeInProduct.name} al inventario.` });
         }
 
-        const pointsEarned = Math.floor(finalTotal / POINT_THRESHOLD);
         const newSaleRef = push(ref(database, "sales"));
         const saleData: Sale = {
             id: newSaleRef.key!,
@@ -563,7 +576,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                   {availablePoints > 0 && (
                     <div className="flex items-center space-x-2">
                       <Checkbox id="use-points" checked={usePoints} onCheckedChange={(checked) => setUsePoints(!!checked)} />
-                      <Label htmlFor="use-points">Usar {availablePoints} puntos</Label>
+                      <Label htmlFor="use-points">
+                        Usar {availablePoints} puntos
+                        {usePoints && discount > 0 && ` (Descuento: ${formatCurrency(discount)})`}
+                      </Label>
                     </div>
                   )}
                   <div><Button type="button" variant="secondary" onClick={() => setIsTradeIn(!isTradeIn)} className="w-full">{isTradeIn ? "Cancelar Parte de Pago" : "Recibir en Parte de Pago"}</Button></div>
@@ -584,6 +600,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 {usePoints && discount > 0 && (
                   <p className="text-sm text-muted-foreground">Descuento: {formatCurrency(discount)}</p>
                 )}
+                <p className="text-sm text-muted-foreground">Puntos que suma: {pointsEarned}</p>
                 <div className="text-2xl font-bold">
                   Total: {formatCurrency(finalTotal)}
                 </div>
