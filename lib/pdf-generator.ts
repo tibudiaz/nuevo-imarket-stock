@@ -35,6 +35,7 @@ interface Sale {
   pointsEarned?: number;
   pointsAccumulated?: number;
   pointsPaused?: boolean;
+  store?: 'local1' | 'local2';
 }
 
 interface Repair {
@@ -51,6 +52,7 @@ interface Repair {
     customerName?: string;
     customerDni?: string;
     customerPhone?: string;
+    store?: 'local1' | 'local2';
 }
 
 interface Reserve {
@@ -69,6 +71,7 @@ interface Reserve {
     downPayment: number;
     remainingAmount: number;
     status: 'reserved' | 'completed' | 'cancelled';
+    store?: 'local1' | 'local2';
 }
 
 interface Customer {
@@ -130,11 +133,14 @@ export const generateSaleReceiptPdf = async (completedSale: Sale) => {
     const hasNewCellphone = completedSale.items?.some(
       item => (item.category || '').toLowerCase() === 'celulares nuevos'
     );
-    let pdfTemplatePath = hasNewCellphone ? 'templates/receipt_nuevos.pdf' : 'templates/factura.pdf';
+    const store = completedSale.store === 'local2' ? 'local2' : 'local1';
+    let pdfTemplateBase = hasNewCellphone ? 'templates/receipt_nuevos' : 'templates/factura';
+    let pdfTemplatePath = store === 'local2' ? `${pdfTemplateBase}2.pdf` : `${pdfTemplateBase}.pdf`;
     let pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
 
     if (!pdfTemplateExists && hasNewCellphone) {
-      pdfTemplatePath = 'templates/factura.pdf';
+      pdfTemplateBase = 'templates/factura';
+      pdfTemplatePath = store === 'local2' ? `${pdfTemplateBase}2.pdf` : `${pdfTemplateBase}.pdf`;
       pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
     }
 
@@ -284,7 +290,7 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
 
 
 // --- Generador de PDF para Reparaciones (Presupuesto) ---
-export const generateRepairReceiptPdf = async (repairData: Repair, customerData: Customer) => {
+export const generateRepairReceiptPdf = async (repairData: Repair, customerData: Customer, store: 'local1' | 'local2' = 'local1') => {
   if (!repairData || !customerData) {
     toast.error("Error", { description: "No hay datos para generar el PDF de reparación." });
     return;
@@ -296,7 +302,7 @@ export const generateRepairReceiptPdf = async (repairData: Repair, customerData:
 
   try {
     let pdfDoc: PDFDocument;
-    const pdfTemplatePath = "templates/presupuesto.pdf";
+    const pdfTemplatePath = store === 'local2' ? "templates/presupuesto2.pdf" : "templates/presupuesto.pdf";
     const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
 
     if (pdfTemplateExists) {
@@ -388,7 +394,7 @@ const drawRepairPdfContent = (page: any, repair: Repair, customer: Customer, fon
 
 
 // --- Generador de PDF para Entregas ---
-export const generateDeliveryReceiptPdf = async (repairData: Repair) => {
+export const generateDeliveryReceiptPdf = async (repairData: Repair, store: 'local1' | 'local2' = 'local1') => {
   if (!repairData) {
     toast.error("Error", { description: "No hay datos para generar el comprobante de entrega." });
     return;
@@ -400,7 +406,7 @@ export const generateDeliveryReceiptPdf = async (repairData: Repair) => {
 
   try {
     let pdfDoc: PDFDocument;
-    const pdfTemplatePath = "templates/entrega.pdf";
+    const pdfTemplatePath = store === 'local2' ? "templates/entrega2.pdf" : "templates/entrega.pdf";
     const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
 
     if (pdfTemplateExists) {
@@ -506,7 +512,8 @@ export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
 
   try {
     let pdfDoc: PDFDocument;
-    const pdfTemplatePath = "templates/reserve-template.pdf";
+    const store = reserveData.store === 'local2' ? 'local2' : 'local1';
+    const pdfTemplatePath = store === 'local2' ? "templates/reserve-template2.pdf" : "templates/reserve-template.pdf";
     const pdfTemplateExists = await checkPdfExists(pdfTemplatePath);
 
     if (pdfTemplateExists) {

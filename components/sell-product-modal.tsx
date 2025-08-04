@@ -35,6 +35,7 @@ interface CartProduct {
   category?: string;
   model?: string;
   provider?: string;
+  store?: "local1" | "local2";
 }
 
 interface BundleRule {
@@ -66,6 +67,7 @@ interface Sale {
     pointsEarned?: number;
     pointsAccumulated?: number;
     pointsPaused?: boolean;
+    store: "local1" | "local2";
 }
 
 // Interfaz para los datos de la reserva
@@ -85,6 +87,7 @@ interface Reserve {
     downPayment: number;
     remainingAmount: number;
     status: 'reserved' | 'completed' | 'cancelled';
+    store: "local1" | "local2";
 }
 
 const DEFAULT_POINT_EARN_RATE = 50000;
@@ -125,6 +128,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [pointEarnRate, setPointEarnRate] = useState(DEFAULT_POINT_EARN_RATE);
   const [pointValue, setPointValue] = useState(DEFAULT_POINT_VALUE);
   const [pointsPaused, setPointsPaused] = useState(false);
+  const [saleStore, setSaleStore] = useState<"local1" | "local2" | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -177,6 +181,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setAvailablePoints(0);
       setUsePoints(false);
       setPointsPaused(false);
+      setSaleStore(null);
     }
   }, [isOpen]);
 
@@ -209,6 +214,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   };
   
   const handleAddProductToCart = useCallback((productToAdd: CartProduct, isInitialProduct = false) => {
+      if (!saleStore) {
+          toast.error("Seleccione un local antes de agregar productos.");
+          return;
+      }
+      if (productToAdd.store && productToAdd.store !== saleStore) {
+          toast.error(`El producto pertenece a ${productToAdd.store === 'local1' ? 'Local 1' : 'Local 2'}`);
+          return;
+      }
       setCart(prevCart => {
           let newCart = [...prevCart];
           const accessoriesToAdd: CartProduct[] = [];
@@ -275,14 +288,18 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           }
           return [...newCart, ...accessoriesToAdd];
       });
-  }, [allProducts, bundles]);
+  }, [allProducts, bundles, saleStore]);
 
   useEffect(() => {
-    if (isOpen && product && !initialProductProcessed && allProducts.length > 0) {
-      handleAddProductToCart(product, true);
-      setInitialProductProcessed(true);
+    if (isOpen && product && saleStore && !initialProductProcessed && allProducts.length > 0) {
+      if (product.store && product.store !== saleStore) {
+        toast.error(`El producto pertenece a ${product.store === 'local1' ? 'Local 1' : 'Local 2'}`);
+      } else {
+        handleAddProductToCart(product, true);
+        setInitialProductProcessed(true);
+      }
     }
-  }, [isOpen, product, allProducts, bundles, initialProductProcessed, handleAddProductToCart]);
+  }, [isOpen, product, saleStore, allProducts, bundles, initialProductProcessed, handleAddProductToCart]);
 
 
   const handleRemoveProductFromCart = (productId: string) => setCart(cart.filter(item => item.id !== productId));
@@ -321,6 +338,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
     if (cart.length === 0) {
         toast.error("El carrito está vacío.");
+        return;
+    }
+    if (!saleStore) {
+        toast.error("Seleccione un local");
         return;
     }
     setIsLoading(true);
@@ -371,6 +392,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 stock: 1,
                 provider: customer.name,
                 createdAt: new Date().toISOString(),
+                store: saleStore,
             };
             await set(newProductRef, newProductData);
             toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${tradeInProduct.name} al inventario.` });
@@ -404,6 +426,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             tradeIn: isTradeIn ? tradeInProduct : null,
             usdRate,
             pointsPaused,
+            store: saleStore,
             ...(pointsPaused
                 ? {}
                 : {
@@ -447,6 +470,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
     if (reserveAmount <= 0) {
         toast.error("Monto de seña inválido");
+        return;
+    }
+    if (!saleStore) {
+        toast.error("Seleccione un local");
         return;
     }
 
@@ -499,7 +526,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             productPrice: priceARS,
             downPayment: reserveAmount,
             remainingAmount: priceARS - reserveAmount,
-            status: 'reserved'
+            status: 'reserved',
+            store: saleStore,
         };
         await set(newReserveRef, reserveData);
         
@@ -584,6 +612,18 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 <h3 className="text-lg font-medium">Datos de la Venta</h3>
                 <Separator className="my-2"/>
                 <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="sale-store">Local</Label>
+                    <Select value={saleStore || undefined} onValueChange={(value: "local1" | "local2") => setSaleStore(value)}>
+                      <SelectTrigger id="sale-store">
+                        <SelectValue placeholder="Seleccionar local" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="local1">Local 1</SelectItem>
+                        <SelectItem value="local2">Local 2</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2"><Label htmlFor="usdRate" className="flex items-center gap-1.5"><DollarSign className="h-4 w-4"/> Cotización Dólar</Label><Input id="usdRate" type="number" value={usdRate} onChange={(e) => setUsdRate(Number(e.target.value) || 0)}/></div>
                   <div className="space-y-2"><Label htmlFor="customerDni" className="flex items-center gap-1.5"><User className="h-4 w-4"/>DNI Cliente</Label><div className="flex gap-2"><Input id="customerDni" value={customer.dni} onChange={(e) => setCustomer({...customer, dni: e.target.value})} /><Button variant="outline" size="icon" onClick={searchCustomerByDni} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}</Button></div></div>
                   <div className="space-y-2"><Label htmlFor="customerName">Nombre Cliente</Label><Input id="customerName" value={customer.name} onChange={(e) => setCustomer({...customer, name: e.target.value})}/></div>
@@ -626,8 +666,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               </div>
               <div className="flex gap-2">
                   <Button variant="outline" onClick={onClose}>Cancelar</Button>
-                  <Button variant="secondary" onClick={() => setIsReserveDialogOpen(true)} disabled={cart.length === 0}>Reservar</Button>
-                  <Button onClick={handleSellProduct} disabled={isLoading || cart.length === 0}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Completar Venta</Button>
+                  <Button variant="secondary" onClick={() => setIsReserveDialogOpen(true)} disabled={cart.length === 0 || !saleStore}>Reservar</Button>
+                  <Button onClick={handleSellProduct} disabled={isLoading || cart.length === 0 || !saleStore}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Completar Venta</Button>
               </div>
             </div>
           </DialogFooter>

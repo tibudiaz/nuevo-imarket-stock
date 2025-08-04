@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { generateDeliveryReceiptPdf } from "@/lib/pdf-generator";
+import { useStore } from "@/hooks/use-store";
 
 // --- INTERFAZ UNIFICADA Y DEFINITIVA ---
 // Usando la misma estructura que la página principal para consistencia.
@@ -47,6 +48,7 @@ interface RepairDetailModalProps {
 
 export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }: RepairDetailModalProps) {
   const [editableRepair, setEditableRepair] = useState<Repair | null>(repair);
+  const { selectedStore } = useStore();
 
   useEffect(() => {
     if (repair) {
@@ -79,7 +81,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
 
     if (updatedData.status === 'delivered' && repair.status !== 'delivered') {
         const pdfDataForGeneration = { ...repair, ...updatedData };
-        await generateDeliveryReceiptPdf(pdfDataForGeneration);
+        await generateDeliveryReceiptPdf(pdfDataForGeneration, selectedStore === 'local2' ? 'local2' : 'local1');
     }
     onClose();
   }
