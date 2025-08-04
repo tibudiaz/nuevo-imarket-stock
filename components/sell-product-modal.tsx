@@ -77,6 +77,7 @@ interface Reserve {
     customerId: string;
     customerName: string;
     customerDni: string;
+    customerPhone: string;
     productName: string;
     productId: string;
     quantity: number;
@@ -491,6 +492,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             customerId: customerId!,
             customerName: customer.name,
             customerDni: customer.dni,
+            customerPhone: customer.phone,
             productName: item.name,
             productId: item.id,
             quantity: reservedQuantity,
