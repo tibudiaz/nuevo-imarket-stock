@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { ref, runTransaction } from "firebase/database";
+import { database } from "@/lib/firebase";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +38,7 @@ interface Repair {
   repairCost?: number;
   finalPrice?: number;
   deliveredAt?: string;
+  deliveryReceiptNumber?: string;
   [key: string]: any;
 }
 
@@ -67,24 +70,44 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
     setEditableRepair(prev => prev ? { ...prev, status: value } : null);
   }
 
-  const handleUpdate = async () => {
-    if (!editableRepair) return;
-    
-    const updatedData = {
-        ...editableRepair,
-        deliveredAt: editableRepair.status === 'delivered' && !repair.deliveredAt 
-            ? new Date().toISOString() 
-            : repair.deliveredAt,
-    };
-    
-    await onUpdate(repair.id, updatedData);
+    const handleUpdate = async () => {
+      if (!editableRepair) return;
 
-    if (updatedData.status === 'delivered' && repair.status !== 'delivered') {
-        const pdfDataForGeneration = { ...repair, ...updatedData };
-        await generateDeliveryReceiptPdf(pdfDataForGeneration, selectedStore === 'local2' ? 'local2' : 'local1');
+      let deliveryReceiptNumber: string | undefined;
+      if (editableRepair.status === 'delivered' && repair.status !== 'delivered') {
+        const counterRef = ref(database, 'counters/deliveryNumber');
+        const transactionResult = await runTransaction(counterRef, (currentData) => {
+          if (currentData === null) {
+            return { value: 1, prefix: 'E-', lastUpdated: new Date().toISOString() };
+          }
+          currentData.value++;
+          currentData.lastUpdated = new Date().toISOString();
+          return currentData;
+        });
+        if (!transactionResult.committed || !transactionResult.snapshot.exists()) {
+          toast.error('Error al generar número de recibo.');
+          return;
+        }
+        const newCounterData = transactionResult.snapshot.val();
+        deliveryReceiptNumber = `${newCounterData.prefix}${String(newCounterData.value).padStart(5, '0')}`;
+      }
+
+      const updatedData = {
+          ...editableRepair,
+          deliveredAt: editableRepair.status === 'delivered' && !repair.deliveredAt
+              ? new Date().toISOString()
+              : repair.deliveredAt,
+          ...(deliveryReceiptNumber ? { deliveryReceiptNumber } : {}),
+      };
+
+      await onUpdate(repair.id, updatedData);
+
+      if (updatedData.status === 'delivered' && repair.status !== 'delivered') {
+          const pdfDataForGeneration = { ...repair, ...updatedData };
+          await generateDeliveryReceiptPdf(pdfDataForGeneration, selectedStore === 'local2' ? 'local2' : 'local1');
+      }
+      onClose();
     }
-    onClose();
-  }
 
   const getStatusVariant = (status: Repair['status']) => {
     switch (status) {

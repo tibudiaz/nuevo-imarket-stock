@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { ref, set, push, get, update, onValue, query, orderByChild, equalTo, remove } from "firebase/database"
+import { ref, set, push, get, update, onValue, query, orderByChild, equalTo, remove, runTransaction } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -162,10 +162,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
       });
       
-      const date = new Date()
-      const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
-      setReceiptNumber(`${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, "0")}${date.getDate().toString().padStart(2, "0")}-${randomNum}`)
-
       return () => {
         unsubscribeProducts();
         unsubscribeCurrency();
@@ -177,8 +173,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setIsTradeIn(false)
       setProductSearchTerm("")
       setCustomer({ name: "", dni: "", phone: "", email: "" })
-      setTradeInProduct({ name: "", imei: "", price: 0, serialNumber: "" });
-      setAvailablePoints(0);
+        setTradeInProduct({ name: "", imei: "", price: 0, serialNumber: "" });
+        setReceiptNumber("");
+        setAvailablePoints(0);
       setUsePoints(false);
       setPointsPaused(false);
       setSaleStore(null);
@@ -401,6 +398,22 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${tradeInProduct.name} al inventario.` });
         }
 
+        const counterRef = ref(database, 'counters/saleNumber');
+        const transactionResult = await runTransaction(counterRef, (currentData) => {
+            if (currentData === null) {
+                return { value: 1, prefix: 'V-', lastUpdated: new Date().toISOString() };
+            }
+            currentData.value++;
+            currentData.lastUpdated = new Date().toISOString();
+            return currentData;
+        });
+        if (!transactionResult.committed || !transactionResult.snapshot.exists()) {
+            throw new Error('No se pudo confirmar la transacción del contador de recibos.');
+        }
+        const newCounterData = transactionResult.snapshot.val();
+        const newReceiptNumber = `${newCounterData.prefix}${String(newCounterData.value).padStart(5, '0')}`;
+        setReceiptNumber(newReceiptNumber);
+
         const newSaleRef = push(ref(database, "sales"));
         let updatedPoints = availablePoints;
         if (!pointsPaused) {
@@ -408,7 +421,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
         const saleData: Sale = {
             id: newSaleRef.key!,
-            receiptNumber,
+            receiptNumber: newReceiptNumber,
             date: new Date().toISOString(),
             customerId,
             customerName: customer.name,
@@ -516,11 +529,27 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             await update(productRef, { stock: newStock });
         }
 
+        const counterRef = ref(database, 'counters/saleNumber');
+        const transactionResult = await runTransaction(counterRef, (currentData) => {
+            if (currentData === null) {
+                return { value: 1, prefix: 'V-', lastUpdated: new Date().toISOString() };
+            }
+            currentData.value++;
+            currentData.lastUpdated = new Date().toISOString();
+            return currentData;
+        });
+        if (!transactionResult.committed || !transactionResult.snapshot.exists()) {
+            throw new Error('No se pudo confirmar la transacción del contador de recibos.');
+        }
+        const newCounterData = transactionResult.snapshot.val();
+        const newReceiptNumber = `${newCounterData.prefix}${String(newCounterData.value).padStart(5, '0')}`;
+        setReceiptNumber(newReceiptNumber);
+
         const newReserveRef = push(ref(database, 'reserves'));
         const priceARS = convertPrice(item.price, usdRate) * item.quantity;
         const reserveData: Reserve = {
             id: newReserveRef.key!,
-            receiptNumber,
+            receiptNumber: newReceiptNumber,
             date: new Date().toISOString(),
             expirationDate: reserveExpirationDate,
             customerId: customerId!,

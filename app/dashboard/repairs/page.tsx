@@ -34,6 +34,7 @@ interface Repair {
   entryDate: string;
   createdAt: number;
   deliveredAt?: string;
+  deliveryReceiptNumber?: string;
   finalPrice?: number;
   technicianNotes?: string;
   [key: string]: any;
