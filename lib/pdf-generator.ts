@@ -185,6 +185,9 @@ export const generateSaleReceiptPdf = async (completedSale: Sale) => {
 
 const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
+
+    const hasItems = (saleData.items || []).length > 0;
+
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
@@ -195,8 +198,8 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         itemStartX: 65,
         imeiStartX: 280,
         priceStartX: 455,
-        subtotal: { x: 400, y: 300 },
-        parteDePago: { x: 400, y: 320 },
+        subtotal: { x: 430, y: hasItems ? 495 : 521 },
+        parteDePago: { x: 430, y: hasItems ? 475 : 501 },
         precioFinal: { x: 455, y: 290 },
     };
 
@@ -212,7 +215,8 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     const itemLineHeight = 15;
 
     (saleData.items || []).forEach(item => {
-        const itemPrice = (item.price || 0) * (item.currency === 'USD' ? (saleData.usdRate || 1) : 1);
+        const isUsd = item.currency === 'USD' || (item.price < 3500 && item.price > 0);
+        const itemPrice = (item.price || 0) * (isUsd ? (saleData.usdRate || 1) : 1);
         const totalPrice = itemPrice * (item.quantity || 1);
         
         const displayName = item.imei ? item.productName : `${item.quantity || 1}x ${item.productName}`;
@@ -239,16 +243,10 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     const finalAmount = saleData.totalAmount || 0;
 
     if (!saleData.pointsPaused) {
-        const pointsY = saleData.tradeIn && saleData.tradeIn.price > 0 ? positions.parteDePago.y - 15 : positions.subtotal.y + 20;
-        page.drawText(`Puntos sumados con esta compra: ${saleData.pointsEarned || 0}`, {
-            x: positions.itemStartX,
-            y: pointsY,
-            size: 10,
-            font: helveticaFont
-        });
-        page.drawText(`Puntos acumulados: ${saleData.pointsAccumulated || 0}`, {
-            x: positions.itemStartX,
-            y: pointsY - 12,
+        const pointsText = `Puntos obtenidos: ${saleData.pointsEarned || 0} | Puntos totales: ${saleData.pointsAccumulated || 0}`;
+        page.drawText(pointsText, {
+            x: 65,
+            y: 495,
             size: 10,
             font: helveticaFont
         });
@@ -256,7 +254,8 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
 
     if (saleData.tradeIn && saleData.tradeIn.price > 0) {
         const cartTotal = (saleData.items || []).reduce((sum, item) => {
-            const priceInArs = (item.price || 0) * (item.currency === 'USD' ? (saleData.usdRate || 1) : 1);
+            const isUsd = item.currency === 'USD' || (item.price < 3500 && item.price > 0);
+            const priceInArs = (item.price || 0) * (isUsd ? (saleData.usdRate || 1) : 1);
             return sum + (priceInArs * (item.quantity || 1));
         }, 0);
         const tradeInValue = (saleData.tradeIn.price || 0) * (saleData.usdRate || 1);
@@ -356,7 +355,7 @@ const drawRepairPdfContent = (page: any, repair: Repair, customer: Customer, fon
         imeiStartX: 320,
         priceStartX: 455,
         descriptionY: 500,
-        priceFinalY: 290
+        estimatedPrice: { x: 435, y: 407 },
     };
 
     const formattedDate = repair.entryDate ? new Date(repair.entryDate).toLocaleDateString() : 'N/A';
@@ -381,8 +380,7 @@ const drawRepairPdfContent = (page: any, repair: Repair, customer: Customer, fon
     page.drawText(repair.description || 'Sin descripción.', { x: positions.itemStartX, y: positions.descriptionY - 15, size: 10, font: helveticaFont });
 
     const priceText = formatCurrencyForPdf(repair.estimatedPrice);
-    page.drawText("Presupuesto Estimado:", { x: positions.priceStartX - 110, y: positions.priceFinalY, size: 12, font: helveticaBold });
-    page.drawText(priceText, { x: positions.priceStartX, y: positions.priceFinalY, size: 12, font: helveticaBold });
+    page.drawText(priceText, { ...positions.estimatedPrice, size: 12, font: helveticaBold });
 };
 
 
@@ -420,8 +418,13 @@ export const generateDeliveryReceiptPdf = async (repairData: Repair) => {
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const firstPage = pdfDoc.getPages()[0];
-    
+
     drawDeliveryPdfContent(firstPage, repairData, { helveticaFont, helveticaBold });
+
+    if (pdfDoc.getPageCount() > 1) {
+        const secondPage = pdfDoc.getPages()[1];
+        drawDeliveryPdfContent(secondPage, repairData, { helveticaFont, helveticaBold });
+    }
 
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: "application/pdf" });
@@ -446,41 +449,44 @@ const drawDeliveryPdfContent = (page: any, repair: Repair, fonts: Fonts) => {
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
-        nombreCliente: { x: 110, y: 657 },
-        dniCliente: { x: 110, y: 643 },
-        celCliente: { x: 110, y: 630 },
+        nombreCliente: { x: 110, y: 177 },
+        dniCliente: { x: 110, y: 191 },
+        celCliente: { x: 110, y: 205 },
         itemStartY: 548,
         itemStartX: 65,
         imeiStartX: 320,
         priceStartX: 455,
         descriptionY: 500,
-        priceFinalY: 290
+        total: { x: 435, y: 407 },
     };
 
     const formattedDate = new Date(repair.deliveredAt || repair.entryDate).toLocaleDateString();
 
+    const customerDni = (repair as any).customerDni || (repair as any).customerDNI || (repair as any).dni || '';
+
     page.drawText(String(repair.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
     page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
     page.drawText(String(repair.customerName || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
-    page.drawText(String(repair.customerDni || ''), { ...positions.dniCliente, size: 10, font: helveticaFont });
+    page.drawText(String(customerDni), { ...positions.dniCliente, size: 10, font: helveticaFont });
     page.drawText(String(repair.customerPhone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
 
     page.drawText(repair.productName || 'Equipo no especificado', { x: positions.itemStartX, y: positions.itemStartY, size: 12, font: helveticaFont });
 
-    let identifiers = [];
+    let identifiers = [] as string[];
     if (repair.unlockPin) identifiers.push(`PIN: ${repair.unlockPin}`);
     if (repair.imei) identifiers.push(`IMEI: ${repair.imei}`);
-    
+
     if (identifiers.length > 0) {
         page.drawText(identifiers.join('  /  '), { x: positions.imeiStartX, y: positions.itemStartY, size: 8, font: helveticaFont, color: rgb(0.3, 0.3, 0.3) });
     }
 
-    page.drawText("Trabajo realizado:", { x: positions.itemStartX, y: positions.descriptionY, size: 10, font: helveticaBold });
-    page.drawText(repair.technicianNotes || 'Sin notas adicionales.', { x: positions.itemStartX, y: positions.descriptionY - 15, size: 10, font: helveticaFont });
+    page.drawText(`Falla reportada: ${repair.description || 'Sin descripción.'}`, { x: positions.itemStartX, y: positions.descriptionY, size: 10, font: helveticaFont });
+    if (repair.technicianNotes) {
+        page.drawText(`Trabajo realizado: ${repair.technicianNotes}`, { x: positions.itemStartX, y: positions.descriptionY - 15, size: 10, font: helveticaFont });
+    }
 
     const priceText = formatCurrencyForPdf(repair.finalPrice || repair.estimatedPrice);
-    page.drawText("Total:", { x: positions.priceStartX - 40, y: positions.priceFinalY, size: 12, font: helveticaBold });
-    page.drawText(priceText, { x: positions.priceStartX, y: positions.priceFinalY, size: 12, font: helveticaBold });
+    page.drawText(priceText, { ...positions.total, size: 12, font: helveticaBold });
 };
 
 // --- Generador de PDF para Reservas (Señas) ---
@@ -551,15 +557,15 @@ const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts) => {
         fecha: { x: 430, y: 710 },
         nombreCliente: { x: 110, y: 657 },
         dniCliente: { x: 110, y: 643 },
-        celCliente: { x: 110, y: 630 },
+        celCliente: { x: 110, y: 205 },
         itemStartY: 548,
         itemStartX: 65,
         priceStartX: 455,
-        total: { x: 400, y: 320 },
-        entrega: { x: 400, y: 300 },
-        saldo: { x: 455, y: 290 },
-        fechaRetiro1: { x: 65, y: 450 },
-        fechaRetiro2: { x: 65, y: 200 }
+        total: { x: 436, y: 365 },
+        entrega: { x: 436, y: 390 },
+        saldo: { x: 436, y: 420 },
+        fechaRetiro1: { x: 137, y: 524 },
+        fechaRetiro2: { x: 340, y: 617 }
     };
 
     const formattedDate = reserve.date ? new Date(reserve.date).toLocaleDateString() : 'N/A';
@@ -574,11 +580,11 @@ const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts) => {
     page.drawText(reserve.productName || 'Producto sin nombre', { x: positions.itemStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
     page.drawText(formatCurrencyForPdf(reserve.productPrice), { x: positions.priceStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
     
-    page.drawText(`Total: ${formatCurrencyForPdf(reserve.productPrice)}`, { ...positions.total, size: 10, font: helveticaFont });
-    page.drawText(`Entrega: ${formatCurrencyForPdf(reserve.downPayment)}`, { ...positions.entrega, size: 10, font: helveticaFont });
-    page.drawText(`${formatCurrencyForPdf(reserve.remainingAmount)}`, { ...positions.saldo, size: 12, font: helveticaBold });
+    page.drawText(formatCurrencyForPdf(reserve.productPrice), { ...positions.total, size: 10, font: helveticaFont });
+    page.drawText(formatCurrencyForPdf(reserve.downPayment), { ...positions.entrega, size: 10, font: helveticaFont });
+    page.drawText(formatCurrencyForPdf(reserve.remainingAmount), { ...positions.saldo, size: 12, font: helveticaBold });
 
     // Imprimir fecha de retiro
-    page.drawText(`Fecha límite para retirar el producto: ${formattedExpirationDate}`, { ...positions.fechaRetiro1, size: 12, font: helveticaFont });
-    page.drawText(`Fecha límite para retirar el producto: ${formattedExpirationDate}`, { ...positions.fechaRetiro2, size: 12, font: helveticaFont });
+    page.drawText(formattedExpirationDate, { ...positions.fechaRetiro1, size: 12, font: helveticaFont });
+    page.drawText(formattedExpirationDate, { ...positions.fechaRetiro2, size: 12, font: helveticaFont });
 };
