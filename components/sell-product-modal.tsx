@@ -398,7 +398,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${tradeInProduct.name} al inventario.` });
         }
 
-        const counterRef = ref(database, 'counters/saleNumber');
+        const counterRef = ref(database, 'counters/receiptNumber');
         const transactionResult = await runTransaction(counterRef, (currentData) => {
             if (currentData === null) {
                 return { value: 1, prefix: 'V-', lastUpdated: new Date().toISOString() };
@@ -529,7 +529,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             await update(productRef, { stock: newStock });
         }
 
-        const counterRef = ref(database, 'counters/saleNumber');
+        const counterRef = ref(database, 'counters/reserveNumber');
         const transactionResult = await runTransaction(counterRef, (currentData) => {
             if (currentData === null) {
                 return { value: 1, prefix: 'V-', lastUpdated: new Date().toISOString() };
