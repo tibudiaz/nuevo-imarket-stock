@@ -186,6 +186,8 @@ export const generateSaleReceiptPdf = async (completedSale: Sale) => {
 const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
 
+    const fromTop = (y: number) => page.getHeight() - y;
+
     const hasItems = (saleData.items || []).length > 0;
 
     const positions = {
@@ -198,8 +200,8 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         itemStartX: 65,
         imeiStartX: 280,
         priceStartX: 455,
-        subtotal: { x: 430, y: hasItems ? 495 : 521 },
-        parteDePago: { x: 430, y: hasItems ? 475 : 501 },
+        subtotal: { x: 430, y: fromTop(hasItems ? 495 : 521) },
+        parteDePago: { x: 430, y: fromTop(hasItems ? 475 : 501) },
         precioFinal: { x: 455, y: 290 },
     };
 
@@ -246,7 +248,7 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         const pointsText = `Puntos obtenidos: ${saleData.pointsEarned || 0} | Puntos totales: ${saleData.pointsAccumulated || 0}`;
         page.drawText(pointsText, {
             x: 65,
-            y: 495,
+            y: fromTop(495),
             size: 10,
             font: helveticaFont
         });
@@ -344,6 +346,7 @@ export const generateRepairReceiptPdf = async (repairData: Repair, customerData:
 
 const drawRepairPdfContent = (page: any, repair: Repair, customer: Customer, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
+    const fromTop = (y: number) => page.getHeight() - y;
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
@@ -355,7 +358,7 @@ const drawRepairPdfContent = (page: any, repair: Repair, customer: Customer, fon
         imeiStartX: 320,
         priceStartX: 455,
         descriptionY: 500,
-        estimatedPrice: { x: 435, y: 407 },
+        estimatedPrice: { x: 435, y: fromTop(407) },
     };
 
     const formattedDate = repair.entryDate ? new Date(repair.entryDate).toLocaleDateString() : 'N/A';
@@ -446,18 +449,19 @@ export const generateDeliveryReceiptPdf = async (repairData: Repair) => {
 
 const drawDeliveryPdfContent = (page: any, repair: Repair, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
+    const fromTop = (y: number) => page.getHeight() - y;
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
-        nombreCliente: { x: 110, y: 177 },
-        dniCliente: { x: 110, y: 191 },
-        celCliente: { x: 110, y: 205 },
+        nombreCliente: { x: 110, y: fromTop(177) },
+        dniCliente: { x: 110, y: fromTop(191) },
+        celCliente: { x: 110, y: fromTop(205) },
         itemStartY: 548,
         itemStartX: 65,
         imeiStartX: 320,
         priceStartX: 455,
         descriptionY: 500,
-        total: { x: 435, y: 407 },
+        total: { x: 435, y: fromTop(407) },
     };
 
     const formattedDate = new Date(repair.deliveredAt || repair.entryDate).toLocaleDateString();
@@ -552,20 +556,21 @@ export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
 
 const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts) => {
     const { helveticaFont, helveticaBold } = fonts;
+    const fromTop = (y: number) => page.getHeight() - y;
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
         fecha: { x: 430, y: 710 },
         nombreCliente: { x: 110, y: 657 },
         dniCliente: { x: 110, y: 643 },
-        celCliente: { x: 110, y: 205 },
+        celCliente: { x: 110, y: fromTop(205) },
         itemStartY: 548,
         itemStartX: 65,
         priceStartX: 455,
-        total: { x: 436, y: 365 },
-        entrega: { x: 436, y: 390 },
-        saldo: { x: 436, y: 420 },
-        fechaRetiro1: { x: 137, y: 524 },
-        fechaRetiro2: { x: 340, y: 617 }
+        total: { x: 436, y: fromTop(365) },
+        entrega: { x: 436, y: fromTop(390) },
+        saldo: { x: 436, y: fromTop(420) },
+        fechaRetiro1: { x: 137, y: fromTop(524) },
+        fechaRetiro2: { x: 340, y: fromTop(617) }
     };
 
     const formattedDate = reserve.date ? new Date(reserve.date).toLocaleDateString() : 'N/A';
