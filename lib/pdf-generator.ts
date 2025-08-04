@@ -198,6 +198,9 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     const hasNewCellphone = (saleData.items || []).some(
         item => (item.category || '').toLowerCase() === 'celulares nuevos'
     );
+    const hasUsedCellphone = (saleData.items || []).some(
+        item => (item.category || '').toLowerCase() === 'celulares usados'
+    );
     const pointsY = fromTop(495);
 
     const positions = {
@@ -210,8 +213,8 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         itemStartX: 65,
         imeiStartX: 280,
         priceStartX: 455,
-        // El valor X permanece, pero en celulares nuevos el subtotal usa la misma Y que los puntos
-        subtotal: { x: 430, y: hasNewCellphone ? pointsY : 495 },
+        // El valor X permanece, pero en celulares nuevos o usados el subtotal usa la misma Y que los puntos
+        subtotal: { x: 430, y: (hasNewCellphone || hasUsedCellphone) ? pointsY : 495 },
         parteDePago: { x: 430, y: fromTop(hasItems ? 475 : 501) },
         precioFinal: { x: 455, y: 290 },
     };
@@ -226,31 +229,44 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
 
     let currentY = positions.itemStartY;
     const itemLineHeight = 15;
+    const usedItemYPositions = [
+        positions.itemStartY,
+        fromTop(334),
+        fromTop(363),
+        fromTop(392),
+        fromTop(417)
+    ];
 
-    (saleData.items || []).forEach(item => {
+    (saleData.items || []).forEach((item, index) => {
         const isUsd = item.currency === 'USD' || (item.price < 3500 && item.price > 0);
         const itemPrice = (item.price || 0) * (isUsd ? (saleData.usdRate || 1) : 1);
         const totalPrice = itemPrice * (item.quantity || 1);
-        
+
         const displayName = item.imei ? item.productName : `${item.quantity || 1}x ${item.productName}`;
-        
-        page.drawText(displayName || 'Producto sin nombre', { x: positions.itemStartX, y: currentY, size: 10, font: helveticaFont });
-        
+
+        const yPos = (hasUsedCellphone && index < usedItemYPositions.length)
+            ? usedItemYPositions[index]
+            : currentY;
+
+        page.drawText(displayName || 'Producto sin nombre', { x: positions.itemStartX, y: yPos, size: 10, font: helveticaFont });
+
         if (item.price > 0) {
-           page.drawText(formatCurrencyForPdf(totalPrice), { x: positions.priceStartX, y: currentY, size: 10, font: helveticaFont });
+           page.drawText(formatCurrencyForPdf(totalPrice), { x: positions.priceStartX, y: yPos, size: 10, font: helveticaFont });
         } else {
-           page.drawText("Regalo", { x: positions.priceStartX, y: currentY, size: 10, font: helveticaBold, color: rgb(0, 0.5, 0) });
+           page.drawText("Regalo", { x: positions.priceStartX, y: yPos, size: 10, font: helveticaBold, color: rgb(0, 0.5, 0) });
         }
-        
+
         let identifiers = [];
         if (item.barcode) identifiers.push(`S/N: ${item.barcode}`);
         if (item.imei) identifiers.push(`IMEI: ${item.imei}`);
 
         if (identifiers.length > 0) {
-             page.drawText(identifiers.join(' / '), { x: positions.imeiStartX, y: currentY, size: 8, font: helveticaFont, color: rgb(0.3, 0.3, 0.3) });
+             page.drawText(identifiers.join(' / '), { x: positions.imeiStartX, y: yPos, size: 8, font: helveticaFont, color: rgb(0.3, 0.3, 0.3) });
         }
-        
-        currentY -= itemLineHeight;
+
+        if (!(hasUsedCellphone && index < usedItemYPositions.length)) {
+            currentY -= itemLineHeight;
+        }
     });
 
     const finalAmount = saleData.totalAmount || 0;
