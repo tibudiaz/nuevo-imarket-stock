@@ -21,6 +21,7 @@ import { generateSaleReceiptPdf, generateReserveReceiptPdf } from "@/lib/pdf-gen
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { convertPrice, formatCurrency } from "../lib/price-converter"
 import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // --- Interfaces para Tipado Fuerte ---
 interface CartProduct {
@@ -61,6 +62,8 @@ interface Sale {
     totalAmount: number;
     tradeIn: any;
     usdRate: number;
+    pointsUsed?: number;
+    pointsEarned?: number;
 }
 
 // Interfaz para los datos de la reserva
@@ -81,6 +84,7 @@ interface Reserve {
     status: 'reserved' | 'completed' | 'cancelled';
 }
 
+const POINT_THRESHOLD = 50000;
 
 interface SellProductModalProps {
   isOpen: boolean;
@@ -110,8 +114,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [isTradeIn, setIsTradeIn] = useState(false);
   const [tradeInProduct, setTradeInProduct] = useState({ name: "", imei: "", price: 0, serialNumber: "" });
   const [bundles, setBundles] = useState<BundleRule[]>([]);
-  
+
   const [initialProductProcessed, setInitialProductProcessed] = useState(false);
+  const [availablePoints, setAvailablePoints] = useState(0);
+  const [usePoints, setUsePoints] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -150,6 +156,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setProductSearchTerm("")
       setCustomer({ name: "", dni: "", phone: "", email: "" })
       setTradeInProduct({ name: "", imei: "", price: 0, serialNumber: "" });
+      setAvailablePoints(0);
+      setUsePoints(false);
     }
   }, [isOpen]);
 
@@ -168,8 +176,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       if (snapshot.exists()) {
           const customerData = Object.values(snapshot.val())[0] as any;
           setCustomer({ name: customerData.name, dni: customerData.dni, phone: customerData.phone || "", email: customerData.email || "" });
+          setAvailablePoints(customerData.points || 0);
           toast.success("Cliente encontrado");
       } else {
+          setAvailablePoints(0);
           toast.info("Cliente no encontrado, puede registrarlo.");
       }
     } catch (error) {
@@ -275,6 +285,15 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     return cartTotal - tradeInValueInARS;
   }, [cart, usdRate, isTradeIn, tradeInProduct.price]);
 
+  const discount = useMemo(() => {
+    if (!usePoints) return 0;
+    const maxUsablePoints = Math.min(availablePoints, Math.floor(totalAmountInARS / POINT_THRESHOLD));
+    return maxUsablePoints * POINT_THRESHOLD;
+  }, [usePoints, availablePoints, totalAmountInARS]);
+
+  const pointsToUse = useMemo(() => discount / POINT_THRESHOLD, [discount]);
+  const finalTotal = useMemo(() => totalAmountInARS - discount, [totalAmountInARS, discount]);
+
   const handleSellProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
         toast.error("Faltan datos del cliente", { description: "Por favor, complete nombre, DNI y teléfono." });
@@ -295,11 +314,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         if (customerSnapshot.exists()) {
             customerId = Object.keys(customerSnapshot.val())[0];
             const customerRef = ref(database, `customers/${customerId}`);
-            await update(customerRef, { ...customer, lastPurchase: new Date().toISOString() });
+            await update(customerRef, { ...customer });
         } else {
             const newCustomerRef = push(customersRef);
             customerId = newCustomerRef.key;
-            await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId });
+            await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId, points: 0 });
         }
 
         for (const item of cart) {
@@ -337,6 +356,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${tradeInProduct.name} al inventario.` });
         }
 
+        const pointsEarned = Math.floor(finalTotal / POINT_THRESHOLD);
         const newSaleRef = push(ref(database, "sales"));
         const saleData: Sale = {
             id: newSaleRef.key!,
@@ -356,11 +376,20 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 provider: item.provider || null,
             })),
             paymentMethod,
-            totalAmount: totalAmountInARS,
+            totalAmount: finalTotal,
             tradeIn: isTradeIn ? tradeInProduct : null,
             usdRate,
+            pointsUsed: pointsToUse,
+            pointsEarned,
         };
         await set(newSaleRef, saleData);
+
+        if (customerId) {
+            const customerRef = ref(database, `customers/${customerId}`);
+            const updatedPoints = availablePoints - pointsToUse + pointsEarned;
+            await update(customerRef, { points: updatedPoints, lastPurchase: new Date().toISOString() });
+            setAvailablePoints(updatedPoints);
+        }
         
         setCompletedSale(saleData);
         onProductSold();
@@ -531,6 +560,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                   <div className="space-y-2"><Label htmlFor="customerPhone" className="flex items-center gap-1.5"><Phone className="h-4 w-4"/>Teléfono</Label><Input id="customerPhone" value={customer.phone} onChange={(e) => setCustomer({...customer, phone: e.target.value})}/></div>
                   <div className="space-y-2"><Label htmlFor="customerEmail" className="flex items-center gap-1.5"><Mail className="h-4 w-4"/>Email (Opcional)</Label><Input id="customerEmail" value={customer.email} onChange={(e) => setCustomer({...customer, email: e.target.value})}/></div>
                   <div className="space-y-2"><Label>Método de Pago</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="tarjeta">Tarjeta</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem></SelectContent></Select></div>
+                  {availablePoints > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="use-points" checked={usePoints} onCheckedChange={(checked) => setUsePoints(!!checked)} />
+                      <Label htmlFor="use-points">Usar {availablePoints} puntos</Label>
+                    </div>
+                  )}
                   <div><Button type="button" variant="secondary" onClick={() => setIsTradeIn(!isTradeIn)} className="w-full">{isTradeIn ? "Cancelar Parte de Pago" : "Recibir en Parte de Pago"}</Button></div>
                   {isTradeIn && <div className="p-4 border rounded-md space-y-3"><h4 className="font-medium text-center text-sm">Equipo Recibido (Apple)</h4>
                     <div className="space-y-1"><Label htmlFor="tradeIn-name" className="text-xs">Modelo</Label><Input id="tradeIn-name" placeholder="Ej: iPhone 13 Pro" value={tradeInProduct.name} onChange={(e) => setTradeInProduct({ ...tradeInProduct, name: e.target.value })} /></div>
@@ -545,8 +580,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           
           <DialogFooter className="mt-auto pt-4 border-t">
             <div className="w-full flex justify-between items-center">
-              <div className="text-2xl font-bold">
-                Total: {formatCurrency(totalAmountInARS)}
+              <div>
+                {usePoints && discount > 0 && (
+                  <p className="text-sm text-muted-foreground">Descuento: {formatCurrency(discount)}</p>
+                )}
+                <div className="text-2xl font-bold">
+                  Total: {formatCurrency(finalTotal)}
+                </div>
               </div>
               <div className="flex gap-2">
                   <Button variant="outline" onClick={onClose}>Cancelar</Button>
