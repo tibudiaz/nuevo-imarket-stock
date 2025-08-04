@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Download, Mail, Phone, User, Calendar, CreditCard, ShoppingBag } from "lucide-react"
+import { Download, Mail, Phone, User, Calendar, CreditCard, ShoppingBag, Star } from "lucide-react"
 import { jsPDF } from "jspdf"
 
 interface CustomerDetailModalProps {
@@ -34,26 +34,27 @@ export default function CustomerDetailModal({ isOpen, onClose, customer }: Custo
       doc.text(`Teléfono: ${customer.phone}`, 20, 60)
       doc.text(`Total gastado: $${customer.totalSpent.toFixed(2)}`, 20, 70)
       doc.text(`Cantidad de compras: ${customer.purchases.length}`, 20, 80)
+      doc.text(`Puntos: ${customer.points || 0}`, 20, 90)
 
       // Línea separadora
-      doc.line(20, 90, 190, 90)
+      doc.line(20, 100, 190, 100)
 
       // Historial de compras
       doc.setFontSize(16)
-      doc.text("Historial de Compras", 105, 100, { align: "center" })
+      doc.text("Historial de Compras", 105, 110, { align: "center" })
 
       // Encabezados de tabla
       doc.setFontSize(12)
-      doc.text("Fecha", 20, 110)
-      doc.text("Producto", 70, 110)
-      doc.text("Precio", 150, 110)
-      doc.text("Método de Pago", 180, 110)
+      doc.text("Fecha", 20, 120)
+      doc.text("Producto", 70, 120)
+      doc.text("Precio", 150, 120)
+      doc.text("Método de Pago", 180, 120)
 
       // Línea separadora
-      doc.line(20, 115, 190, 115)
+      doc.line(20, 125, 190, 125)
 
       // Datos de compras
-      let y = 125
+      let y = 135
       customer.purchases.forEach((purchase, index) => {
         const date = new Date(purchase.date).toLocaleDateString()
         doc.text(date, 20, y)
@@ -142,6 +143,10 @@ export default function CustomerDetailModal({ isOpen, onClose, customer }: Custo
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Total gastado:</span> ${customer.totalSpent.toFixed(2)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Puntos acumulados:</span> {customer.points || 0}
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />

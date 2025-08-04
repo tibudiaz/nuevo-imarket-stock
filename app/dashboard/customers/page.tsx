@@ -36,6 +36,7 @@ interface Customer {
   email?: string
   address?: string
   createdAt?: string
+  points?: number
   [key: string]: any
 }
 
@@ -63,9 +64,11 @@ export default function CustomersPage() {
       if (snapshot.exists()) {
         const customersData: Customer[] = []
         snapshot.forEach((childSnapshot) => {
+          const data = childSnapshot.val() || {}
           customersData.push({
             id: childSnapshot.key || "",
-            ...childSnapshot.val(),
+            points: data.points || 0,
+            ...data,
           })
         })
         setCustomers(customersData)
@@ -201,17 +204,18 @@ export default function CustomersPage() {
                 <TableHead>Teléfono</TableHead>
                 <TableHead>Compras</TableHead>
                 <TableHead>Total Gastado</TableHead>
+                <TableHead>Puntos</TableHead>
                 <TableHead>Última Compra</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCustomers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                    No se encontraron clientes
-                  </TableCell>
-                </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                      No se encontraron clientes
+                    </TableCell>
+                  </TableRow>
               ) : (
                 filteredCustomers.map((customer) => (
                   <TableRow key={customer.id}>
@@ -227,6 +231,7 @@ export default function CustomersPage() {
                       <Badge>{customer.purchases.length}</Badge>
                     </TableCell>
                     <TableCell>${customer.totalSpent.toFixed(2)}</TableCell>
+                    <TableCell>{customer.points || 0}</TableCell>
                     <TableCell>
                       {customer.lastPurchase ? customer.lastPurchase.toLocaleDateString() : "Sin compras"}
                     </TableCell>
