@@ -14,6 +14,7 @@ import { toast } from "sonner"
 import AddRepairForm from "@/components/add-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
 import { generateRepairReceiptPdf } from "@/lib/pdf-generator"
+import { useStore } from "@/hooks/use-store"
 
 // --- INTERFAZ UNIFICADA Y DEFINITIVA ---
 // Esta es la estructura de datos consistente que se usará en ambos componentes.
@@ -61,6 +62,7 @@ export default function RepairsPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const { selectedStore } = useStore();
 
   useEffect(() => {
     setIsLoading(true);
@@ -143,7 +145,7 @@ export default function RepairsPage() {
       
       await set(newRepairRef, finalRepairData);
       
-      await generateRepairReceiptPdf(finalRepairData, customerData);
+      await generateRepairReceiptPdf(finalRepairData, customerData, selectedStore === 'local2' ? 'local2' : 'local1');
 
       toast.success("Reparación agregada correctamente.", { description: `Recibo N°: ${newReceiptNumber}` });
       setIsAddModalOpen(false);
@@ -152,7 +154,7 @@ export default function RepairsPage() {
       console.error("Error detallado al agregar reparación:", error);
       toast.error("Error al agregar la reparación.", { description: (error as Error).message });
     }
-  }, []);
+  }, [selectedStore]);
 
   const handleUpdateRepair = useCallback(async (repairId: string, updatedData: Partial<Repair>) => {
     try {
