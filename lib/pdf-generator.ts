@@ -195,6 +195,10 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     const fromTop = (y: number) => page.getHeight() - y;
 
     const hasItems = (saleData.items || []).length > 0;
+    const hasNewCellphone = (saleData.items || []).some(
+        item => (item.category || '').toLowerCase() === 'celulares nuevos'
+    );
+    const pointsY = fromTop(495);
 
     const positions = {
         numeroRecibo: { x: 430, y: 697 },
@@ -206,8 +210,8 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         itemStartX: 65,
         imeiStartX: 280,
         priceStartX: 455,
-        // El valor X permanece, se ajusta la posición Y del subtotal a 495
-        subtotal: { x: 430, y: 495 },
+        // El valor X permanece, pero en celulares nuevos el subtotal usa la misma Y que los puntos
+        subtotal: { x: 430, y: hasNewCellphone ? pointsY : 495 },
         parteDePago: { x: 430, y: fromTop(hasItems ? 475 : 501) },
         precioFinal: { x: 455, y: 290 },
     };
@@ -255,7 +259,7 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         const pointsText = `Puntos obtenidos: ${saleData.pointsEarned || 0} | Puntos totales: ${saleData.pointsAccumulated || 0}`;
         page.drawText(pointsText, {
             x: 65,
-            y: fromTop(495),
+            y: pointsY,
             size: 10,
             font: helveticaFont
         });
