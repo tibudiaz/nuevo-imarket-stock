@@ -65,6 +65,7 @@ interface Sale {
     pointsUsed?: number;
     pointsEarned?: number;
     pointsAccumulated?: number;
+    pointsPaused?: boolean;
 }
 
 // Interfaz para los datos de la reserva
@@ -122,6 +123,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [usePoints, setUsePoints] = useState(false);
   const [pointEarnRate, setPointEarnRate] = useState(DEFAULT_POINT_EARN_RATE);
   const [pointValue, setPointValue] = useState(DEFAULT_POINT_VALUE);
+  const [pointsPaused, setPointsPaused] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -151,6 +153,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         if (data) {
           setPointEarnRate(data.earnRate ?? DEFAULT_POINT_EARN_RATE);
           setPointValue(data.value ?? DEFAULT_POINT_VALUE);
+          setPointsPaused(!!data.paused);
         }
       });
       
@@ -172,6 +175,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setTradeInProduct({ name: "", imei: "", price: 0, serialNumber: "" });
       setAvailablePoints(0);
       setUsePoints(false);
+      setPointsPaused(false);
     }
   }, [isOpen]);
 
@@ -300,14 +304,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   }, [cart, usdRate, isTradeIn, tradeInProduct.price]);
 
   const discount = useMemo(() => {
-    if (!usePoints) return 0;
+    if (!usePoints || pointsPaused) return 0;
     const maxUsablePoints = Math.min(availablePoints, Math.floor(totalAmountInARS / pointValue));
     return maxUsablePoints * pointValue;
-  }, [usePoints, availablePoints, totalAmountInARS, pointValue]);
+  }, [usePoints, pointsPaused, availablePoints, totalAmountInARS, pointValue]);
 
-  const pointsToUse = useMemo(() => discount / pointValue, [discount, pointValue]);
+  const pointsToUse = useMemo(() => (pointsPaused ? 0 : discount / pointValue), [discount, pointValue, pointsPaused]);
   const finalTotal = useMemo(() => totalAmountInARS - discount, [totalAmountInARS, discount]);
-  const pointsEarned = useMemo(() => Math.floor(finalTotal / pointEarnRate), [finalTotal, pointEarnRate]);
+  const pointsEarned = useMemo(() => (pointsPaused ? 0 : Math.floor(finalTotal / pointEarnRate)), [finalTotal, pointEarnRate, pointsPaused]);
 
   const handleSellProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
@@ -372,7 +376,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
 
         const newSaleRef = push(ref(database, "sales"));
-        const updatedPoints = availablePoints - pointsToUse + pointsEarned;
+        let updatedPoints = availablePoints;
+        if (!pointsPaused) {
+            updatedPoints = availablePoints - pointsToUse + pointsEarned;
+        }
         const saleData: Sale = {
             id: newSaleRef.key!,
             receiptNumber,
@@ -394,13 +401,18 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             totalAmount: finalTotal,
             tradeIn: isTradeIn ? tradeInProduct : null,
             usdRate,
-            pointsUsed: pointsToUse,
-            pointsEarned,
-            pointsAccumulated: updatedPoints,
+            pointsPaused,
+            ...(pointsPaused
+                ? {}
+                : {
+                    pointsUsed: pointsToUse,
+                    pointsEarned,
+                    pointsAccumulated: updatedPoints,
+                }),
         };
         await set(newSaleRef, saleData);
 
-        if (customerId) {
+        if (customerId && !pointsPaused) {
             const customerRef = ref(database, `customers/${customerId}`);
             await update(customerRef, { points: updatedPoints, lastPurchase: new Date().toISOString() });
             setAvailablePoints(updatedPoints);
@@ -575,7 +587,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                   <div className="space-y-2"><Label htmlFor="customerPhone" className="flex items-center gap-1.5"><Phone className="h-4 w-4"/>Teléfono</Label><Input id="customerPhone" value={customer.phone} onChange={(e) => setCustomer({...customer, phone: e.target.value})}/></div>
                   <div className="space-y-2"><Label htmlFor="customerEmail" className="flex items-center gap-1.5"><Mail className="h-4 w-4"/>Email (Opcional)</Label><Input id="customerEmail" value={customer.email} onChange={(e) => setCustomer({...customer, email: e.target.value})}/></div>
                   <div className="space-y-2"><Label>Método de Pago</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="tarjeta">Tarjeta</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem></SelectContent></Select></div>
-                  {availablePoints > 0 && (
+                  {!pointsPaused && availablePoints > 0 && (
                     <div className="flex items-center space-x-2">
                       <Checkbox id="use-points" checked={usePoints} onCheckedChange={(checked) => setUsePoints(!!checked)} />
                       <Label htmlFor="use-points">
@@ -602,7 +614,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 {usePoints && discount > 0 && (
                   <p className="text-sm text-muted-foreground">Descuento: {formatCurrency(discount)}</p>
                 )}
-                <p className="text-sm text-muted-foreground">Puntos que suma: {pointsEarned}</p>
+                {!pointsPaused && (
+                  <p className="text-sm text-muted-foreground">Puntos que suma: {pointsEarned}</p>
+                )}
                 <div className="text-2xl font-bold">
                   Total: {formatCurrency(finalTotal)}
                 </div>

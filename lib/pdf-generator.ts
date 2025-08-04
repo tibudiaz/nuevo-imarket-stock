@@ -33,6 +33,7 @@ interface Sale {
   tradeIn?: TradeIn;
   pointsEarned?: number;
   pointsAccumulated?: number;
+  pointsPaused?: boolean;
 }
 
 interface Repair {
@@ -228,19 +229,21 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
 
     const finalAmount = saleData.totalAmount || 0;
 
-    const pointsY = saleData.tradeIn && saleData.tradeIn.price > 0 ? positions.parteDePago.y - 15 : positions.subtotal.y + 20;
-    page.drawText(`Puntos sumados con esta compra: ${saleData.pointsEarned || 0}`, {
-        x: positions.itemStartX,
-        y: pointsY,
-        size: 10,
-        font: helveticaFont
-    });
-    page.drawText(`Puntos acumulados: ${saleData.pointsAccumulated || 0}`, {
-        x: positions.itemStartX,
-        y: pointsY - 12,
-        size: 10,
-        font: helveticaFont
-    });
+    if (!saleData.pointsPaused) {
+        const pointsY = saleData.tradeIn && saleData.tradeIn.price > 0 ? positions.parteDePago.y - 15 : positions.subtotal.y + 20;
+        page.drawText(`Puntos sumados con esta compra: ${saleData.pointsEarned || 0}`, {
+            x: positions.itemStartX,
+            y: pointsY,
+            size: 10,
+            font: helveticaFont
+        });
+        page.drawText(`Puntos acumulados: ${saleData.pointsAccumulated || 0}`, {
+            x: positions.itemStartX,
+            y: pointsY - 12,
+            size: 10,
+            font: helveticaFont
+        });
+    }
 
     if (saleData.tradeIn && saleData.tradeIn.price > 0) {
         const cartTotal = (saleData.items || []).reduce((sum, item) => {
