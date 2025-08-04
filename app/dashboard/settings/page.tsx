@@ -47,6 +47,9 @@ export default function SettingsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [bundles, setBundles] = useState<BundleRule[]>([]);
+
+  const [pointRate, setPointRate] = useState(0);
+  const [pointValue, setPointValue] = useState(0);
   
   const [ruleName, setRuleName] = useState("");
   const [ruleType, setRuleType] = useState<'model_range' | 'model_start' | 'category'>('model_range');
@@ -82,6 +85,15 @@ export default function SettingsPage() {
       const data = snapshot.val();
       const bundleList: BundleRule[] = data ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value })) : [];
       setBundles(bundleList);
+    });
+
+    const pointsRef = ref(database, 'config/points');
+    onValue(pointsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setPointRate(data.earnRate || 0);
+        setPointValue(data.value || 0);
+      }
     });
   }, []);
 
@@ -171,13 +183,40 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSavePoints = async () => {
+    try {
+      await set(ref(database, 'config/points'), { earnRate: pointRate, value: pointValue });
+      toast.success('Configuración de puntos actualizada.');
+    } catch (error) {
+      toast.error('No se pudo guardar la configuración de puntos.');
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-8">
         <h1 className="text-3xl font-bold">Configuración</h1>
         
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de Puntos</CardTitle>
+              <CardDescription>Define cómo se obtienen y su valor.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="point-rate">Monto para sumar un punto</Label>
+                <Input id="point-rate" type="number" value={pointRate} onChange={(e) => setPointRate(Number(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="point-value">Valor de cada punto</Label>
+                <Input id="point-value" type="number" value={pointValue} onChange={(e) => setPointValue(Number(e.target.value))} />
+              </div>
+              <Button onClick={handleSavePoints}>Guardar</Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Gestionar Categorías</CardTitle>
