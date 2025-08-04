@@ -32,6 +32,7 @@ interface Sale {
   usdRate?: number;
   tradeIn?: TradeIn;
   pointsEarned?: number;
+  pointsAccumulated?: number;
 }
 
 interface Repair {
@@ -231,6 +232,12 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     page.drawText(`Puntos sumados con esta compra: ${saleData.pointsEarned || 0}`, {
         x: positions.itemStartX,
         y: pointsY,
+        size: 10,
+        font: helveticaFont
+    });
+    page.drawText(`Puntos acumulados: ${saleData.pointsAccumulated || 0}`, {
+        x: positions.itemStartX,
+        y: pointsY - 12,
         size: 10,
         font: helveticaFont
     });
