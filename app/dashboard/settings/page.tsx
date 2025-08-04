@@ -14,6 +14,7 @@ import { database } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator" // Importación añadida
@@ -50,6 +51,7 @@ export default function SettingsPage() {
 
   const [pointRate, setPointRate] = useState(0);
   const [pointValue, setPointValue] = useState(0);
+  const [pointsPaused, setPointsPaused] = useState(false);
   
   const [ruleName, setRuleName] = useState("");
   const [ruleType, setRuleType] = useState<'model_range' | 'model_start' | 'category'>('model_range');
@@ -93,6 +95,7 @@ export default function SettingsPage() {
       if (data) {
         setPointRate(data.earnRate || 0);
         setPointValue(data.value || 0);
+        setPointsPaused(data.paused || false);
       }
     });
   }, []);
@@ -185,7 +188,11 @@ export default function SettingsPage() {
 
   const handleSavePoints = async () => {
     try {
-      await set(ref(database, 'config/points'), { earnRate: pointRate, value: pointValue });
+      await set(ref(database, 'config/points'), {
+        earnRate: pointRate,
+        value: pointValue,
+        paused: pointsPaused,
+      });
       toast.success('Configuración de puntos actualizada.');
     } catch (error) {
       toast.error('No se pudo guardar la configuración de puntos.');
@@ -212,6 +219,10 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="point-value">Valor de cada punto</Label>
                 <Input id="point-value" type="number" value={pointValue} onChange={(e) => setPointValue(Number(e.target.value))} />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="points-paused" checked={pointsPaused} onCheckedChange={setPointsPaused} />
+                <Label htmlFor="points-paused">Pausar sistema de puntos</Label>
               </div>
               <Button onClick={handleSavePoints}>Guardar</Button>
             </CardContent>
