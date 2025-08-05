@@ -44,6 +44,15 @@ interface Category {
   name: string;
 }
 
+interface AppUser {
+  id: string;
+  email: string;
+  username: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function SettingsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -65,6 +74,11 @@ export default function SettingsPage() {
 
   // Estado para la nueva categoría
   const [newCategoryName, setNewCategoryName] = useState("");
+
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserUsername, setNewUserUsername] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"admin" | "moderator">("moderator");
 
   useEffect(() => {
     const productsRef = ref(database, 'products');
@@ -97,6 +111,15 @@ export default function SettingsPage() {
         setPointValue(data.value || 0);
         setPointsPaused(data.paused || false);
       }
+    });
+
+    const usersRef = ref(database, 'users');
+    onValue(usersRef, (snapshot) => {
+      const data = snapshot.val();
+      const userList: AppUser[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value }))
+        : [];
+      setUsers(userList);
     });
   }, []);
 
@@ -132,6 +155,42 @@ export default function SettingsPage() {
       } catch (error) {
           toast.error("Error al eliminar la categoría.");
       }
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUserEmail.trim() || !newUserUsername.trim()) {
+      toast.error("Datos incompletos", { description: "Email y usuario son obligatorios." });
+      return;
+    }
+    const newUserRef = push(ref(database, 'users'));
+    const now = new Date().toISOString();
+    try {
+      await set(newUserRef, {
+        id: newUserRef.key,
+        email: newUserEmail.trim(),
+        username: newUserUsername.trim(),
+        role: newUserRole,
+        createdAt: now,
+        updatedAt: now,
+      });
+      toast.success("Usuario creado.");
+      setNewUserEmail("");
+      setNewUserUsername("");
+      setNewUserRole("moderator");
+    } catch (error) {
+      toast.error("Error al crear el usuario.");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm("¿Estás seguro de que quieres eliminar este usuario?")) return;
+    const userRef = ref(database, `users/${userId}`);
+    try {
+      await remove(userRef);
+      toast.success("Usuario eliminado.");
+    } catch (error) {
+      toast.error("Error al eliminar el usuario.");
+    }
   };
 
   const handleSaveBundle = async () => {
@@ -257,6 +316,57 @@ export default function SettingsPage() {
                     </div>
                 </ScrollArea>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestionar Usuarios</CardTitle>
+              <CardDescription>Crea y elimina usuarios del sistema.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="user-email">Email</Label>
+                <Input id="user-email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="user-username">Usuario</Label>
+                <Input id="user-username" value={newUserUsername} onChange={(e) => setNewUserUsername(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Rol</Label>
+                <Select value={newUserRole} onValueChange={(v: any) => setNewUserRole(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="moderator">Moderador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleCreateUser}>Crear Usuario</Button>
+              <Separator />
+              <ScrollArea className="h-64">
+                <div className="space-y-2">
+                  {users.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                      <div>
+                        <p className="font-medium">{user.username}</p>
+                        <p className="text-xs text-muted-foreground">{user.role}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => handleDeleteUser(user.id)}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
 
