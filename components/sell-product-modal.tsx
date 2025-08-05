@@ -301,6 +301,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
     setCart(cart.map(item => item.id === productId ? { ...item, quantity: newQuantity } : item));
   };
+  const handlePriceChange = (productId: string, newPrice: number) => {
+    setCart(cart.map(item => item.id === productId ? { ...item, price: newPrice } : item));
+  };
   const searchedProducts = useMemo(() => {
     if (!productSearchTerm) return [];
     return allProducts.filter(
@@ -613,10 +616,24 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                         <div key={item.id} className="flex items-center justify-between p-2 mb-2 bg-muted/50 rounded-md">
                           <div>
                             <p className="font-medium">{item.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {item.price === 0 ? <span className="font-bold text-green-600">Regalo</span> : formatCurrency(convertPrice(item.price, usdRate) * item.quantity)}
-                              {item.price < 3500 && item.price > 0 && <span className="text-xs text-blue-500"> ({item.quantity} x ${item.price} USD)</span>}
-                            </p>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Input
+                                type="number"
+                                className="h-6 w-20"
+                                value={item.price}
+                                onChange={(e) => handlePriceChange(item.id, Number(e.target.value))}
+                              />
+                              {item.price === 0 ? (
+                                <span className="font-bold text-green-600">Regalo</span>
+                              ) : (
+                                <span>
+                                  {formatCurrency(convertPrice(item.price, usdRate) * item.quantity)}
+                                  {item.price < 3500 && item.price > 0 && (
+                                    <span className="text-xs text-blue-500"> ({item.quantity} x ${item.price} USD)</span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleQuantityChange(item.id, item.quantity - 1)}><Minus className="h-4 w-4"/></Button>
