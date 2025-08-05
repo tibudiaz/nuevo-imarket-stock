@@ -268,6 +268,26 @@ export default function SettingsPage() {
     }
   };
 
+  const handleResetData = async () => {
+    const password = window.prompt('Ingrese la contraseña');
+    if (password !== 'Emachines 16') {
+      toast.error('Contraseña incorrecta');
+      return;
+    }
+    try {
+      await Promise.all([
+        remove(ref(database, 'sales')),
+        remove(ref(database, 'products')),
+        remove(ref(database, 'customers')),
+        remove(ref(database, 'inventory')),
+        set(ref(database, 'finances'), 0),
+      ]);
+      toast.success('Datos del sistema eliminados.');
+    } catch (error) {
+      toast.error('Error al eliminar los datos.');
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-8">
@@ -436,6 +456,15 @@ export default function SettingsPage() {
                           </div>)) : <p className="text-sm text-muted-foreground text-center py-10">No hay reglas de combos configuradas.</p>}
                   </ScrollArea>
                </div>
+            </CardContent>
+          </Card>
+          <Card className="md:col-span-2 lg:col-span-3">
+            <CardHeader>
+              <CardTitle>Restablecer Datos</CardTitle>
+              <CardDescription>Borra ventas, productos, clientes e inventario y reinicia las finanzas.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="destructive" onClick={handleResetData}>Borrar Todo</Button>
             </CardContent>
           </Card>
         </div>
