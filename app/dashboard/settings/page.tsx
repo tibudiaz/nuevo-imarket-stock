@@ -10,6 +10,7 @@ import { Check, ChevronsUpDown, PlusCircle, Trash, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ref, onValue, set, push, remove } from "firebase/database"
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
 import { database } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -79,6 +80,7 @@ export default function SettingsPage() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserUsername, setNewUserUsername] = useState("");
   const [newUserRole, setNewUserRole] = useState<"admin" | "moderator">("moderator");
+  const [newUserPassword, setNewUserPassword] = useState("");
 
   useEffect(() => {
     const productsRef = ref(database, 'products');
@@ -158,15 +160,21 @@ export default function SettingsPage() {
   };
 
   const handleCreateUser = async () => {
-    if (!newUserEmail.trim() || !newUserUsername.trim()) {
-      toast.error("Datos incompletos", { description: "Email y usuario son obligatorios." });
+    if (!newUserEmail.trim() || !newUserUsername.trim() || !newUserPassword.trim()) {
+      toast.error("Datos incompletos", { description: "Email, usuario y contraseña son obligatorios." });
       return;
     }
-    const newUserRef = push(ref(database, 'users'));
+    const auth = getAuth();
     const now = new Date().toISOString();
     try {
-      await set(newUserRef, {
-        id: newUserRef.key,
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        newUserEmail.trim(),
+        newUserPassword.trim()
+      );
+      const uid = userCredential.user.uid;
+      await set(ref(database, `users/${uid}`), {
+        id: uid,
         email: newUserEmail.trim(),
         username: newUserUsername.trim(),
         role: newUserRole,
@@ -176,8 +184,10 @@ export default function SettingsPage() {
       toast.success("Usuario creado.");
       setNewUserEmail("");
       setNewUserUsername("");
+      setNewUserPassword("");
       setNewUserRole("moderator");
     } catch (error) {
+      console.error("Error al crear el usuario:", error);
       toast.error("Error al crear el usuario.");
     }
   };
@@ -332,6 +342,15 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="user-username">Usuario</Label>
                 <Input id="user-username" value={newUserUsername} onChange={(e) => setNewUserUsername(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="user-password">Contraseña</Label>
+                <Input
+                  id="user-password"
+                  type="password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Rol</Label>
