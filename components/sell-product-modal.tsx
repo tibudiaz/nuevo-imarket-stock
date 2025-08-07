@@ -308,16 +308,16 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   };
   const searchedProducts = useMemo(() => {
     if (!productSearchTerm) return [];
-    const term = productSearchTerm.toLowerCase();
+    const terms = productSearchTerm.toLowerCase().split(/\s+/).filter(Boolean);
     return allProducts.filter(
-      (p) =>
-        ((p.name && p.name.toLowerCase().includes(term)) ||
-          (p.category && p.category.toLowerCase().includes(term)) ||
-          (p.brand && p.brand.toLowerCase().includes(term)) ||
-          (p.model && p.model.toLowerCase().includes(term)) ||
-          (p.barcode && p.barcode.toLowerCase().includes(term))) &&
-        p.stock > 0 &&
-        (!saleStore || !p.store || p.store === saleStore)
+      (p) => {
+        const searchable = `${(p.name || "")} ${(p.category || "")} ${(p.brand || "")} ${(p.model || "")} ${(p.barcode || "")}`.toLowerCase();
+        return (
+          terms.every(t => searchable.includes(t)) &&
+          p.stock > 0 &&
+          (!saleStore || !p.store || p.store === saleStore)
+        );
+      }
     );
   }, [productSearchTerm, allProducts, saleStore]);
   
