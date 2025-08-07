@@ -140,9 +140,12 @@ export default function ReportsPage() {
   const salesByPeriodChartData = useMemo<SalesByPeriodData[]>(() => {
     const data: { [key: string]: number } = {};
     filteredSales.forEach(sale => {
-        if (sale.date && sale.totalAmount) {
+        if (sale.date) {
             const date = new Date(sale.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-            data[date] = (data[date] || 0) + sale.totalAmount;
+            const amount = Array.isArray(sale.items)
+                ? sale.items.reduce((acc, item) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0)
+                : Number(sale.totalAmount || 0);
+            data[date] = (data[date] || 0) + amount;
         }
     });
     return Object.entries(data).map(([name, ventas]) => ({ name, ventas })).reverse();

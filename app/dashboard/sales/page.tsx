@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Calendar, ShoppingCart, DollarSign, User, Download, Eye } from "lucide-react"
+import { Search, Calendar, ShoppingCart, DollarSign, User, Download, Eye, Package, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
@@ -67,6 +67,8 @@ export default function SalesPage() {
   const [dailySales, setDailySales] = useState<SalesStats>({ count: 0, total: 0 })
   const [weeklySales, setWeeklySales] = useState<SalesStats>({ count: 0, total: 0 })
   const [topProduct, setTopProduct] = useState<TopProductType>({ name: "", count: 0 })
+  const [totalProducts, setTotalProducts] = useState(0)
+  const [netProfit, setNetProfit] = useState(0)
   
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -87,12 +89,13 @@ export default function SalesPage() {
 
         salesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setSales(salesData);
-        calculateSalesStats(salesData);
       } else {
         setSales([]);
         setDailySales({ count: 0, total: 0 });
         setWeeklySales({ count: 0, total: 0 });
         setTopProduct({ name: "", count: 0 });
+        setTotalProducts(0);
+        setNetProfit(0);
       }
     });
 
@@ -113,7 +116,13 @@ export default function SalesPage() {
     };
   }, [authLoading, user]);
 
-  const calculateSalesStats = (salesData: Sale[]) => {
+  useEffect(() => {
+    if (sales.length > 0) {
+      calculateSalesStats(sales)
+    }
+  }, [sales, calculateSalesStats])
+
+  const calculateSalesStats = useCallback((salesData: Sale[]) => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekStart = new Date(today)
@@ -126,13 +135,19 @@ export default function SalesPage() {
     const weekTotal = weekSales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
 
     const productCounts: Record<string, number> = {}
+    let productTotal = 0
+    let profit = 0
+
     salesData.forEach((sale) => {
       if (Array.isArray(sale.items)) {
         sale.items.forEach(item => {
           if (item.productName && typeof item.quantity === 'number') {
-            productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity;
+            productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity
           }
-        });
+          productTotal += item.quantity
+          const cost = products.find(p => p.id === item.productId)?.cost || 0
+          profit += (Number(item.price) - Number(cost)) * item.quantity
+        })
       }
     })
 
@@ -148,7 +163,9 @@ export default function SalesPage() {
     setDailySales({ count: todaySales.length, total: todayTotal })
     setWeeklySales({ count: weekSales.length, total: weekTotal })
     setTopProduct({ name: topProductName, count: topCount })
-  }
+    setTotalProducts(productTotal)
+    setNetProfit(profit)
+  }, [products])
 
   const filteredSales = sales.filter(
     (sale) =>
@@ -186,7 +203,7 @@ export default function SalesPage() {
         </div>
 
         {user?.role === 'admin' && (
-          <div className="grid gap-4 md:grid-cols-3 mb-6">
+          <div className="grid gap-4 md:grid-cols-5 mb-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
@@ -217,6 +234,24 @@ export default function SalesPage() {
                   <p className="text-xs text-muted-foreground">
                       {topProduct.count > 0 ? `${topProduct.count} unidades vendidas` : "No hay ventas registradas"}
                   </p>
+                  </CardContent>
+              </Card>
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Productos Vendidos</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                  <div className="text-2xl font-bold">{totalProducts}</div>
+                  </CardContent>
+              </Card>
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Ganancia Neta</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                  <div className="text-2xl font-bold">${netProfit.toFixed(2)}</div>
                   </CardContent>
               </Card>
           </div>

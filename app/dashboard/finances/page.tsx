@@ -15,13 +15,20 @@ import { Reserve } from "@/components/complete-reserve-modal"
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 
-// --- Interfaces de Datos (sin cambios) ---
+// --- Interfaces de Datos ---
+interface SaleItem {
+  productId: string;
+  productName?: string;
+  quantity: number;
+  price: number;
+  [key: string]: any;
+}
+
 interface Sale {
   id: string;
   date: string;
-  productId?: string;
-  productName?: string;
-  salePrice?: number | string;
+  items: SaleItem[];
+  totalAmount: number;
   [key: string]: any;
 }
 
@@ -147,14 +154,23 @@ export default function FinancesPage() {
       return true
     })
 
-    const totalIncome = filteredSales.reduce((sum, sale) => sum + Number(sale.salePrice || 0), 0)
-    
+    const totalIncome = filteredSales.reduce((sum, sale) => {
+        if (!Array.isArray(sale.items)) return sum
+        const saleTotal = sale.items.reduce((acc, item) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0)
+        return sum + saleTotal
+    }, 0)
+
     const productMap = new Map(products.map(p => [p.id, p]));
 
     const totalCosts = filteredSales.reduce((sum, sale) => {
-        const product = sale.productId ? productMap.get(sale.productId) : undefined;
-        return sum + (product ? Number(product.cost || 0) : 0);
-    }, 0);
+        if (!Array.isArray(sale.items)) return sum
+        const saleCost = sale.items.reduce((acc, item) => {
+            const product = productMap.get(item.productId)
+            const cost = product ? Number(product.cost || 0) : 0
+            return acc + cost * Number(item.quantity || 1)
+        }, 0)
+        return sum + saleCost
+    }, 0)
 
     const profit = totalIncome - totalCosts
     const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0
@@ -168,7 +184,10 @@ export default function FinancesPage() {
       if (!salesByMonth[monthKey]) {
         salesByMonth[monthKey] = { total: 0 }
       }
-      salesByMonth[monthKey].total += Number(sale.salePrice || 0)
+      const saleTotal = Array.isArray(sale.items)
+        ? sale.items.reduce((acc, item) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0)
+        : 0
+      salesByMonth[monthKey].total += saleTotal
     })
 
     const monthlySales = Object.entries(salesByMonth).map(([key, value]) => {
@@ -178,25 +197,30 @@ export default function FinancesPage() {
 
     const salesByProduct: Record<string, ProductProfitability> = {}
     filteredSales.forEach((sale) => {
-        if (!sale.productId) return;
-        if (!salesByProduct[sale.productId]) {
-            const product = productMap.get(sale.productId);
-            salesByProduct[sale.productId] = {
-                productId: sale.productId,
-                productName: sale.productName || product?.name || "Desconocido",
-                totalSales: 0,
-                quantity: 0,
-                cost: 0,
-                profit: 0,
-                margin: 0,
-            };
-        }
-        const productData = salesByProduct[sale.productId];
-        const productCost = productMap.get(sale.productId)?.cost || 0;
-        productData.totalSales += Number(sale.salePrice || 0);
-        productData.quantity += 1;
-        productData.cost += productCost;
-    });
+        if (!Array.isArray(sale.items)) return
+        sale.items.forEach(item => {
+            const pid = item.productId
+            if (!salesByProduct[pid]) {
+                const product = productMap.get(pid)
+                salesByProduct[pid] = {
+                    productId: pid,
+                    productName: item.productName || product?.name || "Desconocido",
+                    totalSales: 0,
+                    quantity: 0,
+                    cost: 0,
+                    profit: 0,
+                    margin: 0,
+                }
+            }
+            const productData = salesByProduct[pid]
+            const productCost = productMap.get(pid)?.cost || 0
+            const qty = Number(item.quantity || 1)
+            const price = Number(item.price || 0)
+            productData.totalSales += price * qty
+            productData.quantity += qty
+            productData.cost += productCost * qty
+        })
+    })
     
     const productProfitability = Object.values(salesByProduct).map(p => {
         p.profit = p.totalSales - p.cost;
