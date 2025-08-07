@@ -115,13 +115,6 @@ export default function SalesPage() {
       unsubscribeProducts();
     };
   }, [authLoading, user]);
-
-  useEffect(() => {
-    if (sales.length > 0) {
-      calculateSalesStats(sales)
-    }
-  }, [sales, calculateSalesStats])
-
   const calculateSalesStats = useCallback((salesData: Sale[]) => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -166,6 +159,12 @@ export default function SalesPage() {
     setTotalProducts(productTotal)
     setNetProfit(profit)
   }, [products])
+
+  useEffect(() => {
+    if (sales.length > 0) {
+      calculateSalesStats(sales)
+    }
+  }, [sales, calculateSalesStats])
 
   const filteredSales = sales.filter(
     (sale) =>
