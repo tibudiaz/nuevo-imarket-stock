@@ -280,6 +280,8 @@ export default function SettingsPage() {
         remove(ref(database, 'products')),
         remove(ref(database, 'customers')),
         remove(ref(database, 'inventory')),
+        remove(ref(database, 'reserves')),
+        remove(ref(database, 'repairs')),
         set(ref(database, 'finances'), 0),
       ]);
       toast.success('Datos del sistema eliminados.');
