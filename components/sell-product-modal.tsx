@@ -19,7 +19,7 @@ import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone
 import { toast } from "sonner"
 import { generateSaleReceiptPdf, generateReserveReceiptPdf } from "@/lib/pdf-generator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { convertPrice, formatCurrency } from "../lib/price-converter"
+import { convertPrice, convertPriceToUSD, formatCurrency } from "../lib/price-converter"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -88,6 +88,7 @@ interface Reserve {
     remainingAmount: number;
     status: 'reserved' | 'completed' | 'cancelled';
     store: "local1" | "local2";
+    productData?: any;
 }
 
 const DEFAULT_POINT_EARN_RATE = 50000;
@@ -549,7 +550,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         setReceiptNumber(newReceiptNumber);
 
         const newReserveRef = push(ref(database, 'reserves'));
-        const priceARS = convertPrice(item.price, usdRate) * item.quantity;
+        const productPriceUSD = convertPriceToUSD(item.price, usdRate) * item.quantity;
+        const downPaymentUSD = reserveAmount / usdRate;
         const reserveData: Reserve = {
             id: newReserveRef.key!,
             receiptNumber: newReceiptNumber,
@@ -562,11 +564,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             productName: item.name,
             productId: item.id,
             quantity: reservedQuantity,
-            productPrice: priceARS,
-            downPayment: reserveAmount,
-            remainingAmount: priceARS - reserveAmount,
+            productPrice: productPriceUSD,
+            downPayment: downPaymentUSD,
+            remainingAmount: productPriceUSD - downPaymentUSD,
             status: 'reserved',
             store: saleStore,
+            productData: productSnapshot.val(),
         };
         await set(newReserveRef, reserveData);
         

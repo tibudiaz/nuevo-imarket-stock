@@ -15,9 +15,26 @@ export const convertPrice = (price: number, usdRate: number): number => {
   if (price < USD_PRICE_THRESHOLD) {
     return price * usdRate;
   }
-  
+
   // De lo contrario, se asume que ya está en ARS y se devuelve tal cual.
   return price;
+};
+
+/**
+ * Convierte un precio a dólares estadounidenses (USD) si es necesario,
+ * basándose únicamente en el umbral de precio.
+ * @param price - El precio del producto.
+ * @param usdRate - La cotización actual del dólar.
+ * @returns El precio convertido a USD.
+ */
+export const convertPriceToUSD = (price: number, usdRate: number): number => {
+  // Si el precio es menor al umbral, se asume que ya está en USD y se devuelve.
+  if (price < USD_PRICE_THRESHOLD) {
+    return price;
+  }
+
+  // De lo contrario, se convierte de ARS a USD.
+  return price / usdRate;
 };
 
 /**
@@ -29,5 +46,17 @@ export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
+  }).format(amount);
+};
+
+/**
+ * Formatea un número como una moneda en dólares estadounidenses.
+ * @param amount - El monto a formatear.
+ * @returns El monto formateado como string (ej. "$1,234.50").
+ */
+export const formatUsdCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
   }).format(amount);
 };

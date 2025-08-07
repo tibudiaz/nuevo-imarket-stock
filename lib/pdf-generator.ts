@@ -94,6 +94,14 @@ const formatCurrencyForPdf = (amount: number | undefined | null): string => {
   return `$${roundedAmount.toLocaleString('es-AR')}`;
 };
 
+const formatUsdCurrencyForPdf = (amount: number | undefined | null): string => {
+  const numAmount = Number(amount || 0);
+  return `$${numAmount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
 const formatDateForPdf = (dateString: string | undefined | null): string => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -612,11 +620,11 @@ const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts, isSeco
     page.drawText(String(reserve.customerPhone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
 
     page.drawText(reserve.productName || 'Producto sin nombre', { x: positions.itemStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
-    page.drawText(formatCurrencyForPdf(reserve.productPrice), { x: positions.priceStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
-    
-    page.drawText(formatCurrencyForPdf(reserve.productPrice), { ...positions.total, size: 10, font: helveticaFont });
-    page.drawText(formatCurrencyForPdf(reserve.downPayment), { ...positions.entrega, size: 10, font: helveticaFont });
-    page.drawText(formatCurrencyForPdf(reserve.remainingAmount), { ...positions.saldo, size: 12, font: helveticaBold });
+    page.drawText(formatUsdCurrencyForPdf(reserve.productPrice), { x: positions.priceStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
+
+    page.drawText(formatUsdCurrencyForPdf(reserve.productPrice), { ...positions.total, size: 10, font: helveticaFont });
+    page.drawText(formatUsdCurrencyForPdf(reserve.downPayment), { ...positions.entrega, size: 10, font: helveticaFont });
+    page.drawText(formatUsdCurrencyForPdf(reserve.remainingAmount), { ...positions.saldo, size: 12, font: helveticaBold });
 
     // Imprimir fecha de retiro
     page.drawText(formattedExpirationDate, { ...positions.fechaRetiro1, size: 12, font: helveticaFont });

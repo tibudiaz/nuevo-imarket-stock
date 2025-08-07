@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Search, Calendar, User, Clock, AlertTriangle, CheckCircle, Download } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ref, onValue, update, get } from "firebase/database"
+import { ref, onValue, update, get, set } from "firebase/database"
+import { formatUsdCurrency } from "@/lib/price-converter"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import CompleteReserveModal, { Reserve } from "@/components/complete-reserve-modal"
@@ -109,10 +110,16 @@ export default function ReservesPage() {
 
       const productRef = ref(database, `products/${reserve.productId}`)
       const productSnapshot = await get(productRef)
-      const currentStock = productSnapshot.exists() ? productSnapshot.val().stock || 0 : 0
-      await update(productRef, {
-        stock: currentStock + (reserve.quantity || 1),
-      })
+
+      if (productSnapshot.exists()) {
+        const currentStock = productSnapshot.val().stock || 0
+        await update(productRef, {
+          stock: currentStock + (reserve.quantity || 1),
+        })
+      } else if (reserve.productData) {
+        const restoredProduct = { ...reserve.productData, stock: reserve.quantity || 1 }
+        await set(productRef, restoredProduct)
+      }
       toast.success("Reserva cancelada correctamente")
     } catch (error) {
       console.error("Error al cancelar la reserva:", error)
@@ -253,9 +260,9 @@ export default function ReservesPage() {
                       {reserve.customerName}
                     </TableCell>
                     <TableCell>{reserve.productName}</TableCell>
-                    <TableCell>${Number(reserve.productPrice || 0).toFixed(2)}</TableCell>
-                    <TableCell>${Number(reserve.downPayment || 0).toFixed(2)}</TableCell>
-                    <TableCell>${Number(reserve.remainingAmount || 0).toFixed(2)}</TableCell>
+                    <TableCell>{formatUsdCurrency(reserve.productPrice || 0)}</TableCell>
+                    <TableCell>{formatUsdCurrency(reserve.downPayment || 0)}</TableCell>
+                    <TableCell>{formatUsdCurrency(reserve.remainingAmount || 0)}</TableCell>
                     <TableCell className={isReserveExpired(reserve) ? "text-red-500 font-medium" : ""}>
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />

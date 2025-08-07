@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ref, set, push, update } from "firebase/database"
+import { ref, set, push, update, get } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { formatUsdCurrency } from "@/lib/price-converter"
 
 export interface Reserve {
   id: string;
@@ -31,6 +32,7 @@ export interface Reserve {
   downPayment?: number;
   remainingAmount?: number;
   status: string;
+  productData?: any;
   [key: string]: any;
 }
 
@@ -51,6 +53,9 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
     setIsLoading(true);
     try {
       // 1. Crear una nueva venta con el saldo restante
+      const usdRateSnapshot = await get(ref(database, 'config/usdRate'));
+      const usdRate = usdRateSnapshot.exists() ? usdRateSnapshot.val() : 0;
+
       const newSaleRef = push(ref(database, "sales"));
       const saleData = {
         id: newSaleRef.key,
@@ -62,10 +67,11 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
           productId: reserve.productId,
           productName: reserve.productName,
           quantity: reserve.quantity || 1,
-          price: reserve.productPrice,
+          price: (reserve.productPrice || 0) * usdRate,
         }],
         paymentMethod,
-        totalAmount: reserve.remainingAmount, // Se registra el pago del saldo
+        totalAmount: (reserve.remainingAmount || 0) * usdRate, // Se registra el pago del saldo
+        usdRate,
         notes: `Venta completada desde reserva #${reserve.id}`,
       };
       await set(newSaleRef, saleData);
@@ -110,7 +116,7 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
           <div className="text-sm space-y-1">
             <p><strong>Cliente:</strong> {reserve.customerName}</p>
             <p><strong>Producto:</strong> {reserve.productName}</p>
-            <p className="font-bold text-base mt-2">Saldo a pagar: ${Number(reserve.remainingAmount || 0).toFixed(2)}</p>
+            <p className="font-bold text-base mt-2">Saldo a pagar: {formatUsdCurrency(reserve.remainingAmount || 0)}</p>
           </div>
           
           <div className="space-y-2">
