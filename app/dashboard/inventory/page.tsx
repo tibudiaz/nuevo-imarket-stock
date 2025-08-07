@@ -49,6 +49,7 @@ import { database } from "@/lib/firebase";
 import { toast } from "sonner";
 import SellProductModal from "@/components/sell-product-modal";
 import TransferProductDialog from "@/components/transfer-product-dialog";
+import QuickSaleDialog from "@/components/quick-sale-dialog";
 import {
   Select,
   SelectContent,
@@ -112,6 +113,7 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
+  const [isQuickSaleOpen, setIsQuickSaleOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -456,6 +458,21 @@ export default function InventoryPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <Button
+              onClick={() => {
+                if (selectedStore === "all") {
+                  toast.error("Seleccione un local", {
+                    description:
+                      "Debe elegir un local antes de registrar ventas.",
+                  });
+                  return;
+                }
+                setIsQuickSaleOpen(true);
+              }}
+            >
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Venta Rápida
+            </Button>
             {user?.role === "admin" && (
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
@@ -814,6 +831,12 @@ export default function InventoryPage() {
           onProductSold={handleProductSold}
         />
       )}
+
+      <QuickSaleDialog
+        isOpen={isQuickSaleOpen}
+        onClose={() => setIsQuickSaleOpen(false)}
+        store={selectedStore}
+      />
 
       {editingProduct && user?.role === "admin" && (
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
