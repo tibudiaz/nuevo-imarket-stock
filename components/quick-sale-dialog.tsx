@@ -102,7 +102,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
             : item
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, price: product.price || 0, quantity: 1 }];
     });
   };
 
@@ -118,6 +118,16 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
 
   const removeFromCart = (id: string) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const updatePrice = (id: string, price: number) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, price: Math.max(0, price) }
+          : item
+      )
+    );
   };
 
   const totalAmount = useMemo(() => {
@@ -223,20 +233,21 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
               </TableBody>
             </Table>
           </div>
-          <div>
-            <h3 className="mb-2 text-sm font-medium">Carrito</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Cant.</TableHead>
-                  <TableHead>Precio</TableHead>
-                  <TableHead className="text-right">Subtotal</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cart.length === 0 ? (
+        <div>
+          <h3 className="mb-2 text-sm font-medium">Carrito</h3>
+          <div className="max-h-48 overflow-y-auto rounded border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Producto</TableHead>
+                <TableHead>Cant.</TableHead>
+                <TableHead>Precio</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cart.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                       No hay productos en el carrito
@@ -256,7 +267,15 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
                           onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
                         />
                       </TableCell>
-                      <TableCell>${Number(item.price || 0).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={item.price ?? 0}
+                          min={0}
+                          className="w-24"
+                          onChange={(e) => updatePrice(item.id, parseFloat(e.target.value) || 0)}
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         ${((item.price || 0) * item.quantity).toFixed(2)}
                       </TableCell>
@@ -270,6 +289,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
                 )}
               </TableBody>
             </Table>
+          </div>
           </div>
           <div className="space-y-2">
             <Label>Método de pago</Label>
