@@ -28,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Plus, Trash2, Loader2 } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, Gift } from "lucide-react";
 import { toast } from "sonner";
 
 interface Product {
@@ -281,16 +281,29 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          value={item.price ?? 0}
-                          min={0}
-                          className="w-24"
-                          onChange={(e) => updatePrice(item.id, parseFloat(e.target.value) || 0)}
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            value={item.price ?? 0}
+                            min={0}
+                            className="w-24"
+                            onChange={(e) => updatePrice(item.id, parseFloat(e.target.value) || 0)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => updatePrice(item.id, 0)}
+                          >
+                            <Gift className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        ${((item.price || 0) * item.quantity).toFixed(2)}
+                        {item.price === 0 ? (
+                          <span className="font-bold text-green-600">Regalo</span>
+                        ) : (
+                          `$${((item.price || 0) * item.quantity).toFixed(2)}`
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)}>
