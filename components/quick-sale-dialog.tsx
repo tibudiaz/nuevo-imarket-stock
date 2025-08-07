@@ -85,7 +85,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
       if ((p.stock || 0) <= 0) return false;
       if (store !== "all" && p.store !== store) return false;
 
-      const searchable = `${(p.name || "")} ${(p.brand || "")} ${(p.model || "")} ${(p.category || "")} ${(p.barcode || "")}`.toLowerCase();
+      const searchable = `${(p.name || "")} ${(p.brand || "")} ${(p.model || "")} ${(p.barcode || "")}`.toLowerCase();
 
       return terms.every((t) => searchable.includes(t));
     });
@@ -221,9 +221,8 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
                     <TableRow key={p.id}>
                       <TableCell>
                         <div className="space-y-1">
-                          <p className="font-medium">{p.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {`Categoría: ${p.category || "N/A"} | Marca: ${p.brand || "N/A"} | Modelo: ${p.model || "N/A"}`}
+                          <p className="font-medium">
+                            {[p.name, p.brand, p.model].filter(Boolean).join(" ")}
                           </p>
                           {p.barcode && (
                             <p className="text-xs text-muted-foreground">Código: {p.barcode}</p>

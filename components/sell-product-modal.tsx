@@ -311,7 +311,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     const terms = productSearchTerm.toLowerCase().split(/\s+/).filter(Boolean);
     return allProducts.filter(
       (p) => {
-        const searchable = `${(p.name || "")} ${(p.category || "")} ${(p.brand || "")} ${(p.model || "")} ${(p.barcode || "")}`.toLowerCase();
+        const searchable = `${(p.name || "")} ${(p.brand || "")} ${(p.model || "")} ${(p.barcode || "")}`.toLowerCase();
         return (
           terms.every(t => searchable.includes(t)) &&
           p.stock > 0 &&
@@ -661,9 +661,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     {searchedProducts.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 hover:bg-accent cursor-pointer" onClick={() => handleAddProductToCart(p)}>
                             <div>
-                              <p className="font-medium">{p.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {`Categoría: ${p.category || "N/A"} | Marca: ${p.brand || "N/A"} | Modelo: ${p.model || "N/A"}`}
+                              <p className="font-medium">
+                                {[p.name, p.brand, p.model].filter(Boolean).join(" ")}
                               </p>
                               <p className="text-xs text-muted-foreground">Stock: {p.stock}</p>
                             </div>
