@@ -219,7 +219,22 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
                 ) : (
                   filteredProducts.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell>{p.name}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {`Categoría: ${p.category || "N/A"} | Marca: ${p.brand || "N/A"} | Modelo: ${p.model || "N/A"}`}
+                          </p>
+                          {p.barcode && (
+                            <p className="text-xs text-muted-foreground">Código: {p.barcode}</p>
+                          )}
+                          {typeof p.price === "number" && (
+                            <p className="text-xs text-muted-foreground">
+                              Precio: ${Number(p.price).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{p.stock}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => addToCart(p)}>
