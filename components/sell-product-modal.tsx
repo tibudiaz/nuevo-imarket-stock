@@ -34,6 +34,7 @@ interface CartProduct {
   barcode?: string;
   category?: string;
   model?: string;
+  brand?: string;
   provider?: string;
   store?: "local1" | "local2";
 }
@@ -307,9 +308,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   };
   const searchedProducts = useMemo(() => {
     if (!productSearchTerm) return [];
+    const term = productSearchTerm.toLowerCase();
     return allProducts.filter(
       (p) =>
-        p.name.toLowerCase().includes(productSearchTerm.toLowerCase()) &&
+        ((p.name && p.name.toLowerCase().includes(term)) ||
+          (p.category && p.category.toLowerCase().includes(term)) ||
+          (p.brand && p.brand.toLowerCase().includes(term)) ||
+          (p.model && p.model.toLowerCase().includes(term)) ||
+          (p.barcode && p.barcode.toLowerCase().includes(term))) &&
         p.stock > 0 &&
         (!saleStore || !p.store || p.store === saleStore)
     );
@@ -654,7 +660,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                   <ScrollArea className="h-32 border rounded-md mt-2">
                     {searchedProducts.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 hover:bg-accent cursor-pointer" onClick={() => handleAddProductToCart(p)}>
-                            <div><p className="font-medium">{p.name}</p><p className="text-xs text-muted-foreground">Stock: {p.stock}</p></div>
+                            <div>
+                              <p className="font-medium">{p.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {`Categoría: ${p.category || "N/A"} | Marca: ${p.brand || "N/A"} | Modelo: ${p.model || "N/A"}`}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Stock: {p.stock}</p>
+                            </div>
                             <span className="text-sm font-semibold">{formatCurrency(convertPrice(p.price, usdRate))}</span>
                         </div>
                     ))}
