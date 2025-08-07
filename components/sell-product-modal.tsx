@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone, Mail, Calendar } from "lucide-react"
+import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone, Mail, Calendar, Gift } from "lucide-react"
 import { toast } from "sonner"
 import { generateSaleReceiptPdf, generateReserveReceiptPdf } from "@/lib/pdf-generator"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -632,6 +632,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                                 value={item.price}
                                 onChange={(e) => handlePriceChange(item.id, Number(e.target.value))}
                               />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={() => handlePriceChange(item.id, 0)}
+                              >
+                                <Gift className="h-4 w-4" />
+                              </Button>
                               {item.price === 0 ? (
                                 <span className="font-bold text-green-600">Regalo</span>
                               ) : (
