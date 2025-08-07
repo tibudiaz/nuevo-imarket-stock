@@ -220,22 +220,9 @@ export default function InventoryPage() {
         ? product.category === categorySearch
         : true;
 
-      const searchMatch =
-        !searchTerm ||
-        (product.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.brand || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (product.model || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (product.category || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (product.barcode || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (product.imei || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+      const searchable = `${(product.name || "")} ${(product.brand || "")} ${(product.model || "")} ${(product.category || "")} ${(product.barcode || "")} ${(product.imei || "")}`.toLowerCase();
+      const searchMatch = terms.every((t) => searchable.includes(t));
 
       const stockMatch = (product.stock || 0) > 0;
 

@@ -79,16 +79,15 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
   }, [isOpen]);
 
   const filteredProducts = useMemo(() => {
+    const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+
     return allProducts.filter((p) => {
       if ((p.stock || 0) <= 0) return false;
       if (store !== "all" && p.store !== store) return false;
-      const term = searchTerm.toLowerCase();
-      return (
-        (p.name || "").toLowerCase().includes(term) ||
-        (p.brand || "").toLowerCase().includes(term) ||
-        (p.model || "").toLowerCase().includes(term) ||
-        (p.barcode || "").toLowerCase().includes(term)
-      );
+
+      const searchable = `${(p.name || "")} ${(p.brand || "")} ${(p.model || "")} ${(p.category || "")} ${(p.barcode || "")}`.toLowerCase();
+
+      return terms.every((t) => searchable.includes(t));
     });
   }, [allProducts, searchTerm, store]);
 
