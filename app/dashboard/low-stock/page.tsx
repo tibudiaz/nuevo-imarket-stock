@@ -49,7 +49,7 @@ export default function LowStockPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [searchTerm, setSearchTerm] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   useEffect(() => {
     if (!user) return;
@@ -117,7 +117,7 @@ export default function LowStockPage() {
         const storeMatch =
           selectedStore === "all" || p.store === selectedStore;
         const categoryMatch =
-          categoryFilter ? p.category === categoryFilter : true;
+          categoryFilter === "all" ? true : p.category === categoryFilter;
         const terms = searchTerm
           .toLowerCase()
           .split(/\s+/)
@@ -207,7 +207,7 @@ export default function LowStockPage() {
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}
