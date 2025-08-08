@@ -41,6 +41,7 @@ interface Product {
   category: string;
   cost: number;
   stock: number;
+  store?: string;
 }
 
 interface Customer {
@@ -184,6 +185,52 @@ export default function ReportsPage() {
       return Object.entries(categorySales).map(([name, value]) => ({ name, value }));
   }, [filteredSales, products]);
 
+  const filteredProducts = useMemo(() => {
+      return selectedStore === 'all' ? products : products.filter(p => p.store === selectedStore);
+  }, [products, selectedStore]);
+
+  const inventoryByCategoryData = useMemo(() => {
+      const categoryStock: { [key: string]: number } = {};
+      filteredProducts.forEach(prod => {
+          const category = prod.category || 'Sin categoría';
+          categoryStock[category] = (categoryStock[category] || 0) + Number(prod.stock || 0);
+      });
+      return Object.entries(categoryStock).map(([name, stock]) => ({ name, stock }));
+  }, [filteredProducts]);
+
+  const financialSummary = useMemo(() => {
+      const productMap = new Map(filteredProducts.map(p => [p.id, p]));
+      const totalIncome = filteredSales.reduce((sum, sale) => {
+          const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+          const saleTotal = itemsArray.reduce((acc, item: any) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0);
+          return sum + saleTotal;
+      }, 0);
+      const totalCosts = filteredSales.reduce((sum, sale) => {
+          const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+          const saleCost = itemsArray.reduce((acc, item: any) => {
+              const cost = productMap.get(item.productId)?.cost || 0;
+              return acc + cost * Number(item.quantity || 1);
+          }, 0);
+          return sum + saleCost;
+      }, 0);
+      return { totalIncome, totalCosts, profit: totalIncome - totalCosts };
+  }, [filteredSales, filteredProducts]);
+
+  const topCustomersChartData = useMemo(() => {
+      const totals: { [key: string]: number } = {};
+      filteredSales.forEach(sale => {
+          if (sale.customerId) {
+              const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+              const saleTotal = itemsArray.reduce((acc, item: any) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0);
+              totals[sale.customerId] = (totals[sale.customerId] || 0) + saleTotal;
+          }
+      });
+      return Object.entries(totals)
+          .map(([id, total]) => ({ name: customers.find(c => c.id === id)?.name || 'Desconocido', total }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 5);
+  }, [filteredSales, customers]);
+
   if (isLoading || !user || user.role !== "admin") {
     return <div className="flex h-screen items-center justify-center">Cargando reportes...</div>;
   }
@@ -274,7 +321,72 @@ export default function ReportsPage() {
               </Card>
             </div>
           </TabsContent>
-          {/* Aquí irían los demás tabs (Inventario, Finanzas, Clientes) */}
+          <TabsContent value="inventory" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Stock por Categoría</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={inventoryByCategoryData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="stock" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="finances" className="mt-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Ingresos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${financialSummary.totalIncome.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Costos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${financialSummary.totalCosts.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Ganancias</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${financialSummary.profit.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          <TabsContent value="customers" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mejores Clientes</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topCustomersChartData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis type="category" dataKey="name" width={80} />
+                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                    <Legend />
+                    <Bar dataKey="total" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
