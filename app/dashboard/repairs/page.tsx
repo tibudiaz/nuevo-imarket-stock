@@ -193,32 +193,33 @@ export default function RepairsPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Gestión de Reparaciones</h1>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar reparación..."
-              className="pl-8 w-[250px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      <div className="p-4 md:p-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold">Gestión de Reparaciones</h1>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-auto">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar reparación..."
+                className="w-full pl-8 sm:w-[250px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button onClick={() => setIsAddModalOpen(true)} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva Reparación
+            </Button>
           </div>
-          <Button onClick={() => setIsAddModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Reparación
-          </Button>
         </div>
-      </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>N° Recibo</TableHead>
-              <TableHead>Cliente</TableHead>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>N° Recibo</TableHead>
+                <TableHead>Cliente</TableHead>
               <TableHead>Equipo</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Fecha de Ingreso</TableHead>
@@ -259,13 +260,14 @@ export default function RepairsPage() {
               </TableRow>
             )}
           </TableBody>
-        </Table>
-      </div>
+          </Table>
+        </div>
 
-      <AddRepairForm isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddRepair={handleAddRepair} />
-      {selectedRepair && (
-        <RepairDetailModal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} repair={selectedRepair} onUpdate={handleUpdateRepair} />
-      )}
+        <AddRepairForm isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddRepair={handleAddRepair} />
+        {selectedRepair && (
+          <RepairDetailModal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} repair={selectedRepair} onUpdate={handleUpdateRepair} />
+        )}
+      </div>
     </DashboardLayout>
   )
 }
