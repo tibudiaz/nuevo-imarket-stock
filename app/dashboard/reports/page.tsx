@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts"
+import { useStore } from "@/hooks/use-store"
 
 // --- Interfaces de Datos ---
 interface User {
@@ -31,6 +32,7 @@ interface Sale {
   items: SaleItem[];
   totalAmount: number;
   customerId?: string;
+  store?: string;
 }
 
 interface Product {
@@ -66,6 +68,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
 
 export default function ReportsPage() {
   const router = useRouter()
+  const { selectedStore } = useStore()
   const [user, setUser] = useState<User | null>(null)
   const [timeRange, setTimeRange] = useState("month")
   
@@ -123,10 +126,10 @@ export default function ReportsPage() {
   const filteredSales = useMemo(() => {
       const now = new Date();
       return sales.filter(sale => {
-          // --- CORRECCIÓN: Se asegura de que la fecha exista antes de procesarla ---
+          if (selectedStore !== 'all' && sale.store !== selectedStore) return false;
           if (!sale.date) return false;
           const saleDate = new Date(sale.date);
-          
+
           const weekAgo = new Date();
           weekAgo.setDate(now.getDate() - 7);
 
@@ -135,16 +138,15 @@ export default function ReportsPage() {
           if (timeRange === "year") return saleDate.getFullYear() === now.getFullYear();
           return true;
       });
-  }, [sales, timeRange]);
+  }, [sales, timeRange, selectedStore]);
 
   const salesByPeriodChartData = useMemo<SalesByPeriodData[]>(() => {
     const data: { [key: string]: number } = {};
     filteredSales.forEach(sale => {
         if (sale.date) {
             const date = new Date(sale.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-            const amount = Array.isArray(sale.items)
-                ? sale.items.reduce((acc, item) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0)
-                : Number(sale.totalAmount || 0);
+            const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+            const amount = itemsArray.reduce((acc, item: any) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0);
             data[date] = (data[date] || 0) + amount;
         }
     });
@@ -154,8 +156,8 @@ export default function ReportsPage() {
   const topProductsChartData = useMemo<TopProductData[]>(() => {
       const productCounts: { [key: string]: number } = {};
       filteredSales.forEach(sale => {
-          // --- CORRECCIÓN: Se asegura que `items` exista antes de iterar ---
-          sale.items?.forEach(item => {
+          const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+          itemsArray.forEach((item: any) => {
               const product = products.find(p => p.id === item.productId);
               if (product && product.name) {
                   productCounts[product.name] = (productCounts[product.name] || 0) + (item.quantity || 1);
@@ -171,8 +173,8 @@ export default function ReportsPage() {
   const salesByCategoryChartData = useMemo<SalesByCategoryData[]>(() => {
       const categorySales: { [key: string]: number } = {};
       filteredSales.forEach(sale => {
-          // --- CORRECCIÓN: Se asegura que `items` exista antes de iterar ---
-          sale.items?.forEach(item => {
+          const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+          itemsArray.forEach((item: any) => {
               const product = products.find(p => p.id === item.productId);
               if (product?.category) {
                   categorySales[product.category] = (categorySales[product.category] || 0) + ((item.price || 0) * (item.quantity || 1));

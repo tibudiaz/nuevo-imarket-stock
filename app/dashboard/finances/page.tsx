@@ -14,6 +14,7 @@ import { database } from "@/lib/firebase"
 import { Reserve } from "@/components/complete-reserve-modal"
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
+import { useStore } from "@/hooks/use-store"
 
 // --- Interfaces de Datos ---
 interface SaleItem {
@@ -73,6 +74,7 @@ interface FinancialData {
 export default function FinancesPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const { selectedStore } = useStore()
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [reserves, setReserves] = useState<Reserve[]>([])
@@ -140,68 +142,71 @@ export default function FinancesPage() {
   }, [router, user, authLoading])
 
   const financialData = useMemo<FinancialData>(() => {
-    if (sales.length === 0 && products.length === 0 && reserves.length === 0) {
+    const salesByStore = selectedStore === 'all' ? sales : sales.filter(s => s.store === selectedStore);
+    const productsByStore = selectedStore === 'all' ? products : products.filter(p => p.store === selectedStore);
+    const reservesByStore = selectedStore === 'all' ? reserves : reserves.filter(r => r.store === selectedStore);
+
+    if (salesByStore.length === 0 && productsByStore.length === 0 && reservesByStore.length === 0) {
       return { totalIncome: 0, totalCosts: 0, profit: 0, profitMargin: 0, monthlySales: [], productProfitability: [], deviceCount: 0, deviceTotalCost: 0, accessoryCount: 0, accessoryTotalCost: 0 }
     }
 
-    const now = new Date()
-    const filteredSales = sales.filter((sale) => {
-      const saleDate = new Date(sale.date)
-      if (timeRange === "week") return saleDate >= new Date(now.setDate(now.getDate() - 7))
-      if (timeRange === "month") return saleDate >= new Date(now.setMonth(now.getMonth() - 1))
-      if (timeRange === "quarter") return saleDate >= new Date(now.setMonth(now.getMonth() - 3))
-      if (timeRange === "year") return saleDate >= new Date(now.setFullYear(now.getFullYear() - 1))
-      return true
-    })
+    const now = new Date();
+    const filteredSales = salesByStore.filter((sale) => {
+      const saleDate = new Date(sale.date);
+      if (timeRange === "week") return saleDate >= new Date(now.setDate(now.getDate() - 7));
+      if (timeRange === "month") return saleDate >= new Date(now.setMonth(now.getMonth() - 1));
+      if (timeRange === "quarter") return saleDate >= new Date(now.setMonth(now.getMonth() - 3));
+      if (timeRange === "year") return saleDate >= new Date(now.setFullYear(now.getFullYear() - 1));
+      return true;
+    });
 
     const totalIncome = filteredSales.reduce((sum, sale) => {
-        if (!Array.isArray(sale.items)) return sum
-        const saleTotal = sale.items.reduce((acc, item) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0)
-        return sum + saleTotal
-    }, 0)
+        const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+        const saleTotal = itemsArray.reduce((acc, item: any) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0);
+        return sum + saleTotal;
+    }, 0);
 
-    const productMap = new Map(products.map(p => [p.id, p]));
+    const productMap = new Map(productsByStore.map(p => [p.id, p]));
 
     const totalCosts = filteredSales.reduce((sum, sale) => {
-        if (!Array.isArray(sale.items)) return sum
-        const saleCost = sale.items.reduce((acc, item) => {
-            const product = productMap.get(item.productId)
-            const cost = product ? Number(product.cost || 0) : 0
-            return acc + cost * Number(item.quantity || 1)
-        }, 0)
-        return sum + saleCost
-    }, 0)
+        const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+        const saleCost = itemsArray.reduce((acc, item: any) => {
+            const product = productMap.get(item.productId);
+            const cost = product ? Number(product.cost || 0) : 0;
+            return acc + cost * Number(item.quantity || 1);
+        }, 0);
+        return sum + saleCost;
+    }, 0);
 
-    const profit = totalIncome - totalCosts
-    const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0
+    const profit = totalIncome - totalCosts;
+    const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
 
-    const salesByMonth: Record<string, { total: number }> = {}
-    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-    
+    const salesByMonth: Record<string, { total: number }> = {};
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
     filteredSales.forEach((sale) => {
-      const date = new Date(sale.date)
-      const monthKey = `${date.getFullYear()}-${monthNames[date.getMonth()]}`
+      const date = new Date(sale.date);
+      const monthKey = `${date.getFullYear()}-${monthNames[date.getMonth()]}`;
       if (!salesByMonth[monthKey]) {
-        salesByMonth[monthKey] = { total: 0 }
+        salesByMonth[monthKey] = { total: 0 };
       }
-      const saleTotal = Array.isArray(sale.items)
-        ? sale.items.reduce((acc, item) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0)
-        : 0
-      salesByMonth[monthKey].total += saleTotal
-    })
+      const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+      const saleTotal = itemsArray.reduce((acc, item: any) => acc + Number(item.price || 0) * Number(item.quantity || 1), 0);
+      salesByMonth[monthKey].total += saleTotal;
+    });
 
     const monthlySales = Object.entries(salesByMonth).map(([key, value]) => {
         const [year, month] = key.split('-');
         return { month, year: parseInt(year), total: value.total };
     });
 
-    const salesByProduct: Record<string, ProductProfitability> = {}
+    const salesByProduct: Record<string, ProductProfitability> = {};
     filteredSales.forEach((sale) => {
-        if (!Array.isArray(sale.items)) return
-        sale.items.forEach(item => {
-            const pid = item.productId
+        const itemsArray = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
+        itemsArray.forEach((item: any) => {
+            const pid = item.productId;
             if (!salesByProduct[pid]) {
-                const product = productMap.get(pid)
+                const product = productMap.get(pid);
                 salesByProduct[pid] = {
                     productId: pid,
                     productName: item.productName || product?.name || "Desconocido",
@@ -210,18 +215,18 @@ export default function FinancesPage() {
                     cost: 0,
                     profit: 0,
                     margin: 0,
-                }
+                };
             }
-            const productData = salesByProduct[pid]
-            const productCost = productMap.get(pid)?.cost || 0
-            const qty = Number(item.quantity || 1)
-            const price = Number(item.price || 0)
-            productData.totalSales += price * qty
-            productData.quantity += qty
-            productData.cost += productCost * qty
-        })
-    })
-    
+            const productData = salesByProduct[pid];
+            const productCost = productMap.get(pid)?.cost || 0;
+            const qty = Number(item.quantity || 1);
+            const price = Number(item.price || 0);
+            productData.totalSales += price * qty;
+            productData.quantity += qty;
+            productData.cost += productCost * qty;
+        });
+    });
+
     const productProfitability = Object.values(salesByProduct).map(p => {
         p.profit = p.totalSales - p.cost;
         p.margin = p.totalSales > 0 ? (p.profit / p.totalSales) * 100 : 0;
@@ -233,12 +238,11 @@ export default function FinancesPage() {
     let accessoryCount = 0;
     let accessoryTotalCost = 0;
 
-    products.forEach(product => {
+    productsByStore.forEach(product => {
         const stock = Number(product.stock) || 0;
         const cost = Number(product.cost) || 0;
         const totalCostForProduct = cost * stock;
 
-        // --- LÓGICA CORREGIDA Y SIMPLIFICADA ---
         const category = product.category;
         if (category === "Celulares Nuevos" || category === "Celulares Usados") {
             deviceCount += stock;
@@ -249,7 +253,7 @@ export default function FinancesPage() {
         }
     });
 
-    const activeReserves = reserves.filter(r => r.status === "reserved");
+    const activeReserves = reservesByStore.filter(r => r.status === "reserved");
     activeReserves.forEach(reserve => {
         const prod = productMap.get(reserve.productId || "");
         if (!prod) return;
@@ -264,8 +268,8 @@ export default function FinancesPage() {
         }
     });
 
-    return { totalIncome, totalCosts, profit, profitMargin, monthlySales, productProfitability, deviceCount, deviceTotalCost, accessoryCount, accessoryTotalCost }
-  }, [sales, products, reserves, timeRange])
+    return { totalIncome, totalCosts, profit, profitMargin, monthlySales, productProfitability, deviceCount, deviceTotalCost, accessoryCount, accessoryTotalCost };
+  }, [sales, products, reserves, timeRange, selectedStore])
 
   const handleExportData = () => {
     try {
