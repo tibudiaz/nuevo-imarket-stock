@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Home, Package, ShoppingCart, Users, Wrench, ChevronDown, LayoutDashboard } from "lucide-react"
+import { Home, Package, ShoppingCart, Users, Wrench, ChevronDown, LayoutDashboard, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -48,6 +48,7 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
 
   const mainRoutes = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/dashboard", role: ["admin", "moderator"] },
+    { href: "/dashboard/low-stock", label: "Bajo Stock", icon: AlertTriangle, active: pathname === "/dashboard/low-stock", role: ["admin", "moderator"] },
     { href: "/dashboard/sales", label: "Ventas", icon: ShoppingCart, active: pathname === "/dashboard/sales", role: ["admin", "moderator"] },
     { href: "/dashboard/repairs", label: "Reparaciones", icon: Wrench, active: pathname === "/dashboard/repairs", role: ["admin", "moderator"] },
     { href: "/dashboard/reserves", label: "Reservas", icon: ShoppingCart, active: pathname === "/dashboard/reserves", role: ["admin", "moderator"] },
@@ -84,7 +85,13 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
 
             {/* Menú desplegable para Inventario */}
             <Collapsible open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
-              <CollapsibleTrigger className="w-full">
+              <CollapsibleTrigger
+                className="w-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsInventoryOpen((prev) => !prev);
+                }}
+              >
                 <div className={cn(
                     "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-slate-900 transition-all hover:bg-slate-100",
                     isInventoryOpen && "bg-slate-100",
