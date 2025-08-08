@@ -432,15 +432,15 @@ export default function InventoryPage() {
   return (
     <DashboardLayout>
       <div className="p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold">Inventario</h1>
-          <div className="flex items-center gap-4">
-            <div className="relative">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Buscar productos..."
-                className="pl-8 w-[250px]"
+                className="w-full pl-8 sm:w-[250px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -456,6 +456,7 @@ export default function InventoryPage() {
                 }
                 setIsQuickSaleOpen(true);
               }}
+              className="w-full sm:w-auto"
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
               Venta Rápida
@@ -463,7 +464,7 @@ export default function InventoryPage() {
             {user?.role === "admin" && (
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Producto
                   </Button>
