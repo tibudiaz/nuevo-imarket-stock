@@ -310,7 +310,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   ))}
                 </CollapsibleContent>
               </Collapsible>
-              
+
+              <NavItem href="/dashboard/low-stock" icon={AlertTriangle} label="Bajo Stock" active={pathname === "/dashboard/low-stock"} />
+
               <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
 
               <Collapsible open={isReservesOpen} onOpenChange={setIsReservesOpen} className="w-full">
