@@ -11,13 +11,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Search } from "lucide-react";
 import { ref, onValue } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useStore } from "@/hooks/use-store";
 
 interface Product {
   id: string;
@@ -33,6 +35,7 @@ interface Product {
   category?: string;
   model?: string;
   stock?: number;
+  store?: "local1" | "local2";
   [key: string]: any;
 }
 
@@ -40,9 +43,13 @@ const INITIAL_THRESHOLD = 5;
 
 export default function LowStockPage() {
   const { user, loading: authLoading } = useAuth();
+  const { selectedStore } = useStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockThreshold, setStockThreshold] = useState(INITIAL_THRESHOLD);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -84,15 +91,54 @@ export default function LowStockPage() {
     return () => unsubscribe();
   }, [user]);
 
+  useEffect(() => {
+    const categoriesRef = ref(database, "categories");
+    const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const categoryNames = Object.values(data)
+          .map((c: any) => c.name)
+          .filter(
+            (name: string) =>
+              name !== "Celulares Nuevos" && name !== "Celulares Usados"
+          ) as string[];
+        setCategories(categoryNames);
+      } else {
+        setCategories([]);
+      }
+    });
+    return () => unsubscribeCategories();
+  }, []);
+
   const filteredProducts = useMemo(() => {
     return products
-      .filter((p) => p.stock !== undefined && p.stock <= stockThreshold)
+      .filter((p) => {
+        const stockMatch = p.stock !== undefined && p.stock <= stockThreshold;
+        const storeMatch =
+          selectedStore === "all" || p.store === selectedStore;
+        const categoryMatch =
+          categoryFilter ? p.category === categoryFilter : true;
+        const terms = searchTerm
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(Boolean);
+        const searchable = `${(p.name || "")} ${(p.brand || "")} ${(p.model || "")} ${(p.category || "")}`.toLowerCase();
+        const searchMatch = terms.every((t) => searchable.includes(t));
+        return stockMatch && storeMatch && categoryMatch && searchMatch;
+      })
       .sort((a, b) =>
         sortOrder === "asc"
-          ? (a.stock! - b.stock!)
-          : (b.stock! - a.stock!)
+          ? a.stock! - b.stock!
+          : b.stock! - a.stock!
       );
-  }, [products, stockThreshold, sortOrder]);
+  }, [
+    products,
+    stockThreshold,
+    sortOrder,
+    selectedStore,
+    categoryFilter,
+    searchTerm,
+  ]);
 
   if (authLoading || !user) {
     return (
@@ -113,6 +159,15 @@ export default function LowStockPage() {
           <h1 className="text-2xl font-bold">Productos con Bajo Stock</h1>
         </div>
         <div className="flex flex-wrap items-center gap-4 mb-6">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar..."
+              className="pl-8 w-[200px]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           <div className="flex items-center gap-2">
             <Label htmlFor="threshold">Stock máximo:</Label>
             <Slider
@@ -139,6 +194,25 @@ export default function LowStockPage() {
               <SelectContent>
                 <SelectItem value="asc">Menor stock</SelectItem>
                 <SelectItem value="desc">Mayor stock</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label>Categoría:</Label>
+            <Select
+              value={categoryFilter}
+              onValueChange={(value) => setCategoryFilter(value)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
