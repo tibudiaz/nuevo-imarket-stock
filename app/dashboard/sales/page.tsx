@@ -68,6 +68,8 @@ export default function SalesPage() {
   const [weeklySales, setWeeklySales] = useState<SalesStats>({ count: 0, total: 0 })
   const [topProduct, setTopProduct] = useState<TopProductType>({ name: "", count: 0 })
   const [totalProducts, setTotalProducts] = useState(0)
+  const [totalRevenue, setTotalRevenue] = useState(0)
+  const [totalCost, setTotalCost] = useState(0)
   const [netProfit, setNetProfit] = useState(0)
   const [totalLoss, setTotalLoss] = useState(0)
   
@@ -96,6 +98,8 @@ export default function SalesPage() {
         setWeeklySales({ count: 0, total: 0 });
         setTopProduct({ name: "", count: 0 });
         setTotalProducts(0);
+        setTotalRevenue(0);
+        setTotalCost(0);
         setNetProfit(0);
         setTotalLoss(0);
       }
@@ -131,10 +135,12 @@ export default function SalesPage() {
 
     const productCounts: Record<string, number> = {}
     let productTotal = 0
-    let profit = 0
+    let revenue = 0
+    let costTotal = 0
     let loss = 0
 
     salesData.forEach((sale) => {
+      revenue += Number(sale.totalAmount)
       if (Array.isArray(sale.items)) {
         sale.items.forEach(item => {
           if (item.productName && typeof item.quantity === 'number') {
@@ -142,14 +148,15 @@ export default function SalesPage() {
           }
           productTotal += item.quantity
           const cost = products.find(p => p.id === item.productId)?.cost || 0
+          costTotal += Number(cost) * item.quantity
           const itemProfit = (Number(item.price) - Number(cost)) * item.quantity
-          profit += itemProfit
           if (itemProfit < 0) {
             loss += Math.abs(itemProfit)
           }
         })
       }
     })
+    const profit = revenue - costTotal
 
     let topProductName = ""
     let topCount = 0
@@ -164,6 +171,8 @@ export default function SalesPage() {
     setWeeklySales({ count: weekSales.length, total: weekTotal })
     setTopProduct({ name: topProductName, count: topCount })
     setTotalProducts(productTotal)
+    setTotalRevenue(revenue)
+    setTotalCost(costTotal)
     setNetProfit(profit)
     setTotalLoss(loss)
   }, [products])
@@ -219,67 +228,89 @@ export default function SalesPage() {
         </div>
 
         {user?.role === 'admin' && (
-          <div className="grid gap-4 md:grid-cols-6 mb-6">
+          <>
+            <div className="grid gap-4 md:grid-cols-4 mb-6">
               <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                  <div className="text-2xl font-bold">${dailySales.total.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">{dailySales.count} ventas hoy</p>
-                  </CardContent>
-              </Card>
-              <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Ventas de la Semana</CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                  <div className="text-2xl font-bold">${weeklySales.total.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">{weeklySales.count} ventas esta semana</p>
-                  </CardContent>
-              </Card>
-              <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Productos Más Vendidos</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                  <div className="text-lg font-medium">{topProduct.name || "Sin datos"}</div>
-                  <p className="text-xs text-muted-foreground">
-                      {topProduct.count > 0 ? `${topProduct.count} unidades vendidas` : "No hay ventas registradas"}
-                  </p>
-                  </CardContent>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+                </CardContent>
               </Card>
               <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Productos Vendidos</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Costos Totales</CardTitle>
                   <Package className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                  <div className="text-2xl font-bold">{totalProducts}</div>
-                  </CardContent>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${totalCost.toFixed(2)}</div>
+                </CardContent>
               </Card>
               <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">Ganancia Neta</CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
+                </CardHeader>
+                <CardContent>
                   <div className="text-2xl font-bold">${netProfit.toFixed(2)}</div>
-                  </CardContent>
+                </CardContent>
               </Card>
               <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">Pérdidas</CardTitle>
                   <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
+                </CardHeader>
+                <CardContent>
                   <div className="text-2xl font-bold">${totalLoss.toFixed(2)}</div>
-                  </CardContent>
+                </CardContent>
               </Card>
-          </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-4 mb-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${dailySales.total.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">{dailySales.count} ventas hoy</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Ventas de la Semana</CardTitle>
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${weeklySales.total.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">{weeklySales.count} ventas esta semana</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Producto Más Vendido</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg font-medium">{topProduct.name || "Sin datos"}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {topProduct.count > 0 ? `${topProduct.count} unidades vendidas` : "No hay ventas registradas"}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Productos Vendidos</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalProducts}</div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
         )}
 
         <div className="rounded-md border">
