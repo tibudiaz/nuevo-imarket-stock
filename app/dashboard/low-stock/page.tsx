@@ -29,7 +29,9 @@ import {
 interface Product {
   id: string;
   name?: string;
+  brand?: string;
   category?: string;
+  model?: string;
   stock?: number;
   [key: string]: any;
 }
@@ -146,16 +148,20 @@ export default function LowStockPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Producto</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Marca</TableHead>
                 <TableHead>Categoría</TableHead>
+                <TableHead>Modelo</TableHead>
                 <TableHead className="text-right">Stock Actual</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProducts.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>{p.category}</TableCell>
+                  <TableCell className="font-medium">{p.name || "Sin nombre"}</TableCell>
+                  <TableCell>{p.brand || "N/A"}</TableCell>
+                  <TableCell>{p.category || "N/A"}</TableCell>
+                  <TableCell>{p.model || "N/A"}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant="destructive">{p.stock}</Badge>
                   </TableCell>
