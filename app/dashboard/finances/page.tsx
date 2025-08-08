@@ -405,7 +405,7 @@ export default function FinancesPage() {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-3 overflow-x-auto">
             <TabsTrigger value="overview">Resumen</TabsTrigger>
             <TabsTrigger value="products">Productos</TabsTrigger>
             <TabsTrigger value="reports">Reportes</TabsTrigger>
@@ -476,7 +476,7 @@ export default function FinancesPage() {
                 <CardTitle>Rentabilidad por Producto</CardTitle>
                 <CardDescription>Análisis de costos, precios y márgenes de ganancia por producto.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

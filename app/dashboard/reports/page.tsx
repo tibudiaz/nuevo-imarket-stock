@@ -259,7 +259,7 @@ export default function ReportsPage() {
         </div>
 
         <Tabs defaultValue="sales" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 overflow-x-auto">
             <TabsTrigger value="sales">Ventas</TabsTrigger>
             <TabsTrigger value="inventory">Inventario</TabsTrigger>
             <TabsTrigger value="finances">Finanzas</TabsTrigger>
@@ -267,7 +267,7 @@ export default function ReportsPage() {
           </TabsList>
           <TabsContent value="sales" className="mt-6">
             <div className="grid gap-4 md:grid-cols-2">
-              <Card className="col-span-2">
+              <Card className="md:col-span-2">
                 <CardHeader>
                   <CardTitle>Ventas por Período</CardTitle>
                 </CardHeader>

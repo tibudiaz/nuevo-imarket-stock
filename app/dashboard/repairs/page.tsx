@@ -37,6 +37,7 @@ interface Repair {
   deliveryReceiptNumber?: string;
   finalPrice?: number;
   technicianNotes?: string;
+  store?: string;
   [key: string]: any;
 }
 
@@ -142,6 +143,7 @@ export default function RepairsPage() {
           entryDate: new Date().toISOString(),
           createdAt: Date.now(),
           status: 'pending' as const,
+          store: selectedStore === 'all' ? 'local1' : selectedStore,
       };
       
       await set(newRepairRef, finalRepairData);
@@ -186,9 +188,11 @@ export default function RepairsPage() {
   }
 
   const filteredRepairs = repairs.filter(r =>
-    (r.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (r.productName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (r.receiptNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
+    (selectedStore === 'all' || r.store === selectedStore) && (
+      (r.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.productName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.receiptNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   return (
@@ -220,13 +224,13 @@ export default function RepairsPage() {
               <TableRow>
                 <TableHead>N° Recibo</TableHead>
                 <TableHead>Cliente</TableHead>
-              <TableHead>Equipo</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Fecha de Ingreso</TableHead>
-              <TableHead>Precio Estimado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
+                <TableHead>Equipo</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Fecha de Ingreso</TableHead>
+                <TableHead>Precio Estimado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
