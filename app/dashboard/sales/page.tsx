@@ -181,6 +181,15 @@ export default function SalesPage() {
       (sale.items || []).some(item => (item.productName || "").toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
+  const calculateNetSale = useCallback((sale: Sale) => {
+    return (sale.items || []).reduce((sum, item) => {
+      const product = products.find(p => p.id === item.productId)
+      const unitCost = Number(product?.cost || 0)
+      const unitPrice = Number(item.price) * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
+      return sum + (unitPrice - unitCost) * item.quantity
+    }, 0)
+  }, [products])
+
   const handleViewDetails = (sale: Sale) => {
     setSelectedSale(sale);
     setIsDetailModalOpen(true);
@@ -279,52 +288,63 @@ export default function SalesPage() {
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Cliente</TableHead>
-                <TableHead>DNI</TableHead>
+                {user?.role === 'admin' && <TableHead>DNI</TableHead>}
                 <TableHead>Productos</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Método de Pago</TableHead>
+                {user?.role === 'admin' && <TableHead>Total Neto</TableHead>}
+                {user?.role === 'admin' && <TableHead>Método de Pago</TableHead>}
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSales.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                  <TableCell colSpan={user?.role === 'admin' ? 8 : 5} className="text-center py-6 text-muted-foreground">
                     No se encontraron ventas
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredSales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      {sale.customerName}
-                    </TableCell>
-                    <TableCell>{sale.customerDni}</TableCell>
-                    <TableCell>
+                filteredSales.map((sale) => {
+                  const netTotal = calculateNetSale(sale)
+                  return (
+                    <TableRow key={sale.id}>
+                      <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
+                      <TableCell className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        {sale.customerName}
+                      </TableCell>
+                      {user?.role === 'admin' && <TableCell>{sale.customerDni}</TableCell>}
+                      <TableCell>
                         {(sale.items || []).map(item => `${item.quantity}x ${item.productName}`).join(', ')}
-                    </TableCell>
-                    <TableCell>${Number(sale.totalAmount).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {sale.paymentMethod === "efectivo"
-                          ? "Efectivo"
-                          : sale.paymentMethod === "tarjeta"
-                            ? "Tarjeta"
-                            : "Transferencia"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
+                      </TableCell>
+                      <TableCell>${Number(sale.totalAmount).toFixed(2)}</TableCell>
+                      {user?.role === 'admin' && (
+                        <TableCell className={netTotal >= 0 ? "text-green-600" : "text-red-600"}>
+                          ${netTotal.toFixed(2)}
+                        </TableCell>
+                      )}
+                      {user?.role === 'admin' && (
+                        <TableCell>
+                          <Badge variant="outline">
+                            {sale.paymentMethod === "efectivo"
+                              ? "Efectivo"
+                              : sale.paymentMethod === "tarjeta"
+                                ? "Tarjeta"
+                                : "Transferencia"}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => handleViewDetails(sale)}>
-                            <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => downloadSaleReceipt(sale)}>
-                            <Download className="h-4 w-4" />
+                          <Download className="h-4 w-4" />
                         </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>
