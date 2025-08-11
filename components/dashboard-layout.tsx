@@ -317,10 +317,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
 
-              {user?.role === 'admin' && (
-                <NavItem href="/dashboard/caja" icon={Wallet} label="Caja" active={pathname === "/dashboard/caja"} />
-              )}
-
               <Collapsible open={isReservesOpen} onOpenChange={setIsReservesOpen} className="w-full">
                   <NavItem icon={ShoppingCart} label="Reservas" active={pathname.startsWith("/dashboard/reserves")} isCollapsible alert={expiringReserves}>
                       <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", isReservesOpen && "rotate-180")}/>
