@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react";
+import jsPDF from "jspdf";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -120,6 +121,15 @@ export default function CajaPage() {
     let profitUSD = 0;
     let cellphoneCount = 0;
 
+    let accCashARS = 0;
+    let accCashUSD = 0;
+    let accBankARS = 0;
+    let accBankUSD = 0;
+    let cellCashARS = 0;
+    let cellCashUSD = 0;
+    let cellBankARS = 0;
+    let cellBankUSD = 0;
+
     const productMap = new Map(
       (selectedStore === 'all' ? products : products.filter(p => p.store === selectedStore)).map(p => [p.id, p])
     );
@@ -127,6 +137,7 @@ export default function CajaPage() {
     filtered.forEach(sale => {
       const items = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
       let hasAccessory = false;
+      const pm = sale.paymentMethod?.toLowerCase();
       items.forEach(item => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.price || 0) * qty;
@@ -143,28 +154,38 @@ export default function CajaPage() {
           profitARS += price - cost;
         }
 
-        if (category === 'celulares nuevos') {
-          newPhones += qty;
-          cellphoneCount += qty;
-        } else if (category === 'celulares usados') {
-          usedPhones += qty;
+        const isCell = category === 'celulares nuevos' || category === 'celulares usados';
+        if (isCell) {
+          if (category === 'celulares nuevos') {
+            newPhones += qty;
+          } else if (category === 'celulares usados') {
+            usedPhones += qty;
+          }
           cellphoneCount += qty;
         } else {
           productsNoPhones += qty;
           hasAccessory = true;
         }
+
+        if (pm === 'efectivo') {
+          if (currency === 'USD') {
+            totalCashUSD += price;
+            if (isCell) cellCashUSD += price; else accCashUSD += price;
+          } else {
+            totalCashARS += price;
+            if (isCell) cellCashARS += price; else accCashARS += price;
+          }
+        } else if (pm && pm.includes('transfer')) {
+          if (currency === 'USD') {
+            totalBankUSD += price;
+            if (isCell) cellBankUSD += price; else accBankUSD += price;
+          } else {
+            totalBankARS += price;
+            if (isCell) cellBankARS += price; else accBankARS += price;
+          }
+        }
       });
       if (hasAccessory) accessorySales += 1;
-      const pm = sale.paymentMethod?.toLowerCase();
-      const saleTotalARS = items.filter(i => (i.currency || 'ARS') === 'ARS').reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
-      const saleTotalUSD = items.filter(i => (i.currency || 'ARS') === 'USD').reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
-      if (pm === 'efectivo') {
-        totalCashARS += saleTotalARS;
-        totalCashUSD += saleTotalUSD;
-      } else if (pm && pm.includes('transfer')) {
-        totalBankARS += saleTotalARS;
-        totalBankUSD += saleTotalUSD;
-      }
     });
 
     return {
@@ -182,6 +203,14 @@ export default function CajaPage() {
       profitARS,
       profitUSD,
       cellphoneCount,
+      accessoriesCashARS: accCashARS,
+      accessoriesCashUSD: accCashUSD,
+      accessoriesBankARS: accBankARS,
+      accessoriesBankUSD: accBankUSD,
+      cellphonesCashARS: cellCashARS,
+      cellphonesCashUSD: cellCashUSD,
+      cellphonesBankARS: cellBankARS,
+      cellphonesBankUSD: cellBankUSD,
     };
   }, [sales, products, lastClosure, selectedStore]);
 
@@ -203,6 +232,7 @@ export default function CajaPage() {
     try {
       await push(ref(database, 'cashClosures'), summary);
       setLastClosure(Date.now());
+      setSales([]);
       const text = `cantidad de productos vendidos: ${summary.cantidadProductosVendidos}\n` +
         `dinero total: ${summary.dineroTotal}\n` +
         `dinero total efectivo: ${summary.dineroTotalEfectivo}\n` +
@@ -225,6 +255,26 @@ export default function CajaPage() {
     } catch (e) {
       console.error('Error closing cash register', e);
     }
+  };
+
+  const handlePrintPDF = () => {
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString();
+    doc.text(`Resumen de Caja - ${today}`, 10, 10);
+    let y = 20;
+    const accessoriesUSD = metrics.accessoriesCashUSD + metrics.accessoriesBankUSD;
+    const cellphonesUSD = metrics.cellphonesCashUSD + metrics.cellphonesBankUSD;
+    doc.text('Accesorios', 10, y); y += 10;
+    doc.text(`Efectivo ARS: $${metrics.accessoriesCashARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Dólares: $${accessoriesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco ARS: $${metrics.accessoriesBankARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco USD: $${metrics.accessoriesBankUSD.toFixed(2)}`, 10, y); y += 20;
+    doc.text('Celulares', 10, y); y += 10;
+    doc.text(`Efectivo ARS: $${metrics.cellphonesCashARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco ARS: $${metrics.cellphonesBankARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco USD: $${metrics.cellphonesBankUSD.toFixed(2)}`, 10, y);
+    doc.save(`resumen_caja_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
@@ -341,9 +391,12 @@ export default function CajaPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col md:flex-row gap-2">
         <Button onClick={handleCloseCash} className="w-full md:w-auto" variant="destructive">
           Cerrar Caja
+        </Button>
+        <Button onClick={handlePrintPDF} className="w-full md:w-auto" variant="secondary">
+          Imprimir PDF
         </Button>
       </div>
     </DashboardLayout>
