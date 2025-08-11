@@ -22,6 +22,7 @@ import {
   Store,
   AlertTriangle,
   Image,
+  Wallet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -314,6 +315,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <NavItem href="/dashboard/low-stock" icon={AlertTriangle} label="Bajo Stock" active={pathname === "/dashboard/low-stock"} />
 
               <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
+
+              <NavItem href="/dashboard/caja" icon={Wallet} label="Caja" active={pathname === "/dashboard/caja"} />
 
               <Collapsible open={isReservesOpen} onOpenChange={setIsReservesOpen} className="w-full">
                   <NavItem icon={ShoppingCart} label="Reservas" active={pathname.startsWith("/dashboard/reserves")} isCollapsible alert={expiringReserves}>
