@@ -280,6 +280,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <DropdownMenuSeparator />
                 {user?.role === "admin" && (
                   <>
+                    <DropdownMenuItem asChild><Link href="/dashboard/caja"><Wallet className="mr-2 h-4 w-4" /><span>Caja</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/finances"><DollarSign className="mr-2 h-4 w-4" /><span>Finanzas</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/reports"><BarChart className="mr-2 h-4 w-4" /><span>Reportes</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/notifications"><Bell className="mr-2 h-4 w-4" /><span>Notificaciones</span></Link></DropdownMenuItem>
@@ -316,7 +317,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
 
-              <NavItem href="/dashboard/caja" icon={Wallet} label="Caja" active={pathname === "/dashboard/caja"} />
+              {user?.role === 'admin' && (
+                <NavItem href="/dashboard/caja" icon={Wallet} label="Caja" active={pathname === "/dashboard/caja"} />
+              )}
 
               <Collapsible open={isReservesOpen} onOpenChange={setIsReservesOpen} className="w-full">
                   <NavItem icon={ShoppingCart} label="Reservas" active={pathname.startsWith("/dashboard/reserves")} isCollapsible alert={expiringReserves}>
