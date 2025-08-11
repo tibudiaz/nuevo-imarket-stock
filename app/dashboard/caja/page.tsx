@@ -9,6 +9,7 @@ import { Package, Smartphone, DollarSign, Wallet, CreditCard } from "lucide-reac
 import { ref, onValue, push } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
+import { useStore } from "@/hooks/use-store";
 
 interface SaleItem {
   productId: string;
@@ -24,17 +25,20 @@ interface Sale {
   date: string;
   items: SaleItem[];
   paymentMethod?: string;
+  store?: string;
 }
 
 interface Product {
   id: string;
   cost?: number;
   category?: string;
+  store?: string;
 }
 
 export default function CajaPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { selectedStore } = useStore();
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [lastClosure, setLastClosure] = useState<number>(0);
@@ -77,7 +81,13 @@ export default function CajaPage() {
       let last = 0;
       snapshot.forEach((child) => {
         const val = child.val();
-        if (val.timestamp && val.timestamp > last) last = val.timestamp;
+        if (
+          val.timestamp &&
+          (selectedStore === 'all' || val.store === selectedStore) &&
+          val.timestamp > last
+        ) {
+          last = val.timestamp;
+        }
       });
       setLastClosure(last);
     });
@@ -87,10 +97,13 @@ export default function CajaPage() {
       unsubscribeProducts();
       unsubscribeClosures();
     };
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, selectedStore]);
 
   const metrics = useMemo(() => {
-    const filtered = sales.filter(s => new Date(s.date).getTime() > lastClosure);
+    const filtered = sales.filter(s =>
+      new Date(s.date).getTime() > lastClosure &&
+      (selectedStore === 'all' || s.store === selectedStore)
+    );
     let accessorySales = 0;
     let productsNoPhones = 0;
     let newPhones = 0;
@@ -107,7 +120,9 @@ export default function CajaPage() {
     let profitUSD = 0;
     let cellphoneCount = 0;
 
-    const productMap = new Map(products.map(p => [p.id, p]));
+    const productMap = new Map(
+      (selectedStore === 'all' ? products : products.filter(p => p.store === selectedStore)).map(p => [p.id, p])
+    );
 
     filtered.forEach(sale => {
       const items = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
@@ -168,7 +183,7 @@ export default function CajaPage() {
       profitUSD,
       cellphoneCount,
     };
-  }, [sales, products, lastClosure]);
+  }, [sales, products, lastClosure, selectedStore]);
 
   const handleCloseCash = async () => {
     const summary = {
@@ -183,6 +198,7 @@ export default function CajaPage() {
       dineroTotalEfectivoUSD: metrics.totalCashUSD,
       dineroTotalBancoUSD: metrics.totalBankUSD,
       timestamp: Date.now(),
+      store: selectedStore,
     };
     try {
       await push(ref(database, 'cashClosures'), summary);
