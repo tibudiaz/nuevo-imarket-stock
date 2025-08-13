@@ -100,11 +100,17 @@ export default function CajaPage() {
     };
   }, [authLoading, user, router, selectedStore]);
 
+  const filteredSales = useMemo(() =>
+    sales.filter(
+      (s) =>
+        new Date(s.date).getTime() > lastClosure &&
+        (selectedStore === 'all' || s.store === selectedStore)
+    ),
+    [sales, lastClosure, selectedStore]
+  );
+
   const metrics = useMemo(() => {
-    const filtered = sales.filter(s =>
-      new Date(s.date).getTime() > lastClosure &&
-      (selectedStore === 'all' || s.store === selectedStore)
-    );
+    const filtered = filteredSales;
     let accessorySales = 0;
     let productsNoPhones = 0;
     let newPhones = 0;
@@ -212,7 +218,7 @@ export default function CajaPage() {
       cellphonesBankARS: cellBankARS,
       cellphonesBankUSD: cellBankUSD,
     };
-  }, [sales, products, lastClosure, selectedStore]);
+  }, [filteredSales, products, selectedStore]);
 
   const handleCloseCash = async () => {
     const summary = {
@@ -230,7 +236,7 @@ export default function CajaPage() {
       store: selectedStore,
     };
     try {
-      await push(ref(database, 'cashClosures'), summary);
+      await push(ref(database, 'cashClosures'), { ...summary, sales: filteredSales });
       setLastClosure(Date.now());
       setSales([]);
       const text = `cantidad de productos vendidos: ${summary.cantidadProductosVendidos}\n` +
