@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -71,10 +71,26 @@ export default function SalesPage() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalCost, setTotalCost] = useState(0)
   const [netProfit, setNetProfit] = useState(0)
-  const [totalLoss, setTotalLoss] = useState(0)
-  
-  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+    const [totalLoss, setTotalLoss] = useState(0)
+    const [lastClosure, setLastClosure] = useState<number>(0)
+
+    const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+
+    useEffect(() => {
+      const closuresRef = ref(database, "cashClosures");
+      const unsubscribe = onValue(closuresRef, (snapshot) => {
+        let last = 0;
+        snapshot.forEach((child) => {
+          const val = child.val();
+          if (val.timestamp && val.timestamp > last) {
+            last = val.timestamp;
+          }
+        });
+        setLastClosure(last);
+      });
+      return () => unsubscribe();
+    }, []);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -120,8 +136,13 @@ export default function SalesPage() {
       unsubscribeSales();
       unsubscribeProducts();
     };
-  }, [authLoading, user]);
-  const calculateSalesStats = useCallback((salesData: Sale[]) => {
+    }, [authLoading, user]);
+    const salesAfterClosure = useMemo(
+      () => sales.filter(sale => new Date(sale.date).getTime() > lastClosure),
+      [sales, lastClosure]
+    );
+
+    const calculateSalesStats = useCallback((salesData: Sale[]) => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekStart = new Date(today)
@@ -178,12 +199,14 @@ export default function SalesPage() {
   }, [products])
 
   useEffect(() => {
-    if (sales.length > 0) {
-      calculateSalesStats(sales)
+    if (salesAfterClosure.length > 0) {
+      calculateSalesStats(salesAfterClosure)
+    } else {
+      calculateSalesStats([])
     }
-  }, [sales, calculateSalesStats])
+  }, [salesAfterClosure, calculateSalesStats])
 
-  const filteredSales = sales.filter(
+  const filteredSales = salesAfterClosure.filter(
     (sale) =>
       (sale.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (sale.customerDni || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
