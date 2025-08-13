@@ -72,8 +72,24 @@ export default function Dashboard() {
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
   const [reserves, setReserves] = useState<Reserve[]>([]);
+  const [lastClosure, setLastClosure] = useState<number>(0);
 
   // Se elimina el useEffect que manejaba la autenticación localmente
+
+  useEffect(() => {
+    const closuresRef = ref(database, "cashClosures");
+    const unsubscribe = onValue(closuresRef, (snapshot) => {
+      let last = 0;
+      snapshot.forEach((child) => {
+        const val = child.val();
+        if (val.timestamp && val.timestamp > last) {
+          last = val.timestamp;
+        }
+      });
+      setLastClosure(last);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!user) return; // Espera a que el usuario esté verificado por el hook
@@ -160,7 +176,7 @@ export default function Dashboard() {
         const salesData: Sale[] = []
         let totalSalesAmount = 0
         const monthlySales: { [key: string]: number } = {}
-        
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -171,15 +187,17 @@ export default function Dashboard() {
             id: childSnapshot.key || "",
             ...childSnapshot.val(),
           }
+          const saleDate = new Date(sale.date || "")
+          if (saleDate.getTime() <= lastClosure) {
+            return;
+          }
           salesData.push(sale)
           totalSalesAmount += Number(sale.totalAmount || 0)
 
-          const saleDate = new Date(sale.date || "")
-          
           if (sale.date && saleDate >= today) {
               salesFromToday.push(sale);
           }
-          
+
           const month = saleDate.toLocaleString("es-AR", { month: "short" })
           monthlySales[month] = (monthlySales[month] || 0) + Number(sale.totalAmount || 0)
         })
@@ -215,9 +233,9 @@ export default function Dashboard() {
         }))
       }
     })
-    
+
     return () => unsubscribeSales();
-  }, [products]);
+  }, [products, lastClosure]);
 
   if (authLoading || !user) { // Se usa el estado de carga del hook
     return <div className="flex h-screen items-center justify-center">Cargando...</div>
