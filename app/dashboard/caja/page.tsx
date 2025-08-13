@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import jsPDF from "jspdf";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -403,6 +404,9 @@ export default function CajaPage() {
         </Button>
         <Button onClick={handlePrintPDF} className="w-full md:w-auto" variant="secondary">
           Imprimir PDF
+        </Button>
+        <Button asChild className="w-full md:w-auto">
+          <Link href="/dashboard/caja/cierres">Ver cierres anteriores</Link>
         </Button>
       </div>
     </DashboardLayout>
