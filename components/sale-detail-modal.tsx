@@ -19,6 +19,9 @@ interface Sale {
   items: SaleItem[]
   totalAmount: number
   paymentMethod?: string
+  cashAmount?: number
+  transferAmount?: number
+  cardAmount?: number
   receiptNumber?: string
   usdRate?: number
   [key: string]: any
@@ -112,9 +115,20 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
             </Table>
           </div>
           <div className="mt-4 flex justify-end items-center gap-4">
-            <div className="text-sm">
-              Método de Pago: <Badge variant="outline">{sale.paymentMethod}</Badge>
-            </div>
+            {sale.paymentMethod === "multiple" ? (
+              <div className="text-sm space-y-1">
+                <div>
+                  Método de Pago: <Badge variant="outline">Múltiple</Badge>
+                </div>
+                <div>Efectivo: ${ (sale.cashAmount ?? 0).toFixed(2) }</div>
+                <div>Transferencia: ${ (sale.transferAmount ?? 0).toFixed(2) }</div>
+                <div>Tarjeta: ${ (sale.cardAmount ?? 0).toFixed(2) }</div>
+              </div>
+            ) : (
+              <div className="text-sm">
+                Método de Pago: <Badge variant="outline">{sale.paymentMethod}</Badge>
+              </div>
+            )}
             <div className="text-xl font-bold">
               Total: ${sale.totalAmount.toFixed(2)}
             </div>

@@ -61,6 +61,9 @@ interface Sale {
     customerPhone: string;
     items: any[]; // Se mantiene flexible para los items de la venta
     paymentMethod: string;
+    cashAmount?: number;
+    transferAmount?: number;
+    cardAmount?: number;
     totalAmount: number;
     tradeIn: any;
     usdRate: number;
@@ -107,6 +110,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [isSearching, setIsSearching] = useState(false)
   const [customer, setCustomer] = useState({ name: "", dni: "", phone: "", email: "" })
   const [paymentMethod, setPaymentMethod] = useState("efectivo")
+  const [cashAmount, setCashAmount] = useState(0)
+  const [transferAmount, setTransferAmount] = useState(0)
+  const [cardAmount, setCardAmount] = useState(0)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [completedReserve, setCompletedReserve] = useState<Reserve | null>(null)
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false)
@@ -131,6 +137,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [pointValue, setPointValue] = useState(DEFAULT_POINT_VALUE);
   const [pointsPaused, setPointsPaused] = useState(false);
   const [saleStore, setSaleStore] = useState<"local1" | "local2" | null>(null);
+
+  useEffect(() => {
+    if (paymentMethod !== "multiple") {
+      setCashAmount(0)
+      setTransferAmount(0)
+      setCardAmount(0)
+    }
+  }, [paymentMethod])
 
   useEffect(() => {
     if (isOpen) {
@@ -350,6 +364,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         toast.error("No se detectó el local");
         return;
     }
+    if (paymentMethod === "multiple") {
+        const sum = cashAmount + transferAmount + cardAmount;
+        if (Math.abs(sum - finalTotal) > 0.01) {
+            toast.error("La suma de los montos no coincide con el total");
+            return;
+        }
+    }
     setIsLoading(true);
 
     try {
@@ -448,6 +469,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 category: item.category || null,
             })),
             paymentMethod,
+            ...(paymentMethod === "multiple" ? { cashAmount, transferAmount, cardAmount } : {}),
             totalAmount: finalTotal,
             tradeIn: isTradeIn ? tradeInProduct : null,
             usdRate,
@@ -706,7 +728,33 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                   <div className="space-y-2"><Label htmlFor="customerName">Nombre Cliente</Label><Input id="customerName" value={customer.name} onChange={(e) => setCustomer({...customer, name: e.target.value})}/></div>
                   <div className="space-y-2"><Label htmlFor="customerPhone" className="flex items-center gap-1.5"><Phone className="h-4 w-4"/>Teléfono</Label><Input id="customerPhone" value={customer.phone} onChange={(e) => setCustomer({...customer, phone: e.target.value})}/></div>
                   <div className="space-y-2"><Label htmlFor="customerEmail" className="flex items-center gap-1.5"><Mail className="h-4 w-4"/>Email (Opcional)</Label><Input id="customerEmail" value={customer.email} onChange={(e) => setCustomer({...customer, email: e.target.value})}/></div>
-                  <div className="space-y-2"><Label>Método de Pago</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="tarjeta">Tarjeta</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem></SelectContent></Select></div>
+                  <div className="space-y-2"><Label>Método de Pago</Label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="efectivo">Efectivo</SelectItem>
+                        <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                        <SelectItem value="transferencia">Transferencia</SelectItem>
+                        <SelectItem value="multiple">Pago Múltiple</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {paymentMethod === "multiple" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <Label>Monto Efectivo</Label>
+                        <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value) || 0)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Monto Transferencia</Label>
+                        <Input type="number" value={transferAmount} onChange={(e) => setTransferAmount(Number(e.target.value) || 0)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Monto Tarjeta</Label>
+                        <Input type="number" value={cardAmount} onChange={(e) => setCardAmount(Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                  )}
                   {!pointsPaused && availablePoints > 0 && (
                     <div className="flex items-center space-x-2">
                       <Checkbox id="use-points" checked={usePoints} onCheckedChange={(checked) => setUsePoints(!!checked)} />

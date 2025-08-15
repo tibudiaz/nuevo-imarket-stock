@@ -60,7 +60,8 @@ export default function CustomerDetailModal({ isOpen, onClose, customer }: Custo
         doc.text(date, 20, y)
         doc.text(purchase.productName, 70, y)
         doc.text(`$${Number(purchase.salePrice).toFixed(2)}`, 150, y)
-        doc.text(purchase.paymentMethod, 180, y)
+        const pm = purchase.paymentMethod === 'multiple' ? 'multiple' : purchase.paymentMethod
+        doc.text(pm, 180, y)
         y += 10
 
         // Si llegamos al final de la página, crear una nueva
@@ -200,7 +201,9 @@ export default function CustomerDetailModal({ isOpen, onClose, customer }: Custo
                                     ? "Transferencia"
                                     : purchase.paymentMethod === "mercadopago"
                                       ? "Mercado Pago"
-                                      : purchase.paymentMethod}
+                                      : purchase.paymentMethod === "multiple"
+                                        ? "Múltiple"
+                                        : purchase.paymentMethod}
                             </Badge>
                           </TableCell>
                         </TableRow>
