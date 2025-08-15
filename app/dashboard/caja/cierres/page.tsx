@@ -111,12 +111,17 @@ export default function CashClosuresPage() {
 
   return (
     <DashboardLayout title="Cierres de Caja">
-      <Input
-        type="date"
-        value={filterDate}
-        onChange={(e) => setFilterDate(e.target.value)}
-        className="mb-4 w-fit"
-      />
+      <div className="mb-4 flex items-center gap-2">
+        <Button variant="secondary" onClick={() => router.back()}>
+          Volver
+        </Button>
+        <Input
+          type="date"
+          value={filterDate}
+          onChange={(e) => setFilterDate(e.target.value)}
+          className="w-fit"
+        />
+      </div>
       <div className="space-y-4">
         {filtered.map((c) => (
           <Card key={c.id}>
