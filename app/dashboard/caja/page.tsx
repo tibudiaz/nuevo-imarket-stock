@@ -16,10 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Package, Smartphone, DollarSign, Wallet, CreditCard } from "lucide-react";
-import { ref, onValue, push, set } from "firebase/database";
+import { ref, onValue, push } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 import { useStore } from "@/hooks/use-store";
+import { toast } from "sonner";
 
 interface SaleItem {
   productId: string;
@@ -280,15 +281,19 @@ export default function CajaPage() {
       note,
     };
     try {
-      const closureRef = push(ref(database, 'cashClosures'));
-      await set(closureRef, { ...summary, sales: filteredSales });
+      await push(ref(database, "cashClosures"), {
+        ...summary,
+        sales: filteredSales,
+      });
       generatePDF(summary);
       setLastClosure(summary.timestamp);
       setSales([]);
       setNote("");
       setDialogOpen(false);
+      toast.success("Caja cerrada correctamente");
     } catch (e) {
-      console.error('Error closing cash register', e);
+      console.error("Error closing cash register", e);
+      toast.error("Error al cerrar la caja");
     }
   };
 
