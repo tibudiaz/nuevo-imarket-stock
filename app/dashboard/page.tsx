@@ -72,24 +72,8 @@ export default function Dashboard() {
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
   const [reserves, setReserves] = useState<Reserve[]>([]);
-  const [lastClosure, setLastClosure] = useState<number>(0);
 
   // Se elimina el useEffect que manejaba la autenticación localmente
-
-  useEffect(() => {
-    const closuresRef = ref(database, "cashClosures");
-    const unsubscribe = onValue(closuresRef, (snapshot) => {
-      let last = 0;
-      snapshot.forEach((child) => {
-        const val = child.val();
-        if (val.timestamp && val.timestamp > last) {
-          last = val.timestamp;
-        }
-      });
-      setLastClosure(last);
-    });
-    return () => unsubscribe();
-  }, []);
 
   useEffect(() => {
     if (!user) return; // Espera a que el usuario esté verificado por el hook
@@ -188,9 +172,6 @@ export default function Dashboard() {
             ...childSnapshot.val(),
           }
           const saleDate = new Date(sale.date || "")
-          if (saleDate.getTime() <= lastClosure) {
-            return;
-          }
           salesData.push(sale)
           totalSalesAmount += Number(sale.totalAmount || 0)
 
@@ -235,7 +216,7 @@ export default function Dashboard() {
     })
 
     return () => unsubscribeSales();
-  }, [products, lastClosure]);
+  }, [products]);
 
   if (authLoading || !user) { // Se usa el estado de carga del hook
     return <div className="flex h-screen items-center justify-center">Cargando...</div>
