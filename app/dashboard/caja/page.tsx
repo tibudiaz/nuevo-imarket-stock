@@ -7,6 +7,14 @@ import Link from "next/link";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Package, Smartphone, DollarSign, Wallet, CreditCard } from "lucide-react";
 import { ref, onValue, push } from "firebase/database";
 import { database } from "@/lib/firebase";
@@ -44,6 +52,8 @@ export default function CajaPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [lastClosure, setLastClosure] = useState<number>(0);
+  const [note, setNote] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -221,6 +231,30 @@ export default function CajaPage() {
     };
   }, [filteredSales, products, selectedStore]);
 
+  const generatePDF = (summary: any) => {
+    const doc = new jsPDF();
+    const today = new Date(summary.timestamp).toLocaleDateString();
+    doc.text(`Resumen de Caja - ${today}`, 10, 10);
+    let y = 20;
+    const accessoriesUSD = summary.accessoriesCashUSD + summary.accessoriesBankUSD;
+    const cellphonesUSD = summary.cellphonesCashUSD + summary.cellphonesBankUSD;
+    doc.text('Accesorios', 10, y); y += 10;
+    doc.text(`Efectivo ARS: $${summary.accessoriesCashARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Dólares: $${accessoriesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco ARS: $${summary.accessoriesBankARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco USD: $${summary.accessoriesBankUSD.toFixed(2)}`, 10, y); y += 20;
+    doc.text('Celulares', 10, y); y += 10;
+    doc.text(`Efectivo ARS: $${summary.cellphonesCashARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco ARS: $${summary.cellphonesBankARS.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco USD: $${summary.cellphonesBankUSD.toFixed(2)}`, 10, y); y += 20;
+    if (summary.note) {
+      doc.text('Notas:', 10, y); y += 10;
+      doc.text(summary.note, 10, y);
+    }
+    doc.save(`resumen_caja_${new Date(summary.timestamp).toISOString().split('T')[0]}.pdf`);
+  };
+
   const handleCloseCash = async () => {
     const summary = {
       cantidadProductosVendidos: metrics.totalProducts,
@@ -233,55 +267,44 @@ export default function CajaPage() {
       gananciasLimpiasUSD: metrics.profitUSD,
       dineroTotalEfectivoUSD: metrics.totalCashUSD,
       dineroTotalBancoUSD: metrics.totalBankUSD,
+      accessoriesCashARS: metrics.accessoriesCashARS,
+      accessoriesCashUSD: metrics.accessoriesCashUSD,
+      accessoriesBankARS: metrics.accessoriesBankARS,
+      accessoriesBankUSD: metrics.accessoriesBankUSD,
+      cellphonesCashARS: metrics.cellphonesCashARS,
+      cellphonesCashUSD: metrics.cellphonesCashUSD,
+      cellphonesBankARS: metrics.cellphonesBankARS,
+      cellphonesBankUSD: metrics.cellphonesBankUSD,
       timestamp: Date.now(),
       store: selectedStore,
+      note,
     };
     try {
       await push(ref(database, 'cashClosures'), { ...summary, sales: filteredSales });
-      setLastClosure(Date.now());
+      generatePDF(summary);
+      setLastClosure(summary.timestamp);
       setSales([]);
-      const text = `cantidad de productos vendidos: ${summary.cantidadProductosVendidos}\n` +
-        `dinero total: ${summary.dineroTotal}\n` +
-        `dinero total efectivo: ${summary.dineroTotalEfectivo}\n` +
-        `dinero total banco: ${summary.dineroTotalBanco}\n` +
-        `ganancias limpias: ${summary.gananciasLimpias}\n` +
-        `cantidad de celulares vendidos: ${summary.cantidadCelularesVendidos}\n` +
-        `dinero total en usd: ${summary.dineroTotalUSD}\n` +
-        `ganancias limpias en usd: ${summary.gananciasLimpiasUSD}\n` +
-        `dinero total en efectivo usd: ${summary.dineroTotalEfectivoUSD}\n` +
-        `dinero total en banco usd: ${summary.dineroTotalBancoUSD}`;
-      const blob = new Blob([text], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `cierre_caja_${new Date().toISOString().split('T')[0]}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      setNote("");
+      setDialogOpen(false);
     } catch (e) {
       console.error('Error closing cash register', e);
     }
   };
 
   const handlePrintPDF = () => {
-    const doc = new jsPDF();
-    const today = new Date().toLocaleDateString();
-    doc.text(`Resumen de Caja - ${today}`, 10, 10);
-    let y = 20;
-    const accessoriesUSD = metrics.accessoriesCashUSD + metrics.accessoriesBankUSD;
-    const cellphonesUSD = metrics.cellphonesCashUSD + metrics.cellphonesBankUSD;
-    doc.text('Accesorios', 10, y); y += 10;
-    doc.text(`Efectivo ARS: $${metrics.accessoriesCashARS.toFixed(2)}`, 10, y); y += 10;
-    doc.text(`Dólares: $${accessoriesUSD.toFixed(2)}`, 10, y); y += 10;
-    doc.text(`Banco ARS: $${metrics.accessoriesBankARS.toFixed(2)}`, 10, y); y += 10;
-    doc.text(`Banco USD: $${metrics.accessoriesBankUSD.toFixed(2)}`, 10, y); y += 20;
-    doc.text('Celulares', 10, y); y += 10;
-    doc.text(`Efectivo ARS: $${metrics.cellphonesCashARS.toFixed(2)}`, 10, y); y += 10;
-    doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
-    doc.text(`Banco ARS: $${metrics.cellphonesBankARS.toFixed(2)}`, 10, y); y += 10;
-    doc.text(`Banco USD: $${metrics.cellphonesBankUSD.toFixed(2)}`, 10, y);
-    doc.save(`resumen_caja_${new Date().toISOString().split('T')[0]}.pdf`);
+    const summary = {
+      accessoriesCashARS: metrics.accessoriesCashARS,
+      accessoriesCashUSD: metrics.accessoriesCashUSD,
+      accessoriesBankARS: metrics.accessoriesBankARS,
+      accessoriesBankUSD: metrics.accessoriesBankUSD,
+      cellphonesCashARS: metrics.cellphonesCashARS,
+      cellphonesCashUSD: metrics.cellphonesCashUSD,
+      cellphonesBankARS: metrics.cellphonesBankARS,
+      cellphonesBankUSD: metrics.cellphonesBankUSD,
+      timestamp: Date.now(),
+      note,
+    };
+    generatePDF(summary);
   };
 
   return (
@@ -399,7 +422,7 @@ export default function CajaPage() {
         </Card>
       </div>
       <div className="mt-6 flex flex-col md:flex-row gap-2">
-        <Button onClick={handleCloseCash} className="w-full md:w-auto" variant="destructive">
+        <Button onClick={() => setDialogOpen(true)} className="w-full md:w-auto" variant="destructive">
           Cerrar Caja
         </Button>
         <Button onClick={handlePrintPDF} className="w-full md:w-auto" variant="secondary">
@@ -409,6 +432,24 @@ export default function CajaPage() {
           <Link href="/dashboard/caja/cierres">Ver cierres anteriores</Link>
         </Button>
       </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anotaciones del cierre</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Agregar anotación"
+          />
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCloseCash}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

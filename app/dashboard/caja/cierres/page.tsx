@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ref, onValue } from "firebase/database";
+import jsPDF from "jspdf";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { database } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -35,6 +37,15 @@ interface Closure {
   gananciasLimpiasUSD: number;
   dineroTotalEfectivoUSD: number;
   dineroTotalBancoUSD: number;
+  accessoriesCashARS?: number;
+  accessoriesCashUSD?: number;
+  accessoriesBankARS?: number;
+  accessoriesBankUSD?: number;
+  cellphonesCashARS?: number;
+  cellphonesCashUSD?: number;
+  cellphonesBankARS?: number;
+  cellphonesBankUSD?: number;
+  note?: string;
   sales?: Sale[];
 }
 
@@ -74,6 +85,30 @@ export default function CashClosuresPage() {
       )
     : closures;
 
+  const handlePrintPDF = (c: Closure) => {
+    const doc = new jsPDF();
+    const date = new Date(c.timestamp).toLocaleDateString();
+    doc.text(`Resumen de Caja - ${date}`, 10, 10);
+    let y = 20;
+    const accessoriesUSD = (c.accessoriesCashUSD || 0) + (c.accessoriesBankUSD || 0);
+    const cellphonesUSD = (c.cellphonesCashUSD || 0) + (c.cellphonesBankUSD || 0);
+    doc.text('Accesorios', 10, y); y += 10;
+    doc.text(`Efectivo ARS: $${(c.accessoriesCashARS || 0).toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Dólares: $${accessoriesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco ARS: $${(c.accessoriesBankARS || 0).toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco USD: $${(c.accessoriesBankUSD || 0).toFixed(2)}`, 10, y); y += 20;
+    doc.text('Celulares', 10, y); y += 10;
+    doc.text(`Efectivo ARS: $${(c.cellphonesCashARS || 0).toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco ARS: $${(c.cellphonesBankARS || 0).toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Banco USD: $${(c.cellphonesBankUSD || 0).toFixed(2)}`, 10, y); y += 20;
+    if (c.note) {
+      doc.text('Notas:', 10, y); y += 10;
+      doc.text(c.note, 10, y);
+    }
+    doc.save(`resumen_caja_${new Date(c.timestamp).toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <DashboardLayout title="Cierres de Caja">
       <Input
@@ -94,6 +129,7 @@ export default function CashClosuresPage() {
               <p>Productos vendidos: {c.cantidadProductosVendidos}</p>
               <p>Dinero total ARS: ${c.dineroTotal.toFixed(2)}</p>
               <p>Dinero total USD: ${c.dineroTotalUSD.toFixed(2)}</p>
+              {c.note && <p>Nota: {c.note}</p>}
               <details className="mt-2">
                 <summary>Ver detalles</summary>
                 {c.sales?.map((sale) => (
@@ -108,6 +144,9 @@ export default function CashClosuresPage() {
                   </div>
                 ))}
               </details>
+              <Button onClick={() => handlePrintPDF(c)} className="mt-2">
+                Imprimir PDF
+              </Button>
             </CardContent>
           </Card>
         ))}
