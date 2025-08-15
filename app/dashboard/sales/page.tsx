@@ -37,6 +37,9 @@ interface Sale {
   items: SaleItem[]
   totalAmount: number
   paymentMethod?: string
+  cashAmount?: number
+  transferAmount?: number
+  cardAmount?: number
   [key: string]: any
 }
 
@@ -384,7 +387,11 @@ export default function SalesPage() {
                               ? "Efectivo"
                               : sale.paymentMethod === "tarjeta"
                                 ? "Tarjeta"
-                                : "Transferencia"}
+                                : sale.paymentMethod === "transferencia"
+                                  ? "Transferencia"
+                                  : sale.paymentMethod === "multiple"
+                                    ? "Múltiple"
+                                    : sale.paymentMethod}
                           </Badge>
                         </TableCell>
                       )}

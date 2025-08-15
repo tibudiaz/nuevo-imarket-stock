@@ -55,6 +55,9 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
+  const [cashAmount, setCashAmount] = useState(0);
+  const [transferAmount, setTransferAmount] = useState(0);
+  const [cardAmount, setCardAmount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -75,8 +78,19 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
       setSearchTerm("");
       setCart([]);
       setPaymentMethod("efectivo");
+      setCashAmount(0);
+      setTransferAmount(0);
+      setCardAmount(0);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (paymentMethod !== "multiple") {
+      setCashAmount(0);
+      setTransferAmount(0);
+      setCardAmount(0);
+    }
+  }, [paymentMethod]);
 
   const filteredProducts = useMemo(() => {
     const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
@@ -138,6 +152,13 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
       toast.error("El carrito está vacío");
       return;
     }
+    if (paymentMethod === "multiple") {
+      const sum = cashAmount + transferAmount + cardAmount;
+      if (Math.abs(sum - totalAmount) > 0.01) {
+        toast.error("La suma de los montos no coincide con el total");
+        return;
+      }
+    }
     setIsLoading(true);
     try {
       // Update stock
@@ -170,6 +191,9 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
         })),
         totalAmount,
         paymentMethod,
+        ...(paymentMethod === "multiple"
+          ? { cashAmount, transferAmount, cardAmount }
+          : {}),
         store: store === "local2" ? "local2" : "local1",
       };
       await set(saleRef, saleData);
@@ -325,10 +349,40 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="efectivo">Efectivo</SelectItem>
+                <SelectItem value="tarjeta">Tarjeta</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
+                <SelectItem value="multiple">Pago Múltiple</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {paymentMethod === "multiple" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label>Monto Efectivo</Label>
+                <Input
+                  type="number"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(Number(e.target.value) || 0)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto Transferencia</Label>
+                <Input
+                  type="number"
+                  value={transferAmount}
+                  onChange={(e) => setTransferAmount(Number(e.target.value) || 0)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto Tarjeta</Label>
+                <Input
+                  type="number"
+                  value={cardAmount}
+                  onChange={(e) => setCardAmount(Number(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+          )}
           <div className="flex justify-between font-medium">
             <span>Total</span>
             <span>${totalAmount.toFixed(2)}</span>

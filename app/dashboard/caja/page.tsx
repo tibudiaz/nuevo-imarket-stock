@@ -36,6 +36,10 @@ interface Sale {
   date: string;
   items: SaleItem[];
   paymentMethod?: string;
+  cashAmount?: number;
+  transferAmount?: number;
+  cardAmount?: number;
+  usdRate?: number;
   store?: string;
 }
 
@@ -156,12 +160,15 @@ export default function CajaPage() {
       const items = Array.isArray(sale.items) ? sale.items : Object.values(sale.items || {});
       let hasAccessory = false;
       const pm = sale.paymentMethod?.toLowerCase();
+      let accessoryTotalARS = 0;
+      let cellphoneTotalARS = 0;
       items.forEach(item => {
         const qty = Number(item.quantity || 0);
         const price = Number(item.price || 0) * qty;
         const cost = Number(productMap.get(item.productId)?.cost || 0) * qty;
         const category = (item.category || '').toLowerCase();
         const currency = item.currency || 'ARS';
+        const priceInARS = currency === 'USD' ? price * (sale.usdRate || 1) : price;
 
         totalProducts += qty;
         if (currency === 'USD') {
@@ -180,9 +187,11 @@ export default function CajaPage() {
             usedPhones += qty;
           }
           cellphoneCount += qty;
+          cellphoneTotalARS += priceInARS;
         } else {
           productsNoPhones += qty;
           hasAccessory = true;
+          accessoryTotalARS += priceInARS;
         }
 
         if (pm === 'efectivo') {
@@ -193,7 +202,7 @@ export default function CajaPage() {
             totalCashARS += price;
             if (isCell) cellCashARS += price; else accCashARS += price;
           }
-        } else if (pm && pm.includes('transfer')) {
+        } else if (pm === 'tarjeta' || (pm && pm.includes('transfer'))) {
           if (currency === 'USD') {
             totalBankUSD += price;
             if (isCell) cellBankUSD += price; else accBankUSD += price;
@@ -203,6 +212,21 @@ export default function CajaPage() {
           }
         }
       });
+
+      if (pm === 'multiple') {
+        const saleTotalARS = accessoryTotalARS + cellphoneTotalARS;
+        const cash = sale.cashAmount || 0;
+        const bank = (sale.transferAmount || 0) + (sale.cardAmount || 0);
+        totalCashARS += cash;
+        totalBankARS += bank;
+        const accRatio = saleTotalARS ? accessoryTotalARS / saleTotalARS : 0;
+        const cellRatio = saleTotalARS ? cellphoneTotalARS / saleTotalARS : 0;
+        accCashARS += cash * accRatio;
+        cellCashARS += cash * cellRatio;
+        accBankARS += bank * accRatio;
+        cellBankARS += bank * cellRatio;
+      }
+
       if (hasAccessory) accessorySales += 1;
     });
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ref, set, push, update, get } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatUsdCurrency } from "@/lib/price-converter"
@@ -46,6 +47,17 @@ interface CompleteReserveModalProps {
 export default function CompleteReserveModal({ isOpen, onClose, reserve, onReserveCompleted }: CompleteReserveModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
+  const [cashAmount, setCashAmount] = useState(0);
+  const [transferAmount, setTransferAmount] = useState(0);
+  const [cardAmount, setCardAmount] = useState(0);
+
+  useEffect(() => {
+    if (paymentMethod !== "multiple") {
+      setCashAmount(0);
+      setTransferAmount(0);
+      setCardAmount(0);
+    }
+  }, [paymentMethod]);
 
   const handleCompleteSale = async () => {
     if (!reserve) return;
@@ -55,6 +67,15 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
       // 1. Crear una nueva venta con el saldo restante
       const usdRateSnapshot = await get(ref(database, 'config/usdRate'));
       const usdRate = usdRateSnapshot.exists() ? usdRateSnapshot.val() : 0;
+      const totalARS = (reserve.remainingAmount || 0) * usdRate;
+      if (paymentMethod === "multiple") {
+        const sum = cashAmount + transferAmount + cardAmount;
+        if (Math.abs(sum - totalARS) > 0.01) {
+          toast.error("La suma de los montos no coincide con el total");
+          setIsLoading(false);
+          return;
+        }
+      }
 
       const newSaleRef = push(ref(database, "sales"));
       const saleData = {
@@ -70,7 +91,8 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
           price: (reserve.productPrice || 0) * usdRate,
         }],
         paymentMethod,
-        totalAmount: (reserve.remainingAmount || 0) * usdRate, // Se registra el pago del saldo
+        ...(paymentMethod === "multiple" ? { cashAmount, transferAmount, cardAmount } : {}),
+        totalAmount: totalARS, // Se registra el pago del saldo
         usdRate,
         notes: `Venta completada desde reserva #${reserve.id}`,
       };
@@ -129,9 +151,26 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
                 <SelectItem value="efectivo">Efectivo</SelectItem>
                 <SelectItem value="tarjeta">Tarjeta</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
+                <SelectItem value="multiple">Pago Múltiple</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {paymentMethod === "multiple" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label>Monto Efectivo</Label>
+                <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value) || 0)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto Transferencia</Label>
+                <Input type="number" value={transferAmount} onChange={(e) => setTransferAmount(Number(e.target.value) || 0)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto Tarjeta</Label>
+                <Input type="number" value={cardAmount} onChange={(e) => setCardAmount(Number(e.target.value) || 0)} />
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
