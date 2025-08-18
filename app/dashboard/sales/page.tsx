@@ -13,6 +13,7 @@ import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import SaleDetailModal from "@/components/sale-detail-modal"
 import { useAuth } from "@/hooks/use-auth"
+import { generateSaleReceiptPdf } from "@/lib/pdf-generator"
 
 // Interfaces
 interface UserType {
@@ -230,8 +231,12 @@ export default function SalesPage() {
     setIsDetailModalOpen(true);
   };
 
-  const downloadSaleReceipt = (sale: Sale) => {
-    console.log("Descargar comprobante para la venta:", sale.id)
+  const downloadSaleReceipt = async (sale: Sale) => {
+    try {
+      await generateSaleReceiptPdf(sale as any)
+    } catch (error) {
+      console.error("Error al generar el comprobante:", error)
+    }
   }
 
   return (
