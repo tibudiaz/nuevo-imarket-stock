@@ -80,6 +80,8 @@ interface Product {
   provider?: string;
   store?: "local1" | "local2";
   lastTransfer?: string;
+  entryDate?: string;
+  createdAt?: string;
   [key: string]: any;
 }
 interface NewProduct {
@@ -93,6 +95,7 @@ interface NewProduct {
   barcode: string;
   imei: string;
   provider: string;
+  entryDate: string;
   store: "local1" | "local2";
 }
 interface Category {
@@ -128,6 +131,7 @@ export default function InventoryPage() {
     barcode: "",
     imei: "",
     provider: "",
+    entryDate: new Date().toISOString().split("T")[0],
     store: selectedStore === "local2" ? "local2" : "local1",
   });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -153,6 +157,7 @@ export default function InventoryPage() {
       setNewProduct((prev) => ({
         ...prev,
         store: selectedStore === "local2" ? "local2" : "local1",
+        entryDate: new Date().toISOString().split("T")[0],
       }));
     }
   }, [isAddDialogOpen, selectedStore]);
@@ -261,6 +266,9 @@ export default function InventoryPage() {
       await set(newProductRef, {
         ...newProduct,
         store: selectedStore === "local2" ? "local2" : "local1",
+        entryDate: newProduct.entryDate
+          ? new Date(newProduct.entryDate).toISOString()
+          : new Date().toISOString(),
         createdAt: new Date().toISOString(),
       });
       setNewProduct({
@@ -274,6 +282,7 @@ export default function InventoryPage() {
         barcode: "",
         imei: "",
         provider: "",
+        entryDate: new Date().toISOString().split("T")[0],
         store: selectedStore === "local2" ? "local2" : "local1",
       });
       setIsAddDialogOpen(false);
@@ -289,7 +298,8 @@ export default function InventoryPage() {
   };
 
   const handleEditProduct = (product: Product) => {
-    setEditingProduct({ ...product });
+    const entryDate = (product.entryDate || product.createdAt || new Date().toISOString()).split("T")[0];
+    setEditingProduct({ ...product, entryDate });
     setIsEditDialogOpen(true);
   };
 
@@ -297,7 +307,13 @@ export default function InventoryPage() {
     if (!editingProduct) return;
     try {
       const productRef = ref(database, `products/${editingProduct.id}`);
-      await update(productRef, editingProduct);
+      const updatedProduct = {
+        ...editingProduct,
+        entryDate: editingProduct.entryDate
+          ? new Date(editingProduct.entryDate).toISOString()
+          : editingProduct.entryDate,
+      };
+      await update(productRef, updatedProduct);
       setIsEditDialogOpen(false);
       setEditingProduct(null);
       toast.success("Producto actualizado", {
@@ -563,6 +579,20 @@ export default function InventoryPage() {
                         }
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="entryDate">Fecha de Ingreso</Label>
+                      <Input
+                        id="entryDate"
+                        type="date"
+                        value={newProduct.entryDate}
+                        onChange={(e) =>
+                          setNewProduct({
+                            ...newProduct,
+                            entryDate: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       {isCellphoneCategory ? (
                         <>
@@ -686,6 +716,7 @@ export default function InventoryPage() {
                 <TableHead>Marca</TableHead>
                 <TableHead>Modelo</TableHead>
                 <TableHead>Categoría</TableHead>
+                <TableHead>Ingreso</TableHead>
                 {user?.role === "admin" && <TableHead>Proveedor</TableHead>}
                 <TableHead>Código/IMEI</TableHead>
                 <TableHead>Precio</TableHead>
@@ -698,7 +729,7 @@ export default function InventoryPage() {
               {filteredProducts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={user?.role === "admin" ? 11 : 9}
+                    colSpan={user?.role === "admin" ? 12 : 10}
                     className="text-center py-6 text-muted-foreground"
                   >
                     No se encontraron productos
@@ -726,6 +757,14 @@ export default function InventoryPage() {
                     <TableCell>{product.brand || "N/A"}</TableCell>
                     <TableCell>{product.model || "N/A"}</TableCell>
                     <TableCell>{product.category || "N/A"}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const date = product.entryDate || product.createdAt;
+                        return date
+                          ? new Date(date).toLocaleDateString()
+                          : "N/A";
+                      })()}
+                    </TableCell>
                     {user?.role === "admin" && (
                       <TableCell>
                         {product.provider && (
@@ -904,21 +943,39 @@ export default function InventoryPage() {
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar categoría" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {isEditingCellphoneCategory ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-imei">IMEI</Label>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-entryDate">Fecha de Ingreso</Label>
+            <Input
+              id="edit-entryDate"
+              type="date"
+              value={
+                editingProduct.entryDate
+                  ? new Date(editingProduct.entryDate).toISOString().split("T")[0]
+                  : ""
+              }
+              onChange={(e) =>
+                setEditingProduct({
+                  ...editingProduct,
+                  entryDate: e.target.value,
+                })
+              }
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {isEditingCellphoneCategory ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-imei">IMEI</Label>
                       <Input
                         id="edit-imei"
                         value={editingProduct.imei}
