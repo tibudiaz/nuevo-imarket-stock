@@ -237,7 +237,7 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
     page.drawText(String(saleData.customerPhone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
 
     let currentY = positions.itemStartY;
-    const itemLineHeight = 15;
+    const itemLineHeight = 18;
     const usedItemYPositions = [
         positions.itemStartY,
         fromTop(334),
@@ -265,12 +265,24 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
            page.drawText("Regalo", { x: positions.priceStartX, y: yPos, size: 10, font: helveticaBold, color: rgb(0, 0.5, 0) });
         }
 
-        let identifiers = [];
-        if (item.barcode) identifiers.push(`S/N: ${item.barcode}`);
-        if (item.imei) identifiers.push(`IMEI: ${item.imei}`);
-
-        if (identifiers.length > 0) {
-             page.drawText(identifiers.join(' / '), { x: positions.imeiStartX, y: yPos, size: 8, font: helveticaFont, color: rgb(0.3, 0.3, 0.3) });
+        if (item.barcode) {
+            page.drawText(`S/N: ${item.barcode}`, {
+                x: positions.imeiStartX,
+                y: yPos,
+                size: 8,
+                font: helveticaFont,
+                color: rgb(0.3, 0.3, 0.3)
+            });
+        }
+        if (item.imei) {
+            const imeiY = item.barcode ? yPos - 9 : yPos;
+            page.drawText(`IMEI: ${item.imei}`, {
+                x: positions.imeiStartX,
+                y: imeiY,
+                size: 8,
+                font: helveticaFont,
+                color: rgb(0.3, 0.3, 0.3)
+            });
         }
 
         if (!(hasUsedCellphone && index < usedItemYPositions.length)) {
@@ -301,13 +313,24 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
         page.drawText(`Subtotal: ${formatCurrencyForPdf(cartTotal)}`, { ...positions.subtotal, size: 10, font: helveticaFont });
         
         const tradeInName = `Parte de Pago: ${saleData.tradeIn.name || ''}`;
-        let tradeInIdentifiers = [];
-        if (saleData.tradeIn.serialNumber) tradeInIdentifiers.push(`S/N: ${saleData.tradeIn.serialNumber}`);
-        if (saleData.tradeIn.imei) tradeInIdentifiers.push(`IMEI: ${saleData.tradeIn.imei}`);
-
         page.drawText(tradeInName, { x: positions.itemStartX, y: positions.parteDePago.y, size: 8, font: helveticaBold });
-        if(tradeInIdentifiers.length > 0) {
-            page.drawText(tradeInIdentifiers.join(' / '), { x: positions.imeiStartX, y: positions.parteDePago.y, size: 8, font: helveticaBold });
+
+        if (saleData.tradeIn.serialNumber) {
+            page.drawText(`S/N: ${saleData.tradeIn.serialNumber}`, {
+                x: positions.imeiStartX,
+                y: positions.parteDePago.y,
+                size: 8,
+                font: helveticaBold
+            });
+        }
+        if (saleData.tradeIn.imei) {
+            const imeiY = saleData.tradeIn.serialNumber ? positions.parteDePago.y - 9 : positions.parteDePago.y;
+            page.drawText(`IMEI: ${saleData.tradeIn.imei}`, {
+                x: positions.imeiStartX,
+                y: imeiY,
+                size: 8,
+                font: helveticaBold
+            });
         }
         page.drawText(`-${formatCurrencyForPdf(tradeInValue)}`, { ...positions.parteDePago, x: positions.priceStartX, size: 10, font: helveticaFont, color: rgb(0.7, 0, 0) });
         
