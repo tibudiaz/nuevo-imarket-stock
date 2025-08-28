@@ -393,7 +393,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             const productRef = ref(database, `products/${item.id}`);
             const productSnapshot = await get(productRef);
             if (productSnapshot.exists()) {
-                const currentStock = productSnapshot.val().stock || 0;
+                const productData = productSnapshot.val();
+                const currentStock = productData.stock || 0;
                 const newStock = currentStock - item.quantity;
 
                 if (newStock < 0) {
@@ -401,7 +402,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 }
 
                 if (newStock <= 0) {
-                    await remove(productRef);
+                    const category = productData.category;
+                    if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+                        await remove(productRef);
+                    } else {
+                        await update(productRef, { stock: 0 });
+                    }
                 } else {
                     await update(productRef, { stock: newStock });
                 }
@@ -547,7 +553,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         const productSnapshot = await get(productRef);
         if (!productSnapshot.exists()) throw new Error('Producto no encontrado');
         
-        const currentStock = productSnapshot.val().stock || 0;
+        const productData = productSnapshot.val();
+        const currentStock = productData.stock || 0;
         const reservedQuantity = item.quantity;
 
         if (currentStock < reservedQuantity) {
@@ -556,7 +563,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
         const newStock = currentStock - reservedQuantity;
         if (newStock <= 0) {
-            await remove(productRef);
+            const category = productData.category;
+            if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+                await remove(productRef);
+            } else {
+                await update(productRef, { stock: 0 });
+            }
         } else {
             await update(productRef, { stock: newStock });
         }

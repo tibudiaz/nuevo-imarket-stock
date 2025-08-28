@@ -87,10 +87,18 @@ export default function ReservesPage() {
     const threeDaysFromNow = new Date();
     threeDaysFromNow.setDate(now.getDate() + 3);
 
-    const active = reservesData.filter(r => r.status === "reserved").length;
-    const expiringSoon = reservesData.filter(r => r.status === "reserved" && r.expirationDate && new Date(r.expirationDate) <= threeDaysFromNow).length;
-    const completed = reservesData.filter(r => r.status === "completed").length;
-    const cancelled = reservesData.filter(r => r.status === "cancelled").length;
+    const active = reservesData
+      .filter(r => r.status === "reserved")
+      .reduce((sum, r) => sum + (r.quantity || 1), 0);
+    const expiringSoon = reservesData
+      .filter(r => r.status === "reserved" && r.expirationDate && new Date(r.expirationDate) <= threeDaysFromNow)
+      .reduce((sum, r) => sum + (r.quantity || 1), 0);
+    const completed = reservesData
+      .filter(r => r.status === "completed")
+      .reduce((sum, r) => sum + (r.quantity || 1), 0);
+    const cancelled = reservesData
+      .filter(r => r.status === "cancelled")
+      .reduce((sum, r) => sum + (r.quantity || 1), 0);
 
     setReserveStats({ active, expiringSoon, completed, cancelled });
   };

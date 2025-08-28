@@ -109,7 +109,9 @@ export default function Dashboard() {
             });
         }
         
-        const activeReserves = reserves.filter(r => r.status === "reserved").length
+        const activeReserves = reserves
+          .filter(r => r.status === "reserved")
+          .reduce((sum, r) => sum + (r.quantity || 1), 0)
         setDashboardData((prev) => ({
           ...prev,
           totalProducts:
@@ -126,7 +128,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (products.length === 0 && reserves.length === 0) return;
-    const activeReserves = reserves.filter(r => r.status === "reserved").length;
+    const activeReserves = reserves
+      .filter(r => r.status === "reserved")
+      .reduce((sum, r) => sum + (r.quantity || 1), 0);
     setDashboardData((prev) => ({
       ...prev,
       totalProducts:

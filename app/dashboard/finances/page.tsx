@@ -256,15 +256,16 @@ export default function FinancesPage() {
     const activeReserves = reservesByStore.filter(r => r.status === "reserved");
     activeReserves.forEach(reserve => {
         const prod = productMap.get(reserve.productId || "");
-        if (!prod) return;
-        const cost = Number(prod.cost) || 0;
-        const category = prod.category;
+        const category = prod?.category || reserve.productData?.category;
+        const cost = prod?.cost ?? reserve.productData?.cost ?? 0;
+        const quantity = reserve.quantity || 1;
+        if (!category) return;
         if (category === "Celulares Nuevos" || category === "Celulares Usados") {
-            deviceCount += 1;
-            deviceTotalCost += cost;
+            deviceCount += quantity;
+            deviceTotalCost += cost * quantity;
         } else {
-            accessoryCount += 1;
-            accessoryTotalCost += cost;
+            accessoryCount += quantity;
+            accessoryTotalCost += cost * quantity;
         }
     });
 
