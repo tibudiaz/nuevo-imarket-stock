@@ -166,10 +166,16 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
         const productRef = ref(database, `products/${item.id}`);
         const snap = await get(productRef);
         if (!snap.exists()) continue;
-        const currentStock = snap.val().stock || 0;
+        const productData = snap.val();
+        const currentStock = productData.stock || 0;
         const newStock = currentStock - item.quantity;
         if (newStock <= 0) {
-          await remove(productRef);
+          const category = productData.category;
+          if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+            await remove(productRef);
+          } else {
+            await update(productRef, { stock: 0 });
+          }
         } else {
           await update(productRef, { stock: newStock });
         }
