@@ -98,13 +98,17 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                   const productInfo = productsMap.get(item.productId)
                   const category = (item.category || '').toLowerCase()
                   const isUSD = category === 'celulares nuevos' || category === 'celulares usados'
-                  const unitPriceARS = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
+                  const unitPriceUSD = Number(item.price)
+                  const unitPriceARS = unitPriceUSD * (isUSD ? (sale.usdRate || 1) : 1)
                   const unitCostUSD = Number(productInfo?.cost ?? item.cost ?? 0)
                   const unitCostARS = unitCostUSD * (isUSD ? (sale.usdRate || 1) : 1)
                   const provider = productInfo?.provider || item.provider || 'N/A'
-                  const profitPerUnit = unitPriceARS - unitCostARS
-                  const subtotal = unitPriceARS * item.quantity
-                  const totalProfit = profitPerUnit * item.quantity
+                  const profitPerUnitUSD = unitPriceUSD - unitCostUSD
+                  const profitPerUnitARS = unitPriceARS - unitCostARS
+                  const subtotalUSD = unitPriceUSD * item.quantity
+                  const subtotalARS = unitPriceARS * item.quantity
+                  const totalProfitUSD = profitPerUnitUSD * item.quantity
+                  const totalProfitARS = profitPerUnitARS * item.quantity
 
                   return (
                     <TableRow key={`${item.productId}-${index}`}>
@@ -137,12 +141,32 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                         </TableCell>
                       )}
                       {user.role === 'admin' && (
-                        <TableCell className={profitPerUnit >= 0 ? "text-green-600" : "text-red-600"}>
-                          {`$${totalProfit.toFixed(2)}`}
+                        <TableCell className={profitPerUnitARS >= 0 ? "text-green-600" : "text-red-600"}>
+                          {isUSD ? (
+                            <>
+                              {`USD ${totalProfitUSD.toFixed(2)}`}
+                              <div className="text-xs text-muted-foreground">
+                                {`ARS ${totalProfitARS.toFixed(2)}`}
+                              </div>
+                            </>
+                          ) : (
+                            <>{`$${totalProfitARS.toFixed(2)}`}</>
+                          )}
                         </TableCell>
                       )}
                       {user.role === 'admin' && <TableCell>{provider}</TableCell>}
-                      <TableCell className="text-right">{`$${subtotal.toFixed(2)}`}</TableCell>
+                      <TableCell className="text-right">
+                        {isUSD ? (
+                          <>
+                            {`USD ${subtotalUSD.toFixed(2)}`}
+                            <div className="text-xs text-muted-foreground">
+                              {`ARS ${subtotalARS.toFixed(2)}`}
+                            </div>
+                          </>
+                        ) : (
+                          <>{`$${subtotalARS.toFixed(2)}`}</>
+                        )}
+                      </TableCell>
                     </TableRow>
                   )
                 })}
