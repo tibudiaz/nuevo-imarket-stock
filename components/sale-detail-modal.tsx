@@ -96,7 +96,8 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
               <TableBody>
                 {sale.items.map((item, index) => {
                   const productInfo = productsMap.get(item.productId)
-                  const isUSD = item.category === 'Celulares Nuevos' || item.category === 'Celulares Usados'
+                  const category = (item.category || '').toLowerCase()
+                  const isUSD = category === 'celulares nuevos' || category === 'celulares usados'
                   const unitPriceARS = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
                   const unitCostUSD = Number(productInfo?.cost ?? item.cost ?? 0)
                   const unitCostARS = unitCostUSD * (isUSD ? (sale.usdRate || 1) : 1)
@@ -145,6 +146,24 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                     </TableRow>
                   )
                 })}
+                {sale.tradeIn && sale.tradeIn.price > 0 && (
+                  <TableRow key="trade-in">
+                    <TableCell className="font-medium">Parte de Pago: {sale.tradeIn.name || 'Equipo'}</TableCell>
+                    <TableCell>1</TableCell>
+                    <TableCell>
+                      {`USD ${Number(sale.tradeIn.price).toFixed(2)}`}
+                      <div className="text-xs text-muted-foreground">
+                        {`ARS ${(sale.tradeIn.price * (sale.usdRate || 1)).toFixed(2)}`}
+                      </div>
+                    </TableCell>
+                    {user.role === 'admin' && <TableCell>-</TableCell>}
+                    {user.role === 'admin' && <TableCell>-</TableCell>}
+                    {user.role === 'admin' && <TableCell>-</TableCell>}
+                    <TableCell className="text-right text-red-600">
+                      {`-$${(sale.tradeIn.price * (sale.usdRate || 1)).toFixed(2)}`}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
