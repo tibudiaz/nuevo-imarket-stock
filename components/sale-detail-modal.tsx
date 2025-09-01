@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { formatCurrency, formatUsdCurrency } from "@/lib/price-converter"
 
 // Interfaces
 interface Sale {
@@ -64,6 +65,8 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
 
   const productsMap = new Map(products.map(p => [p.id, p]))
 
+  const USD_PRICE_THRESHOLD = 3500
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl">
@@ -91,10 +94,12 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
               <TableBody>
                 {sale.items.map((item, index) => {
                   const productInfo = productsMap.get(item.productId)
-                  const unitPriceInARS = item.price * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
-                  const unitCost = productInfo?.cost ?? item.cost ?? 0
+                  const cost = productInfo?.cost ?? item.cost ?? 0
+                  const isUSD = item.currency === 'USD' || Number(item.price) < USD_PRICE_THRESHOLD
+                  const unitPriceInARS = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
+                  const unitCostInARS = Number(cost) * (isUSD ? (sale.usdRate || 1) : 1)
                   const provider = productInfo?.provider || item.provider || 'N/A'
-                  const profitPerUnit = unitPriceInARS - unitCost
+                  const profitPerUnit = unitPriceInARS - unitCostInARS
                   const subtotal = unitPriceInARS * item.quantity
                   const totalProfit = profitPerUnit * item.quantity
 
@@ -102,15 +107,41 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                     <TableRow key={`${item.productId}-${index}`}>
                       <TableCell className="font-medium">{item.productName}</TableCell>
                       <TableCell>{item.quantity}</TableCell>
-                      <TableCell>${unitPriceInARS.toFixed(2)}</TableCell>
-                      {user.role === 'admin' && <TableCell>${unitCost.toFixed(2)}</TableCell>}
+                      <TableCell>
+                        {isUSD ? (
+                          <>
+                            {formatUsdCurrency(Number(item.price))}
+                            <br />
+                            <span className="text-xs text-muted-foreground">
+                              {formatCurrency(unitPriceInARS)}
+                            </span>
+                          </>
+                        ) : (
+                          formatCurrency(unitPriceInARS)
+                        )}
+                      </TableCell>
+                      {user.role === 'admin' && (
+                        <TableCell>
+                          {isUSD ? (
+                            <>
+                              {formatUsdCurrency(Number(cost))}
+                              <br />
+                              <span className="text-xs text-muted-foreground">
+                                {formatCurrency(unitCostInARS)}
+                              </span>
+                            </>
+                          ) : (
+                            formatCurrency(unitCostInARS)
+                          )}
+                        </TableCell>
+                      )}
                       {user.role === 'admin' && (
                         <TableCell className={profitPerUnit >= 0 ? "text-green-600" : "text-red-600"}>
-                          ${totalProfit.toFixed(2)}
+                          {formatCurrency(totalProfit)}
                         </TableCell>
                       )}
                       {user.role === 'admin' && <TableCell>{provider}</TableCell>}
-                      <TableCell className="text-right">${subtotal.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
                     </TableRow>
                   )
                 })}
@@ -118,14 +149,15 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
             </Table>
           </div>
           <div className="mt-4 flex justify-end items-center gap-4">
+            <div className="text-sm">Cotización: {sale.usdRate ? `$${sale.usdRate.toFixed(2)}` : '-'}</div>
             {sale.paymentMethod === "multiple" ? (
               <div className="text-sm space-y-1">
                 <div>
                   Método de Pago: <Badge variant="outline">Múltiple</Badge>
                 </div>
-                <div>Efectivo: ${ (sale.cashAmount ?? 0).toFixed(2) }</div>
-                <div>Transferencia: ${ (sale.transferAmount ?? 0).toFixed(2) }</div>
-                <div>Tarjeta: ${ (sale.cardAmount ?? 0).toFixed(2) }</div>
+                <div>Efectivo: {formatCurrency(sale.cashAmount ?? 0)}</div>
+                <div>Transferencia: {formatCurrency(sale.transferAmount ?? 0)}</div>
+                <div>Tarjeta: {formatCurrency(sale.cardAmount ?? 0)}</div>
               </div>
             ) : (
               <div className="text-sm">
@@ -133,7 +165,7 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
               </div>
             )}
             <div className="text-xl font-bold">
-              Total: ${sale.totalAmount.toFixed(2)}
+              Total: {formatCurrency(sale.totalAmount)}
             </div>
           </div>
         </div>
