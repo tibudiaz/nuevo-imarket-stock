@@ -43,8 +43,11 @@ interface Sale {
   cashAmount?: number
   transferAmount?: number
   cardAmount?: number
+  usdRate?: number
   [key: string]: any
 }
+
+const USD_PRICE_THRESHOLD = 3500
 
 interface Product {
   id: string;
@@ -176,9 +179,11 @@ export default function SalesPage() {
           productTotal += item.quantity
           const product = products.find(p => p.id === item.productId)
           const cost = product?.cost ?? item.cost ?? 0
-          const unitPrice = Number(item.price) * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
-          costTotal += Number(cost) * item.quantity
-          const itemProfit = (unitPrice - Number(cost)) * item.quantity
+          const isUSD = item.currency === 'USD' || Number(item.price) < USD_PRICE_THRESHOLD
+          const unitPrice = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
+          const unitCost = Number(cost) * (isUSD ? (sale.usdRate || 1) : 1)
+          costTotal += unitCost * item.quantity
+          const itemProfit = (unitPrice - unitCost) * item.quantity
           if (itemProfit < 0) {
             loss += Math.abs(itemProfit)
           }
@@ -224,8 +229,10 @@ export default function SalesPage() {
   const calculateNetSale = useCallback((sale: Sale) => {
     return (sale.items || []).reduce((sum, item) => {
       const product = products.find(p => p.id === item.productId)
-      const unitCost = Number(product?.cost ?? item.cost ?? 0)
-      const unitPrice = Number(item.price) * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
+      const cost = product?.cost ?? item.cost ?? 0
+      const isUSD = item.currency === 'USD' || Number(item.price) < USD_PRICE_THRESHOLD
+      const unitPrice = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
+      const unitCost = Number(cost) * (isUSD ? (sale.usdRate || 1) : 1)
       return sum + (unitPrice - unitCost) * item.quantity
     }, 0)
   }, [products])
@@ -357,6 +364,7 @@ export default function SalesPage() {
                 {user?.role === 'admin' && <TableHead>DNI</TableHead>}
                 <TableHead>Productos</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Cotización</TableHead>
                 {user?.role === 'admin' && <TableHead>Total Neto</TableHead>}
                 {user?.role === 'admin' && <TableHead>Método de Pago</TableHead>}
                 <TableHead className="text-right">Acciones</TableHead>
@@ -365,7 +373,7 @@ export default function SalesPage() {
             <TableBody>
               {filteredSales.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={user?.role === 'admin' ? 8 : 5} className="text-center py-6 text-muted-foreground">
+                  <TableCell colSpan={user?.role === 'admin' ? 9 : 6} className="text-center py-6 text-muted-foreground">
                     No se encontraron ventas
                   </TableCell>
                 </TableRow>
@@ -384,6 +392,7 @@ export default function SalesPage() {
                         {(sale.items || []).map(item => `${item.quantity}x ${item.productName}`).join(', ')}
                       </TableCell>
                       <TableCell>${Number(sale.totalAmount).toFixed(2)}</TableCell>
+                      <TableCell>{sale.usdRate ? sale.usdRate.toFixed(2) : '-'}</TableCell>
                       {user?.role === 'admin' && (
                         <TableCell className={netTotal >= 0 ? "text-green-600" : "text-red-600"}>
                           ${netTotal.toFixed(2)}
