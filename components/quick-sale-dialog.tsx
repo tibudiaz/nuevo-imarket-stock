@@ -194,6 +194,8 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
           quantity: item.quantity,
           price: item.price || 0,
           currency: "ARS",
+          cost: Number(item.cost || 0),
+          provider: item.provider || null,
         })),
         totalAmount,
         paymentMethod,

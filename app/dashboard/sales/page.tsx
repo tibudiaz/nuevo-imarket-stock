@@ -28,6 +28,8 @@ interface SaleItem {
   price: number;
   currency: 'USD' | 'ARS';
   category?: string;
+  cost?: number;
+  provider?: string;
 }
 
 interface Sale {
@@ -172,9 +174,11 @@ export default function SalesPage() {
             productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity
           }
           productTotal += item.quantity
-          const cost = products.find(p => p.id === item.productId)?.cost || 0
+          const product = products.find(p => p.id === item.productId)
+          const cost = product?.cost ?? item.cost ?? 0
+          const unitPrice = Number(item.price) * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
           costTotal += Number(cost) * item.quantity
-          const itemProfit = (Number(item.price) - Number(cost)) * item.quantity
+          const itemProfit = (unitPrice - Number(cost)) * item.quantity
           if (itemProfit < 0) {
             loss += Math.abs(itemProfit)
           }
@@ -220,7 +224,7 @@ export default function SalesPage() {
   const calculateNetSale = useCallback((sale: Sale) => {
     return (sale.items || []).reduce((sum, item) => {
       const product = products.find(p => p.id === item.productId)
-      const unitCost = Number(product?.cost || 0)
+      const unitCost = Number(product?.cost ?? item.cost ?? 0)
       const unitPrice = Number(item.price) * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
       return sum + (unitPrice - unitCost) * item.quantity
     }, 0)

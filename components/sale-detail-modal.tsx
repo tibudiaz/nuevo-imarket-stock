@@ -34,6 +34,8 @@ interface SaleItem {
   price: number
   currency: 'USD' | 'ARS'
   category?: string
+  cost?: number
+  provider?: string
 }
 
 interface Product {
@@ -90,7 +92,8 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                 {sale.items.map((item, index) => {
                   const productInfo = productsMap.get(item.productId)
                   const unitPriceInARS = item.price * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
-                  const unitCost = productInfo?.cost || 0
+                  const unitCost = productInfo?.cost ?? item.cost ?? 0
+                  const provider = productInfo?.provider || item.provider || 'N/A'
                   const profitPerUnit = unitPriceInARS - unitCost
                   const subtotal = unitPriceInARS * item.quantity
                   const totalProfit = profitPerUnit * item.quantity
@@ -106,7 +109,7 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                           ${totalProfit.toFixed(2)}
                         </TableCell>
                       )}
-                      {user.role === 'admin' && <TableCell>{productInfo?.provider || 'N/A'}</TableCell>}
+                      {user.role === 'admin' && <TableCell>{provider}</TableCell>}
                       <TableCell className="text-right">${subtotal.toFixed(2)}</TableCell>
                     </TableRow>
                   )
