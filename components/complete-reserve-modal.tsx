@@ -89,6 +89,8 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
           productName: reserve.productName,
           quantity: reserve.quantity || 1,
           price: (reserve.productPrice || 0) * usdRate,
+          cost: Number(reserve.productData?.cost || 0),
+          provider: reserve.productData?.provider || null,
         }],
         paymentMethod,
         ...(paymentMethod === "multiple" ? { cashAmount, transferAmount, cardAmount } : {}),

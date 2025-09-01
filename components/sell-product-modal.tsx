@@ -37,6 +37,7 @@ interface CartProduct {
   brand?: string;
   provider?: string;
   store?: "local1" | "local2";
+  cost?: number;
 }
 
 interface BundleRule {
@@ -473,6 +474,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 barcode: item.barcode || null,
                 provider: item.provider || null,
                 category: item.category || null,
+                cost: item.cost ?? 0,
             })),
             paymentMethod,
             ...(paymentMethod === "multiple" ? { cashAmount, transferAmount, cardAmount } : {}),
