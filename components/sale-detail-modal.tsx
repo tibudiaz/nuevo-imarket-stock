@@ -32,7 +32,7 @@ interface SaleItem {
   productName: string
   quantity: number
   price: number
-  currency: 'USD' | 'ARS'
+  currency?: 'USD' | 'ARS'
   category?: string
   cost?: number
   provider?: string
@@ -72,6 +72,11 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
           <DialogDescription>
             Realizada el {new Date(sale.date).toLocaleString('es-AR')} por {sale.customerName} (DNI: {sale.customerDni})
           </DialogDescription>
+          {sale.usdRate && (
+            <p className="text-sm text-muted-foreground">
+              Cotización dólar: {sale.usdRate.toFixed(2)}
+            </p>
+          )}
         </DialogHeader>
         <div className="py-4">
           <h3 className="mb-4 text-lg font-medium">Productos Incluidos</h3>
@@ -91,26 +96,52 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
               <TableBody>
                 {sale.items.map((item, index) => {
                   const productInfo = productsMap.get(item.productId)
-                  const unitPriceInARS = item.price * (item.currency === 'USD' ? (sale.usdRate || 1) : 1)
-                  const unitCost = productInfo?.cost ?? item.cost ?? 0
+                  const isUSD = item.category === 'Celulares Nuevos' || item.category === 'Celulares Usados'
+                  const unitPriceARS = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
+                  const unitCostUSD = Number(productInfo?.cost ?? item.cost ?? 0)
+                  const unitCostARS = unitCostUSD * (isUSD ? (sale.usdRate || 1) : 1)
                   const provider = productInfo?.provider || item.provider || 'N/A'
-                  const profitPerUnit = unitPriceInARS - unitCost
-                  const subtotal = unitPriceInARS * item.quantity
+                  const profitPerUnit = unitPriceARS - unitCostARS
+                  const subtotal = unitPriceARS * item.quantity
                   const totalProfit = profitPerUnit * item.quantity
 
                   return (
                     <TableRow key={`${item.productId}-${index}`}>
                       <TableCell className="font-medium">{item.productName}</TableCell>
                       <TableCell>{item.quantity}</TableCell>
-                      <TableCell>${unitPriceInARS.toFixed(2)}</TableCell>
-                      {user.role === 'admin' && <TableCell>${unitCost.toFixed(2)}</TableCell>}
+                      <TableCell>
+                        {isUSD ? (
+                          <>
+                            {`USD ${Number(item.price).toFixed(2)}`}
+                            <div className="text-xs text-muted-foreground">
+                              {`ARS ${unitPriceARS.toFixed(2)}`}
+                            </div>
+                          </>
+                        ) : (
+                          <>{`$${unitPriceARS.toFixed(2)}`}</>
+                        )}
+                      </TableCell>
+                      {user.role === 'admin' && (
+                        <TableCell>
+                          {isUSD ? (
+                            <>
+                              {`USD ${unitCostUSD.toFixed(2)}`}
+                              <div className="text-xs text-muted-foreground">
+                                {`ARS ${unitCostARS.toFixed(2)}`}
+                              </div>
+                            </>
+                          ) : (
+                            <>{`$${unitCostARS.toFixed(2)}`}</>
+                          )}
+                        </TableCell>
+                      )}
                       {user.role === 'admin' && (
                         <TableCell className={profitPerUnit >= 0 ? "text-green-600" : "text-red-600"}>
-                          ${totalProfit.toFixed(2)}
+                          {`$${totalProfit.toFixed(2)}`}
                         </TableCell>
                       )}
                       {user.role === 'admin' && <TableCell>{provider}</TableCell>}
-                      <TableCell className="text-right">${subtotal.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{`$${subtotal.toFixed(2)}`}</TableCell>
                     </TableRow>
                   )
                 })}
