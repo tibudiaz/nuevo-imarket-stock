@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Image,
   Wallet,
+  Smartphone,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -189,6 +190,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   
   const currentCategory = searchParams.get('category')
   const currentReserveStatus = searchParams.get('status');
+  const currentSalesType = searchParams.get('type');
 
   const pageVariants = {
     initial: { opacity: 0, y: 5 },
@@ -315,7 +317,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               <NavItem href="/dashboard/low-stock" icon={AlertTriangle} label="Bajo Stock" active={pathname === "/dashboard/low-stock"} />
 
-              <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales"} />
+              <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales" && currentSalesType !== 'celulares'} />
+              <NavItem href="/dashboard/sales?type=celulares" icon={Smartphone} label="Ventas de Celulares" active={pathname === "/dashboard/sales" && currentSalesType === 'celulares'} />
 
               <Collapsible open={isReservesOpen} onOpenChange={setIsReservesOpen} className="w-full">
                   <NavItem icon={ShoppingCart} label="Reservas" active={pathname.startsWith("/dashboard/reserves")} isCollapsible alert={expiringReserves}>

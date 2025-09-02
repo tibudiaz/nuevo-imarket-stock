@@ -311,7 +311,6 @@ export default function CajaPage() {
       });
       generatePDF(summary);
       setLastClosure(summary.timestamp);
-      setSales([]);
       setNote("");
       setDialogOpen(false);
       toast.success("Caja cerrada correctamente");
