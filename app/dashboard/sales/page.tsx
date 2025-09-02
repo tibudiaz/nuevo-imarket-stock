@@ -420,13 +420,15 @@ export default function SalesPage() {
                           <Badge variant="outline">
                             {sale.paymentMethod === "efectivo"
                               ? "Efectivo"
-                              : sale.paymentMethod === "tarjeta"
-                                ? "Tarjeta"
-                                : sale.paymentMethod === "transferencia"
-                                  ? "Transferencia"
-                                  : sale.paymentMethod === "multiple"
-                                    ? "Múltiple"
-                                    : sale.paymentMethod}
+                              : sale.paymentMethod === "efectivo_usd"
+                                ? "Efectivo USD"
+                                : sale.paymentMethod === "tarjeta"
+                                  ? "Tarjeta"
+                                  : sale.paymentMethod === "transferencia"
+                                    ? "Transferencia"
+                                    : sale.paymentMethod === "multiple"
+                                      ? "Múltiple"
+                                      : sale.paymentMethod}
                           </Badge>
                         </TableCell>
                       )}

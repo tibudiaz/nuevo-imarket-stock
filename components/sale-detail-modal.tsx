@@ -214,7 +214,7 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
               </div>
             ) : (
               <div className="text-sm">
-                Método de Pago: <Badge variant="outline">{sale.paymentMethod}</Badge>
+                Método de Pago: <Badge variant="outline">{sale.paymentMethod === "efectivo_usd" ? "Efectivo USD" : sale.paymentMethod}</Badge>
               </div>
             )}
             <div className="text-xl font-bold">

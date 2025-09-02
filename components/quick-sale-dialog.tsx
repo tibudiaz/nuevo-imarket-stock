@@ -58,6 +58,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
   const [cashAmount, setCashAmount] = useState(0);
   const [transferAmount, setTransferAmount] = useState(0);
   const [cardAmount, setCardAmount] = useState(0);
+  const [usdRate, setUsdRate] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -74,6 +75,16 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const usdRef = ref(database, "config/usdRate");
+    const unsubscribe = onValue(usdRef, (snapshot) => {
+      const val = snapshot.val();
+      setUsdRate(typeof val === "number" ? val : 0);
+    });
+    return () => unsubscribe();
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) {
       setSearchTerm("");
       setCart([]);
@@ -81,6 +92,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
       setCashAmount(0);
       setTransferAmount(0);
       setCardAmount(0);
+      setUsdRate(0);
     }
   }, [isOpen]);
 
@@ -203,6 +215,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
           ? { cashAmount, transferAmount, cardAmount }
           : {}),
         store: store === "local2" ? "local2" : "local1",
+        usdRate,
       };
       await set(saleRef, saleData);
 
@@ -357,6 +370,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="efectivo">Efectivo</SelectItem>
+                <SelectItem value="efectivo_usd">Efectivo USD</SelectItem>
                 <SelectItem value="tarjeta">Tarjeta</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
                 <SelectItem value="multiple">Pago Múltiple</SelectItem>
