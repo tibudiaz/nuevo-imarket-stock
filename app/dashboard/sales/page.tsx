@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Search, Calendar, ShoppingCart, DollarSign, User, Download, Eye, Package, TrendingUp, TrendingDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import SaleDetailModal from "@/components/sale-detail-modal"
@@ -65,8 +66,10 @@ interface TopProductType {
 }
 
 export default function SalesPage() {
-  const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const searchParams = useSearchParams()
+  const typeParam = searchParams.get('type')
+  const cellphonesOnly = typeParam === 'celulares'
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -77,26 +80,10 @@ export default function SalesPage() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalCost, setTotalCost] = useState(0)
   const [netProfit, setNetProfit] = useState(0)
-    const [totalLoss, setTotalLoss] = useState(0)
-    const [lastClosure, setLastClosure] = useState<number>(0)
-
-    const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
-    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-
-    useEffect(() => {
-      const closuresRef = ref(database, "cashClosures");
-      const unsubscribe = onValue(closuresRef, (snapshot) => {
-        let last = 0;
-        snapshot.forEach((child) => {
-          const val = child.val();
-          if (val.timestamp && val.timestamp > last) {
-            last = val.timestamp;
-          }
-        });
-        setLastClosure(last);
-      });
-      return () => unsubscribe();
-    }, []);
+  const [totalLoss, setTotalLoss] = useState(0)
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [dateFilter, setDateFilter] = useState<'all' | 'week' | 'day'>('all')
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -143,10 +130,25 @@ export default function SalesPage() {
       unsubscribeProducts();
     };
     }, [authLoading, user]);
-    const salesAfterClosure = useMemo(
-      () => sales.filter(sale => new Date(sale.date).getTime() > lastClosure),
-      [sales, lastClosure]
+    const salesFilteredByType = useMemo(
+      () => cellphonesOnly
+        ? sales.filter(sale => (sale.items || []).some(item => item.category === 'Celulares Nuevos' || item.category === 'Celulares Usados'))
+        : sales,
+      [sales, cellphonesOnly]
     );
+
+    const filteredByDate = useMemo(() => {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const weekStart = new Date(today)
+      weekStart.setDate(today.getDate() - today.getDay())
+      return salesFilteredByType.filter(sale => {
+        const saleDate = new Date(sale.date)
+        if (dateFilter === 'day') return saleDate >= today
+        if (dateFilter === 'week') return saleDate >= weekStart
+        return true
+      })
+    }, [salesFilteredByType, dateFilter])
 
     const calculateSalesStats = useCallback((salesData: Sale[]) => {
     const now = new Date()
@@ -208,14 +210,14 @@ export default function SalesPage() {
   }, [products])
 
   useEffect(() => {
-    if (salesAfterClosure.length > 0) {
-      calculateSalesStats(salesAfterClosure)
+    if (salesFilteredByType.length > 0) {
+      calculateSalesStats(salesFilteredByType)
     } else {
       calculateSalesStats([])
     }
-  }, [salesAfterClosure, calculateSalesStats])
+  }, [salesFilteredByType, calculateSalesStats])
 
-  const filteredSales = salesAfterClosure.filter(
+  const filteredSales = filteredByDate.filter(
     (sale) =>
       (sale.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (sale.customerDni || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -245,11 +247,13 @@ export default function SalesPage() {
     }
   }
 
+  const pageTitle = cellphonesOnly ? "Ventas de Celulares" : "Ventas"
+
   return (
     <DashboardLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Ventas</h1>
+          <h1 className="text-2xl font-bold">{pageTitle}</h1>
           <div className="flex items-center gap-4">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -261,6 +265,16 @@ export default function SalesPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Rango" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="week">Semana</SelectItem>
+                <SelectItem value="day">Hoy</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
