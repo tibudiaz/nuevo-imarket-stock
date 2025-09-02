@@ -160,11 +160,25 @@ export default function SalesPage() {
     const weekStart = new Date(today)
     weekStart.setDate(today.getDate() - today.getDay())
 
+    const isCellphoneItem = (item: SaleItem) =>
+      item.category === 'Celulares Nuevos' || item.category === 'Celulares Usados'
+
+    const filterItems = (items: SaleItem[] = []) =>
+      cellphonesOnly ? items.filter(isCellphoneItem) : items
+
+    const calculateSaleTotal = (sale: Sale) => {
+      return filterItems(sale.items || []).reduce((sum, item) => {
+        const isUSD = isCellphoneItem(item)
+        const unitPrice = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
+        return sum + unitPrice * item.quantity
+      }, 0)
+    }
+
     const todaySales = salesData.filter((sale) => new Date(sale.date) >= today)
-    const todayTotal = todaySales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
+    const todayTotal = todaySales.reduce((sum, sale) => sum + calculateSaleTotal(sale), 0)
 
     const weekSales = salesData.filter((sale) => new Date(sale.date) >= weekStart)
-    const weekTotal = weekSales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
+    const weekTotal = weekSales.reduce((sum, sale) => sum + calculateSaleTotal(sale), 0)
 
     const productCounts: Record<string, number> = {}
     let productTotal = 0
@@ -173,24 +187,23 @@ export default function SalesPage() {
     let loss = 0
 
     salesData.forEach((sale) => {
-      revenue += Number(sale.totalAmount)
-      if (Array.isArray(sale.items)) {
-        sale.items.forEach(item => {
-          if (item.productName && typeof item.quantity === 'number') {
-            productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity
-          }
-          productTotal += item.quantity
-          const product = products.find(p => p.id === item.productId)
-          const isUSD = item.category === 'Celulares Nuevos' || item.category === 'Celulares Usados'
-          const cost = Number(product?.cost ?? item.cost ?? 0) * (isUSD ? (sale.usdRate || 1) : 1)
-          const unitPrice = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
-          costTotal += cost * item.quantity
-          const itemProfit = (unitPrice - cost) * item.quantity
-          if (itemProfit < 0) {
-            loss += Math.abs(itemProfit)
-          }
-        })
-      }
+      const items = filterItems(sale.items || [])
+      items.forEach(item => {
+        if (item.productName && typeof item.quantity === 'number') {
+          productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity
+        }
+        productTotal += item.quantity
+        const product = products.find(p => p.id === item.productId)
+        const isUSD = isCellphoneItem(item)
+        const cost = Number(product?.cost ?? item.cost ?? 0) * (isUSD ? (sale.usdRate || 1) : 1)
+        const unitPrice = Number(item.price) * (isUSD ? (sale.usdRate || 1) : 1)
+        costTotal += cost * item.quantity
+        revenue += unitPrice * item.quantity
+        const itemProfit = (unitPrice - cost) * item.quantity
+        if (itemProfit < 0) {
+          loss += Math.abs(itemProfit)
+        }
+      })
     })
     const profit = revenue - costTotal
 
@@ -211,7 +224,7 @@ export default function SalesPage() {
     setTotalCost(costTotal)
     setNetProfit(profit)
     setTotalLoss(loss)
-  }, [products])
+  }, [products, cellphonesOnly])
 
   useEffect(() => {
     if (salesFilteredByType.length > 0) {
