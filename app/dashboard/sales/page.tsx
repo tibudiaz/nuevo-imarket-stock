@@ -227,12 +227,12 @@ export default function SalesPage() {
   }, [products, cellphonesOnly])
 
   useEffect(() => {
-    if (salesFilteredByType.length > 0) {
-      calculateSalesStats(salesFilteredByType)
+    if (filteredByDate.length > 0) {
+      calculateSalesStats(filteredByDate)
     } else {
       calculateSalesStats([])
     }
-  }, [salesFilteredByType, calculateSalesStats])
+  }, [filteredByDate, calculateSalesStats])
 
   const filteredSales = filteredByDate.filter(
     (sale) =>
