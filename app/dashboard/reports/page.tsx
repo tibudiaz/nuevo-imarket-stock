@@ -33,6 +33,7 @@ interface Sale {
   totalAmount: number;
   customerId?: string;
   store?: string;
+  usdtAmount?: number;
 }
 
 interface Product {

@@ -44,7 +44,6 @@ import {
   Barcode,
   User,
   Wallet,
-  Banknote,
 } from "lucide-react";
 import { ref, onValue, set, push, remove, update } from "firebase/database";
 import { database } from "@/lib/firebase";
@@ -52,7 +51,6 @@ import { toast } from "sonner";
 import SellProductModal from "@/components/sell-product-modal";
 import TransferProductDialog from "@/components/transfer-product-dialog";
 import QuickSaleDialog from "@/components/quick-sale-dialog";
-import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog";
 import {
   Select,
   SelectContent,
@@ -123,7 +121,6 @@ export default function InventoryPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState<NewProduct>({
     name: "",
     brand: "",
@@ -491,44 +488,10 @@ export default function InventoryPage() {
                   <Wallet className="mr-2 h-4 w-4" />
                   Cerrar Caja
                 </Button>
-                <Button
-                  onClick={() => {
-                    if (selectedStore === "all") {
-                      toast.error("Seleccione un local", {
-                        description:
-                          "Debe elegir un local antes de registrar extracciones.",
-                      });
-                      return;
-                    }
-                    setIsWithdrawalOpen(true);
-                  }}
-                  className="w-full sm:w-auto"
-                  variant="destructive"
-                >
-                  <Banknote className="mr-2 h-4 w-4" />
-                  Extracción de dinero
-                </Button>
               </>
             )}
             {user?.role === "admin" && (
               <>
-                <Button
-                  onClick={() => {
-                    if (selectedStore === "all") {
-                      toast.error("Seleccione un local", {
-                        description:
-                          "Debe elegir un local antes de registrar extracciones.",
-                      });
-                      return;
-                    }
-                    setIsWithdrawalOpen(true);
-                  }}
-                  className="w-full sm:w-auto"
-                  variant="destructive"
-                >
-                  <Banknote className="mr-2 h-4 w-4" />
-                  Extracción de dinero
-                </Button>
                 <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="w-full sm:w-auto">
@@ -915,11 +878,6 @@ export default function InventoryPage() {
         isOpen={isQuickSaleOpen}
         onClose={() => setIsQuickSaleOpen(false)}
         store={selectedStore}
-      />
-
-      <CashWithdrawalDialog
-        isOpen={isWithdrawalOpen}
-        onClose={() => setIsWithdrawalOpen(false)}
       />
 
       {editingProduct && user?.role === "admin" && (

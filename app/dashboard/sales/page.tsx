@@ -47,6 +47,7 @@ interface Sale {
   cashUsdAmount?: number
   transferAmount?: number
   cardAmount?: number
+  usdtAmount?: number
   [key: string]: any
 }
 
@@ -429,7 +430,9 @@ export default function SalesPage() {
                                     ? "Transferencia"
                                     : sale.paymentMethod === "multiple"
                                       ? "Múltiple"
-                                      : sale.paymentMethod}
+                                      : sale.paymentMethod === "transferencia_usdt"
+                                        ? "Transferencia USDT"
+                                        : sale.paymentMethod}
                           </Badge>
                         </TableCell>
                       )}

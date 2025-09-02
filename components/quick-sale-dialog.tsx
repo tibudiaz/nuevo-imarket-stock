@@ -220,7 +220,9 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
         paymentMethod,
         ...(paymentMethod === "multiple"
           ? { cashAmount, cashUsdAmount, transferAmount, cardAmount }
-          : {}),
+          : paymentMethod === "transferencia_usdt"
+            ? { usdtAmount: totalAmount / usdRate }
+            : {}),
         store: store === "local2" ? "local2" : "local1",
         usdRate,
       };
@@ -380,6 +382,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
                 <SelectItem value="efectivo_usd">Efectivo USD</SelectItem>
                 <SelectItem value="tarjeta">Tarjeta</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
+                <SelectItem value="transferencia_usdt">Transferencia USDT</SelectItem>
                 <SelectItem value="multiple">Pago Múltiple</SelectItem>
               </SelectContent>
             </Select>

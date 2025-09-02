@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ref, push } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,12 @@ export default function CashWithdrawalDialog({ isOpen, onClose }: CashWithdrawal
   const [method, setMethod] = useState("cash");
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (box !== "cellphones" && (method === "cash_usd" || method === "usdt")) {
+      setMethod("cash");
+    }
+  }, [box, method]);
 
   const reset = () => {
     setBox("accessories");
@@ -104,7 +110,13 @@ export default function CashWithdrawalDialog({ isOpen, onClose }: CashWithdrawal
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash">Efectivo</SelectItem>
+                {box === "cellphones" && (
+                  <SelectItem value="cash_usd">Efectivo USD</SelectItem>
+                )}
                 <SelectItem value="transfer">Transferencia</SelectItem>
+                {box === "cellphones" && (
+                  <SelectItem value="usdt">USDT</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

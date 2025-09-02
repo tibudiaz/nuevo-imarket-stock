@@ -24,6 +24,7 @@ import {
   Image,
   Wallet,
   Smartphone,
+  Banknote,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -49,6 +50,8 @@ import MobileMenu from "@/components/mobile-menu"
 import { useStore } from "@/hooks/use-store"
 import { Reserve } from "@/components/complete-reserve-modal"
 import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
+import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog"
+import { toast } from "sonner"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -109,6 +112,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [expiringReserves, setExpiringReserves] = useState(false);
 
   const { selectedStore, setSelectedStore } = useStore();
+  const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
 
   useEffect(() => {
     const fetchDolarBlue = async () => {
@@ -253,6 +257,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {(user.role === "admin" || user.role === "moderator") && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (selectedStore === "all") {
+                    toast.error("Seleccione un local", {
+                      description: "Debe elegir un local antes de registrar extracciones.",
+                    });
+                    return;
+                  }
+                  setIsWithdrawalOpen(true);
+                }}
+                className="hidden sm:flex"
+              >
+                <Banknote className="mr-2 h-4 w-4" />
+                Extracción
+              </Button>
+            )}
+
             <div className="hidden sm:flex items-center gap-2">
                 <span className="font-semibold text-sm text-blue-600">Dólar Blue:</span>
                 {isDolarLoading ? (
@@ -296,6 +319,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </DropdownMenu>
           </div>
         </header>
+
+        <CashWithdrawalDialog
+          isOpen={isWithdrawalOpen}
+          onClose={() => setIsWithdrawalOpen(false)}
+        />
 
         <div className="flex flex-1">
           <aside className="group sticky top-16 hidden h-[calc(100vh-4rem)] md:flex flex-col border-r bg-white w-16 hover:w-64 transition-all duration-300 ease-in-out">
