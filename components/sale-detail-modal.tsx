@@ -36,6 +36,8 @@ interface SaleItem {
   category?: string
   cost?: number
   provider?: string
+  imei?: string
+  barcode?: string
 }
 
 interface Product {
@@ -85,6 +87,7 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
               <TableHeader>
                 <TableRow>
                   <TableHead>Producto</TableHead>
+                  <TableHead>IMEI/Serie</TableHead>
                   <TableHead>Cantidad</TableHead>
                   <TableHead>Precio Unitario</TableHead>
                   {user.role === 'admin' && <TableHead>Costo Unitario</TableHead>}
@@ -113,6 +116,10 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                   return (
                     <TableRow key={`${item.productId}-${index}`}>
                       <TableCell className="font-medium">{item.productName}</TableCell>
+                      <TableCell>
+                        {item.imei && <div>IMEI: {item.imei}</div>}
+                        {item.barcode && <div>S/N: {item.barcode}</div>}
+                      </TableCell>
                       <TableCell>{item.quantity}</TableCell>
                       <TableCell>
                         {isUSD ? (
@@ -173,6 +180,10 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                 {sale.tradeIn && sale.tradeIn.price > 0 && (
                   <TableRow key="trade-in">
                     <TableCell className="font-medium">Parte de Pago: {sale.tradeIn.name || 'Equipo'}</TableCell>
+                    <TableCell>
+                      {sale.tradeIn.imei && <div>IMEI: {sale.tradeIn.imei}</div>}
+                      {sale.tradeIn.serialNumber && <div>S/N: {sale.tradeIn.serialNumber}</div>}
+                    </TableCell>
                     <TableCell>1</TableCell>
                     <TableCell>
                       {`USD ${Number(sale.tradeIn.price).toFixed(2)}`}

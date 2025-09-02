@@ -66,7 +66,7 @@ export default function CajaPage() {
       router.push("/");
       return;
     }
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'moderator') {
       router.push('/dashboard');
       return;
     }
@@ -395,24 +395,28 @@ export default function CajaPage() {
             <div className="text-2xl font-bold">${metrics.totalMoneyUSD.toFixed(2)}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Ganancias Limpias (ARS)</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${metrics.profitARS.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Ganancias Limpias (USD)</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${metrics.profitUSD.toFixed(2)}</div>
-          </CardContent>
-        </Card>
+        {user?.role === 'admin' && (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Ganancias Limpias (ARS)</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${metrics.profitARS.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Ganancias Limpias (USD)</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${metrics.profitUSD.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+          </>
+        )}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Efectivo (ARS)</CardTitle>

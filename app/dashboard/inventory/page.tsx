@@ -43,6 +43,7 @@ import {
   ShoppingCart,
   Barcode,
   User,
+  Wallet,
 } from "lucide-react";
 import { ref, onValue, set, push, remove, update } from "firebase/database";
 import { database } from "@/lib/firebase";
@@ -477,6 +478,16 @@ export default function InventoryPage() {
               <ShoppingCart className="mr-2 h-4 w-4" />
               Venta Rápida
             </Button>
+            {user?.role === "moderator" && (
+              <Button
+                onClick={() => router.push("/dashboard/caja")}
+                className="w-full sm:w-auto"
+                variant="secondary"
+              >
+                <Wallet className="mr-2 h-4 w-4" />
+                Cerrar Caja
+              </Button>
+            )}
             {user?.role === "admin" && (
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>

@@ -31,6 +31,8 @@ interface SaleItem {
   category?: string;
   cost?: number;
   provider?: string;
+  imei?: string;
+  barcode?: string;
 }
 
 interface Sale {
@@ -398,7 +400,13 @@ export default function SalesPage() {
                       </TableCell>
                       {user?.role === 'admin' && <TableCell>{sale.customerDni}</TableCell>}
                       <TableCell>
-                        {(sale.items || []).map(item => `${item.quantity}x ${item.productName}`).join(', ')}
+                        {(sale.items || []).map(item => {
+                          const details = [] as string[]
+                          if (item.imei) details.push(`IMEI: ${item.imei}`)
+                          if (item.barcode) details.push(`S/N: ${item.barcode}`)
+                          const info = details.length ? ` (${details.join(' / ')})` : ''
+                          return `${item.quantity}x ${item.productName}${info}`
+                        }).join(', ')}
                       </TableCell>
                       <TableCell>${Number(sale.totalAmount).toFixed(2)}</TableCell>
                       <TableCell>{sale.usdRate ? sale.usdRate.toFixed(2) : '-'}</TableCell>
