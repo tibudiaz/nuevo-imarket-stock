@@ -45,6 +45,11 @@ interface Closure {
   cellphonesCashUSD?: number;
   cellphonesBankARS?: number;
   cellphonesBankUSD?: number;
+  withdrawalsAccCashARS?: number;
+  withdrawalsAccBankARS?: number;
+  withdrawalsCellCashARS?: number;
+  withdrawalsCellBankARS?: number;
+  withdrawals?: any[];
   note?: string;
   sales?: Sale[];
 }
@@ -102,6 +107,11 @@ export default function CashClosuresPage() {
     doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
     doc.text(`Banco ARS: $${(c.cellphonesBankARS || 0).toFixed(2)}`, 10, y); y += 10;
     doc.text(`Banco USD: $${(c.cellphonesBankUSD || 0).toFixed(2)}`, 10, y); y += 20;
+    const withdrawAcc = (c.withdrawalsAccCashARS || 0) + (c.withdrawalsAccBankARS || 0);
+    const withdrawCell = (c.withdrawalsCellCashARS || 0) + (c.withdrawalsCellBankARS || 0);
+    doc.text('Extracciones', 10, y); y += 10;
+    doc.text(`Accesorios: $${withdrawAcc.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Celulares: $${withdrawCell.toFixed(2)}`, 10, y); y += 20;
     if (c.note) {
       doc.text('Notas:', 10, y); y += 10;
       doc.text(c.note, 10, y);
