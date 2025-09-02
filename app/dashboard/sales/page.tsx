@@ -44,6 +44,7 @@ interface Sale {
   totalAmount: number
   paymentMethod?: string
   cashAmount?: number
+  cashUsdAmount?: number
   transferAmount?: number
   cardAmount?: number
   [key: string]: any

@@ -20,6 +20,7 @@ interface Sale {
   totalAmount: number
   paymentMethod?: string
   cashAmount?: number
+  cashUsdAmount?: number
   transferAmount?: number
   cardAmount?: number
   receiptNumber?: string
@@ -209,6 +210,7 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
                   Método de Pago: <Badge variant="outline">Múltiple</Badge>
                 </div>
                 <div>Efectivo: ${ (sale.cashAmount ?? 0).toFixed(2) }</div>
+                <div>Efectivo USD: ${ (sale.cashUsdAmount ?? 0).toFixed(2) }</div>
                 <div>Transferencia: ${ (sale.transferAmount ?? 0).toFixed(2) }</div>
                 <div>Tarjeta: ${ (sale.cardAmount ?? 0).toFixed(2) }</div>
               </div>
