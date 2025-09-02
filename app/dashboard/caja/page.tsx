@@ -50,12 +50,23 @@ interface Product {
   store?: string;
 }
 
+interface Withdrawal {
+  id: string;
+  box: 'accessories' | 'cellphones';
+  method: 'cash' | 'transfer';
+  amount: number;
+  note?: string;
+  timestamp: number;
+  store?: string;
+}
+
 export default function CajaPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { selectedStore } = useStore();
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [lastClosure, setLastClosure] = useState<number>(0);
   const [note, setNote] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -109,10 +120,22 @@ export default function CajaPage() {
       setLastClosure(last);
     });
 
+    const withdrawalsRef = ref(database, "cashWithdrawals");
+    const unsubscribeWithdrawals = onValue(withdrawalsRef, (snapshot) => {
+      const data: Withdrawal[] = [];
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          data.push({ id: child.key!, ...child.val() });
+        });
+      }
+      setWithdrawals(data);
+    });
+
     return () => {
       unsubscribeSales();
       unsubscribeProducts();
       unsubscribeClosures();
+      unsubscribeWithdrawals();
     };
   }, [authLoading, user, router, selectedStore]);
 
@@ -123,6 +146,16 @@ export default function CajaPage() {
         (selectedStore === 'all' || s.store === selectedStore)
     ),
     [sales, lastClosure, selectedStore]
+  );
+
+  const filteredWithdrawals = useMemo(
+    () =>
+      withdrawals.filter(
+        (w) =>
+          w.timestamp > lastClosure &&
+          (selectedStore === 'all' || w.store === selectedStore)
+      ),
+    [withdrawals, lastClosure, selectedStore]
   );
 
   const metrics = useMemo(() => {
@@ -152,6 +185,11 @@ export default function CajaPage() {
     let cellBankARS = 0;
     let cellBankUSD = 0;
 
+    let withdrawAccCashARS = 0;
+    let withdrawAccBankARS = 0;
+    let withdrawCellCashARS = 0;
+    let withdrawCellBankARS = 0;
+
     const productMap = new Map(
       (selectedStore === 'all' ? products : products.filter(p => p.store === selectedStore)).map(p => [p.id, p])
     );
@@ -179,7 +217,7 @@ export default function CajaPage() {
           profitARS += price - cost;
         }
 
-        const isCell = category === 'celulares nuevos' || category === 'celulares usados';
+        const isCell = category.includes('celulares');
         if (isCell) {
           if (category === 'celulares nuevos') {
             newPhones += qty;
@@ -230,6 +268,24 @@ export default function CajaPage() {
       if (hasAccessory) accessorySales += 1;
     });
 
+    filteredWithdrawals.forEach((w) => {
+      const amt = Number(w.amount || 0);
+      if (w.box === 'cellphones') {
+        if (w.method === 'cash') withdrawCellCashARS += amt;
+        else withdrawCellBankARS += amt;
+      } else {
+        if (w.method === 'cash') withdrawAccCashARS += amt;
+        else withdrawAccBankARS += amt;
+      }
+    });
+
+    totalCashARS -= withdrawAccCashARS + withdrawCellCashARS;
+    totalBankARS -= withdrawAccBankARS + withdrawCellBankARS;
+    accCashARS -= withdrawAccCashARS;
+    accBankARS -= withdrawAccBankARS;
+    cellCashARS -= withdrawCellCashARS;
+    cellBankARS -= withdrawCellBankARS;
+
     return {
       accessorySales,
       productsNoPhones,
@@ -253,8 +309,12 @@ export default function CajaPage() {
       cellphonesCashUSD: cellCashUSD,
       cellphonesBankARS: cellBankARS,
       cellphonesBankUSD: cellBankUSD,
+      withdrawalsAccCashARS: withdrawAccCashARS,
+      withdrawalsAccBankARS: withdrawAccBankARS,
+      withdrawalsCellCashARS: withdrawCellCashARS,
+      withdrawalsCellBankARS: withdrawCellBankARS,
     };
-  }, [filteredSales, products, selectedStore]);
+  }, [filteredSales, filteredWithdrawals, products, selectedStore]);
 
   const generatePDF = (summary: any) => {
     const doc = new jsPDF();
@@ -273,6 +333,11 @@ export default function CajaPage() {
     doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
     doc.text(`Banco ARS: $${summary.cellphonesBankARS.toFixed(2)}`, 10, y); y += 10;
     doc.text(`Banco USD: $${summary.cellphonesBankUSD.toFixed(2)}`, 10, y); y += 20;
+    const withdrawAcc = (summary.withdrawalsAccCashARS || 0) + (summary.withdrawalsAccBankARS || 0);
+    const withdrawCell = (summary.withdrawalsCellCashARS || 0) + (summary.withdrawalsCellBankARS || 0);
+    doc.text('Extracciones', 10, y); y += 10;
+    doc.text(`Accesorios: $${withdrawAcc.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`Celulares: $${withdrawCell.toFixed(2)}`, 10, y); y += 20;
     if (summary.note) {
       doc.text('Notas:', 10, y); y += 10;
       doc.text(summary.note, 10, y);
@@ -300,6 +365,10 @@ export default function CajaPage() {
       cellphonesCashUSD: metrics.cellphonesCashUSD,
       cellphonesBankARS: metrics.cellphonesBankARS,
       cellphonesBankUSD: metrics.cellphonesBankUSD,
+      withdrawalsAccCashARS: metrics.withdrawalsAccCashARS,
+      withdrawalsAccBankARS: metrics.withdrawalsAccBankARS,
+      withdrawalsCellCashARS: metrics.withdrawalsCellCashARS,
+      withdrawalsCellBankARS: metrics.withdrawalsCellBankARS,
       timestamp: Date.now(),
       store: selectedStore,
       note,
@@ -308,6 +377,7 @@ export default function CajaPage() {
       await push(ref(database, "cashClosures"), {
         ...summary,
         sales: filteredSales,
+        withdrawals: filteredWithdrawals,
       });
       generatePDF(summary);
       setLastClosure(summary.timestamp);
