@@ -63,6 +63,7 @@ interface Sale {
     items: any[]; // Se mantiene flexible para los items de la venta
     paymentMethod: string;
     cashAmount?: number;
+    cashUsdAmount?: number;
     transferAmount?: number;
     cardAmount?: number;
     totalAmount: number;
@@ -112,6 +113,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [customer, setCustomer] = useState({ name: "", dni: "", phone: "", email: "" })
   const [paymentMethod, setPaymentMethod] = useState("efectivo")
   const [cashAmount, setCashAmount] = useState(0)
+  const [cashUsdAmount, setCashUsdAmount] = useState(0)
   const [transferAmount, setTransferAmount] = useState(0)
   const [cardAmount, setCardAmount] = useState(0)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
@@ -142,6 +144,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   useEffect(() => {
     if (paymentMethod !== "multiple") {
       setCashAmount(0)
+      setCashUsdAmount(0)
       setTransferAmount(0)
       setCardAmount(0)
     }
@@ -366,7 +369,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         return;
     }
     if (paymentMethod === "multiple") {
-        const sum = cashAmount + transferAmount + cardAmount;
+        const sum =
+            cashAmount +
+            transferAmount +
+            cardAmount +
+            cashUsdAmount * usdRate;
         if (Math.abs(sum - finalTotal) > 0.01) {
             toast.error("La suma de los montos no coincide con el total");
             return;
@@ -477,7 +484,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 cost: item.cost ?? 0,
             })),
             paymentMethod,
-            ...(paymentMethod === "multiple" ? { cashAmount, transferAmount, cardAmount } : {}),
+            ...(paymentMethod === "multiple"
+                ? { cashAmount, cashUsdAmount, transferAmount, cardAmount }
+                : {}),
             totalAmount: finalTotal,
             tradeIn: isTradeIn ? tradeInProduct : null,
             usdRate,
@@ -755,10 +764,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     </Select>
                   </div>
                   {paymentMethod === "multiple" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                       <div className="space-y-1">
                         <Label>Monto Efectivo</Label>
                         <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value) || 0)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Monto Efectivo USD</Label>
+                        <Input type="number" value={cashUsdAmount} onChange={(e) => setCashUsdAmount(Number(e.target.value) || 0)} />
                       </div>
                       <div className="space-y-1">
                         <Label>Monto Transferencia</Label>

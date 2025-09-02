@@ -56,6 +56,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [cashAmount, setCashAmount] = useState(0);
+  const [cashUsdAmount, setCashUsdAmount] = useState(0);
   const [transferAmount, setTransferAmount] = useState(0);
   const [cardAmount, setCardAmount] = useState(0);
   const [usdRate, setUsdRate] = useState(0);
@@ -90,6 +91,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
       setCart([]);
       setPaymentMethod("efectivo");
       setCashAmount(0);
+      setCashUsdAmount(0);
       setTransferAmount(0);
       setCardAmount(0);
       setUsdRate(0);
@@ -99,6 +101,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
   useEffect(() => {
     if (paymentMethod !== "multiple") {
       setCashAmount(0);
+      setCashUsdAmount(0);
       setTransferAmount(0);
       setCardAmount(0);
     }
@@ -165,7 +168,11 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
       return;
     }
     if (paymentMethod === "multiple") {
-      const sum = cashAmount + transferAmount + cardAmount;
+      const sum =
+        cashAmount +
+        transferAmount +
+        cardAmount +
+        cashUsdAmount * usdRate;
       if (Math.abs(sum - totalAmount) > 0.01) {
         toast.error("La suma de los montos no coincide con el total");
         return;
@@ -212,7 +219,7 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
         totalAmount,
         paymentMethod,
         ...(paymentMethod === "multiple"
-          ? { cashAmount, transferAmount, cardAmount }
+          ? { cashAmount, cashUsdAmount, transferAmount, cardAmount }
           : {}),
         store: store === "local2" ? "local2" : "local1",
         usdRate,
@@ -378,13 +385,21 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
             </Select>
           </div>
           {paymentMethod === "multiple" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
               <div className="space-y-1">
                 <Label>Monto Efectivo</Label>
                 <Input
                   type="number"
                   value={cashAmount}
                   onChange={(e) => setCashAmount(Number(e.target.value) || 0)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto Efectivo USD</Label>
+                <Input
+                  type="number"
+                  value={cashUsdAmount}
+                  onChange={(e) => setCashUsdAmount(Number(e.target.value) || 0)}
                 />
               </div>
               <div className="space-y-1">

@@ -48,12 +48,14 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [cashAmount, setCashAmount] = useState(0);
+  const [cashUsdAmount, setCashUsdAmount] = useState(0);
   const [transferAmount, setTransferAmount] = useState(0);
   const [cardAmount, setCardAmount] = useState(0);
 
   useEffect(() => {
     if (paymentMethod !== "multiple") {
       setCashAmount(0);
+      setCashUsdAmount(0);
       setTransferAmount(0);
       setCardAmount(0);
     }
@@ -69,7 +71,11 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
       const usdRate = usdRateSnapshot.exists() ? usdRateSnapshot.val() : 0;
       const totalARS = (reserve.remainingAmount || 0) * usdRate;
       if (paymentMethod === "multiple") {
-        const sum = cashAmount + transferAmount + cardAmount;
+        const sum =
+          cashAmount +
+          transferAmount +
+          cardAmount +
+          cashUsdAmount * usdRate;
         if (Math.abs(sum - totalARS) > 0.01) {
           toast.error("La suma de los montos no coincide con el total");
           setIsLoading(false);
@@ -93,7 +99,9 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
           provider: reserve.productData?.provider || null,
         }],
         paymentMethod,
-        ...(paymentMethod === "multiple" ? { cashAmount, transferAmount, cardAmount } : {}),
+        ...(paymentMethod === "multiple"
+          ? { cashAmount, cashUsdAmount, transferAmount, cardAmount }
+          : {}),
         totalAmount: totalARS, // Se registra el pago del saldo
         usdRate,
         notes: `Venta completada desde reserva #${reserve.id}`,
@@ -159,10 +167,14 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
             </Select>
           </div>
           {paymentMethod === "multiple" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
               <div className="space-y-1">
                 <Label>Monto Efectivo</Label>
                 <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value) || 0)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto Efectivo USD</Label>
+                <Input type="number" value={cashUsdAmount} onChange={(e) => setCashUsdAmount(Number(e.target.value) || 0)} />
               </div>
               <div className="space-y-1">
                 <Label>Monto Transferencia</Label>

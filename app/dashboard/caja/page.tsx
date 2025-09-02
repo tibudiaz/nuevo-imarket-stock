@@ -37,6 +37,7 @@ interface Sale {
   items: SaleItem[];
   paymentMethod?: string;
   cashAmount?: number;
+  cashUsdAmount?: number;
   transferAmount?: number;
   cardAmount?: number;
   usdRate?: number;
@@ -258,13 +259,17 @@ export default function CajaPage() {
       if (pm === 'multiple') {
         const saleTotalARS = accessoryTotalARS + cellphoneTotalARS;
         const cash = sale.cashAmount || 0;
+        const cashUSD = sale.cashUsdAmount || 0;
         const bank = (sale.transferAmount || 0) + (sale.cardAmount || 0);
         totalCashARS += cash;
+        totalCashUSD += cashUSD;
         totalBankARS += bank;
         const accRatio = saleTotalARS ? accessoryTotalARS / saleTotalARS : 0;
         const cellRatio = saleTotalARS ? cellphoneTotalARS / saleTotalARS : 0;
         accCashARS += cash * accRatio;
         cellCashARS += cash * cellRatio;
+        accCashUSD += cashUSD * accRatio;
+        cellCashUSD += cashUSD * cellRatio;
         accBankARS += bank * accRatio;
         cellBankARS += bank * cellRatio;
       }
