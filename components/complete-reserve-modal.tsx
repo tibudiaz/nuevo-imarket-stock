@@ -101,7 +101,9 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
         paymentMethod,
         ...(paymentMethod === "multiple"
           ? { cashAmount, cashUsdAmount, transferAmount, cardAmount }
-          : {}),
+          : paymentMethod === "transferencia_usdt"
+            ? { usdtAmount: totalARS / usdRate }
+            : {}),
         totalAmount: totalARS, // Se registra el pago del saldo
         usdRate,
         notes: `Venta completada desde reserva #${reserve.id}`,
@@ -162,6 +164,7 @@ export default function CompleteReserveModal({ isOpen, onClose, reserve, onReser
                 <SelectItem value="efectivo_usd">Efectivo USD</SelectItem>
                 <SelectItem value="tarjeta">Tarjeta</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
+                <SelectItem value="transferencia_usdt">Transferencia USDT</SelectItem>
                 <SelectItem value="multiple">Pago Múltiple</SelectItem>
               </SelectContent>
             </Select>

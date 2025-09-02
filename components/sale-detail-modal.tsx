@@ -25,6 +25,7 @@ interface Sale {
   cardAmount?: number
   receiptNumber?: string
   usdRate?: number
+  usdtAmount?: number
   [key: string]: any
 }
 
@@ -216,7 +217,7 @@ export default function SaleDetailModal({ isOpen, onClose, sale, products, user 
               </div>
             ) : (
               <div className="text-sm">
-                Método de Pago: <Badge variant="outline">{sale.paymentMethod === "efectivo_usd" ? "Efectivo USD" : sale.paymentMethod}</Badge>
+                Método de Pago: <Badge variant="outline">{sale.paymentMethod === "efectivo_usd" ? "Efectivo USD" : sale.paymentMethod === "transferencia_usdt" ? "Transferencia USDT" : sale.paymentMethod}</Badge>
               </div>
             )}
             <div className="text-xl font-bold">

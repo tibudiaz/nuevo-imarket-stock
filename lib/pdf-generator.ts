@@ -36,6 +36,8 @@ interface Sale {
   pointsAccumulated?: number;
   pointsPaused?: boolean;
   store?: 'local1' | 'local2';
+  paymentMethod?: string;
+  usdtAmount?: number;
 }
 
 interface Repair {

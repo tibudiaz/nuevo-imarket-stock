@@ -41,6 +41,7 @@ interface Sale {
   transferAmount?: number;
   cardAmount?: number;
   usdRate?: number;
+  usdtAmount?: number;
   store?: string;
 }
 
@@ -54,7 +55,7 @@ interface Product {
 interface Withdrawal {
   id: string;
   box: 'accessories' | 'cellphones';
-  method: 'cash' | 'transfer';
+  method: 'cash' | 'transfer' | 'cash_usd' | 'usdt';
   amount: number;
   note?: string;
   timestamp: number;
@@ -173,6 +174,7 @@ export default function CajaPage() {
     let totalBankARS = 0;
     let totalCashUSD = 0;
     let totalBankUSD = 0;
+    let totalUsdt = 0;
     let profitARS = 0;
     let profitUSD = 0;
     let cellphoneCount = 0;
@@ -185,11 +187,14 @@ export default function CajaPage() {
     let cellCashUSD = 0;
     let cellBankARS = 0;
     let cellBankUSD = 0;
+    let cellUsdt = 0;
 
     let withdrawAccCashARS = 0;
     let withdrawAccBankARS = 0;
     let withdrawCellCashARS = 0;
     let withdrawCellBankARS = 0;
+    let withdrawCellCashUSD = 0;
+    let withdrawCellUsdt = 0;
 
     const productMap = new Map(
       (selectedStore === 'all' ? products : products.filter(p => p.store === selectedStore)).map(p => [p.id, p])
@@ -245,7 +250,7 @@ export default function CajaPage() {
             totalCashARS += price;
             if (isCell) cellCashARS += price; else accCashARS += price;
           }
-        } else if (pm === 'tarjeta' || (pm && pm.includes('transfer'))) {
+        } else if (pm === 'tarjeta' || (pm && pm.includes('transfer') && pm !== 'transferencia_usdt')) {
           if (currency === 'USD') {
             totalBankUSD += price;
             if (isCell) cellBankUSD += price; else accBankUSD += price;
@@ -272,6 +277,12 @@ export default function CajaPage() {
         cellCashUSD += cashUSD * cellRatio;
         accBankARS += bank * accRatio;
         cellBankARS += bank * cellRatio;
+      } else if (pm === 'transferencia_usdt') {
+        const saleTotalARS = accessoryTotalARS + cellphoneTotalARS;
+        const usdt = (sale.usdtAmount || 0);
+        totalUsdt += usdt;
+        const cellRatio = saleTotalARS ? cellphoneTotalARS / saleTotalARS : 0;
+        cellUsdt += usdt * cellRatio;
       }
 
       if (hasAccessory) accessorySales += 1;
@@ -281,6 +292,8 @@ export default function CajaPage() {
       const amt = Number(w.amount || 0);
       if (w.box === 'cellphones') {
         if (w.method === 'cash') withdrawCellCashARS += amt;
+        else if (w.method === 'cash_usd') withdrawCellCashUSD += amt;
+        else if (w.method === 'usdt') withdrawCellUsdt += amt;
         else withdrawCellBankARS += amt;
       } else {
         if (w.method === 'cash') withdrawAccCashARS += amt;
@@ -290,10 +303,14 @@ export default function CajaPage() {
 
     totalCashARS -= withdrawAccCashARS + withdrawCellCashARS;
     totalBankARS -= withdrawAccBankARS + withdrawCellBankARS;
+    totalCashUSD -= withdrawCellCashUSD;
+    totalUsdt -= withdrawCellUsdt;
     accCashARS -= withdrawAccCashARS;
     accBankARS -= withdrawAccBankARS;
     cellCashARS -= withdrawCellCashARS;
     cellBankARS -= withdrawCellBankARS;
+    cellCashUSD -= withdrawCellCashUSD;
+    cellUsdt -= withdrawCellUsdt;
 
     return {
       accessorySales,
@@ -303,6 +320,7 @@ export default function CajaPage() {
       totalProducts,
       totalMoneyARS,
       totalMoneyUSD,
+      totalUsdt,
       totalCashARS,
       totalBankARS,
       totalCashUSD,
@@ -318,10 +336,13 @@ export default function CajaPage() {
       cellphonesCashUSD: cellCashUSD,
       cellphonesBankARS: cellBankARS,
       cellphonesBankUSD: cellBankUSD,
+      cellphonesUsdt: cellUsdt,
       withdrawalsAccCashARS: withdrawAccCashARS,
       withdrawalsAccBankARS: withdrawAccBankARS,
       withdrawalsCellCashARS: withdrawCellCashARS,
       withdrawalsCellBankARS: withdrawCellBankARS,
+      withdrawalsCellCashUSD: withdrawCellCashUSD,
+      withdrawalsCellUsdt: withdrawCellUsdt,
     };
   }, [filteredSales, filteredWithdrawals, products, selectedStore]);
 
@@ -340,10 +361,11 @@ export default function CajaPage() {
     doc.text('Celulares', 10, y); y += 10;
     doc.text(`Efectivo ARS: $${summary.cellphonesCashARS.toFixed(2)}`, 10, y); y += 10;
     doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`USDT: ${ (summary.cellphonesUsdt || 0).toFixed(2) }`, 10, y); y += 10;
     doc.text(`Banco ARS: $${summary.cellphonesBankARS.toFixed(2)}`, 10, y); y += 10;
     doc.text(`Banco USD: $${summary.cellphonesBankUSD.toFixed(2)}`, 10, y); y += 20;
     const withdrawAcc = (summary.withdrawalsAccCashARS || 0) + (summary.withdrawalsAccBankARS || 0);
-    const withdrawCell = (summary.withdrawalsCellCashARS || 0) + (summary.withdrawalsCellBankARS || 0);
+    const withdrawCell = (summary.withdrawalsCellCashARS || 0) + (summary.withdrawalsCellBankARS || 0) + (summary.withdrawalsCellCashUSD || 0) + (summary.withdrawalsCellUsdt || 0);
     doc.text('Extracciones', 10, y); y += 10;
     doc.text(`Accesorios: $${withdrawAcc.toFixed(2)}`, 10, y); y += 10;
     doc.text(`Celulares: $${withdrawCell.toFixed(2)}`, 10, y); y += 20;
@@ -363,6 +385,7 @@ export default function CajaPage() {
       gananciasLimpias: metrics.profitARS,
       cantidadCelularesVendidos: metrics.cellphoneCount,
       dineroTotalUSD: metrics.totalMoneyUSD,
+      dineroTotalUSDT: metrics.totalUsdt,
       gananciasLimpiasUSD: metrics.profitUSD,
       dineroTotalEfectivoUSD: metrics.totalCashUSD,
       dineroTotalBancoUSD: metrics.totalBankUSD,
@@ -374,10 +397,13 @@ export default function CajaPage() {
       cellphonesCashUSD: metrics.cellphonesCashUSD,
       cellphonesBankARS: metrics.cellphonesBankARS,
       cellphonesBankUSD: metrics.cellphonesBankUSD,
+      cellphonesUsdt: metrics.cellphonesUsdt,
       withdrawalsAccCashARS: metrics.withdrawalsAccCashARS,
       withdrawalsAccBankARS: metrics.withdrawalsAccBankARS,
       withdrawalsCellCashARS: metrics.withdrawalsCellCashARS,
       withdrawalsCellBankARS: metrics.withdrawalsCellBankARS,
+      withdrawalsCellCashUSD: metrics.withdrawalsCellCashUSD,
+      withdrawalsCellUsdt: metrics.withdrawalsCellUsdt,
       timestamp: Date.now(),
       store: selectedStore,
       note,
@@ -409,6 +435,7 @@ export default function CajaPage() {
       cellphonesCashUSD: metrics.cellphonesCashUSD,
       cellphonesBankARS: metrics.cellphonesBankARS,
       cellphonesBankUSD: metrics.cellphonesBankUSD,
+      cellphonesUsdt: metrics.cellphonesUsdt,
       timestamp: Date.now(),
       note,
     };
@@ -474,6 +501,15 @@ export default function CajaPage() {
             <div className="text-2xl font-bold">${metrics.totalMoneyUSD.toFixed(2)}</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Dinero Total (USDT)</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalUsdt.toFixed(2)}</div>
+          </CardContent>
+        </Card>
         {user?.role === 'admin' && (
           <>
             <Card>
@@ -530,6 +566,15 @@ export default function CajaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${metrics.totalBankUSD.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Transferencias (USDT)</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalUsdt.toFixed(2)}</div>
           </CardContent>
         </Card>
       </div>

@@ -205,7 +205,9 @@ export default function CustomerDetailModal({ isOpen, onClose, customer }: Custo
                                       ? "Mercado Pago"
                                       : purchase.paymentMethod === "multiple"
                                         ? "Múltiple"
-                                        : purchase.paymentMethod}
+                                        : purchase.paymentMethod === "transferencia_usdt"
+                                          ? "Transferencia USDT"
+                                          : purchase.paymentMethod}
                             </Badge>
                           </TableCell>
                         </TableRow>

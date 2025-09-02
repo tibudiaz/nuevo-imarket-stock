@@ -69,6 +69,7 @@ interface Sale {
     totalAmount: number;
     tradeIn: any;
     usdRate: number;
+    usdtAmount?: number;
     pointsUsed?: number;
     pointsEarned?: number;
     pointsAccumulated?: number;
@@ -486,7 +487,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             paymentMethod,
             ...(paymentMethod === "multiple"
                 ? { cashAmount, cashUsdAmount, transferAmount, cardAmount }
-                : {}),
+                : paymentMethod === "transferencia_usdt"
+                  ? { usdtAmount: finalTotal / usdRate }
+                  : {}),
             totalAmount: finalTotal,
             tradeIn: isTradeIn ? tradeInProduct : null,
             usdRate,
@@ -759,6 +762,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                         <SelectItem value="efectivo_usd">Efectivo USD</SelectItem>
                         <SelectItem value="tarjeta">Tarjeta</SelectItem>
                         <SelectItem value="transferencia">Transferencia</SelectItem>
+                        <SelectItem value="transferencia_usdt">Transferencia USDT</SelectItem>
                         <SelectItem value="multiple">Pago Múltiple</SelectItem>
                       </SelectContent>
                     </Select>

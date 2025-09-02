@@ -21,6 +21,7 @@ interface SaleItem {
 interface Sale {
   id: string;
   items: SaleItem[];
+  [key: string]: any;
 }
 
 interface Closure {
@@ -34,6 +35,7 @@ interface Closure {
   gananciasLimpias: number;
   cantidadCelularesVendidos: number;
   dineroTotalUSD: number;
+  dineroTotalUSDT?: number;
   gananciasLimpiasUSD: number;
   dineroTotalEfectivoUSD: number;
   dineroTotalBancoUSD: number;
@@ -45,10 +47,13 @@ interface Closure {
   cellphonesCashUSD?: number;
   cellphonesBankARS?: number;
   cellphonesBankUSD?: number;
+  cellphonesUsdt?: number;
   withdrawalsAccCashARS?: number;
   withdrawalsAccBankARS?: number;
   withdrawalsCellCashARS?: number;
   withdrawalsCellBankARS?: number;
+  withdrawalsCellCashUSD?: number;
+  withdrawalsCellUsdt?: number;
   withdrawals?: any[];
   note?: string;
   sales?: Sale[];
@@ -105,10 +110,11 @@ export default function CashClosuresPage() {
     doc.text('Celulares', 10, y); y += 10;
     doc.text(`Efectivo ARS: $${(c.cellphonesCashARS || 0).toFixed(2)}`, 10, y); y += 10;
     doc.text(`Dólares: $${cellphonesUSD.toFixed(2)}`, 10, y); y += 10;
+    doc.text(`USDT: ${(c.cellphonesUsdt || 0).toFixed(2)}`, 10, y); y += 10;
     doc.text(`Banco ARS: $${(c.cellphonesBankARS || 0).toFixed(2)}`, 10, y); y += 10;
     doc.text(`Banco USD: $${(c.cellphonesBankUSD || 0).toFixed(2)}`, 10, y); y += 20;
     const withdrawAcc = (c.withdrawalsAccCashARS || 0) + (c.withdrawalsAccBankARS || 0);
-    const withdrawCell = (c.withdrawalsCellCashARS || 0) + (c.withdrawalsCellBankARS || 0);
+    const withdrawCell = (c.withdrawalsCellCashARS || 0) + (c.withdrawalsCellBankARS || 0) + (c.withdrawalsCellCashUSD || 0) + (c.withdrawalsCellUsdt || 0);
     doc.text('Extracciones', 10, y); y += 10;
     doc.text(`Accesorios: $${withdrawAcc.toFixed(2)}`, 10, y); y += 10;
     doc.text(`Celulares: $${withdrawCell.toFixed(2)}`, 10, y); y += 20;
@@ -144,6 +150,7 @@ export default function CashClosuresPage() {
               <p>Productos vendidos: {c.cantidadProductosVendidos}</p>
               <p>Dinero total ARS: ${c.dineroTotal.toFixed(2)}</p>
               <p>Dinero total USD: ${c.dineroTotalUSD.toFixed(2)}</p>
+              {c.dineroTotalUSDT && <p>Dinero total USDT: {c.dineroTotalUSDT.toFixed(2)}</p>}
               {c.note && <p>Nota: {c.note}</p>}
               <details className="mt-2">
                 <summary>Ver detalles</summary>
