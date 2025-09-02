@@ -232,8 +232,12 @@ export default function CajaPage() {
           accessoryTotalARS += priceInARS;
         }
 
-        if (pm === 'efectivo') {
-          if (currency === 'USD') {
+        if (pm === 'efectivo' || pm === 'efectivo_usd') {
+          if (pm === 'efectivo_usd') {
+            const priceUSD = currency === 'USD' ? price : price / (sale.usdRate || 1);
+            totalCashUSD += priceUSD;
+            if (isCell) cellCashUSD += priceUSD; else accCashUSD += priceUSD;
+          } else if (currency === 'USD') {
             totalCashUSD += price;
             if (isCell) cellCashUSD += price; else accCashUSD += price;
           } else {

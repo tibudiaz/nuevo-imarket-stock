@@ -195,6 +195,8 @@ export default function CustomerDetailModal({ isOpen, onClose, customer }: Custo
                             <Badge variant="outline">
                               {purchase.paymentMethod === "efectivo"
                                 ? "Efectivo"
+                                : purchase.paymentMethod === "efectivo_usd"
+                                  ? "Efectivo USD"
                                 : purchase.paymentMethod === "tarjeta"
                                   ? "Tarjeta"
                                   : purchase.paymentMethod === "transferencia"

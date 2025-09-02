@@ -747,6 +747,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                       <SelectTrigger><SelectValue/></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="efectivo">Efectivo</SelectItem>
+                        <SelectItem value="efectivo_usd">Efectivo USD</SelectItem>
                         <SelectItem value="tarjeta">Tarjeta</SelectItem>
                         <SelectItem value="transferencia">Transferencia</SelectItem>
                         <SelectItem value="multiple">Pago Múltiple</SelectItem>
