@@ -21,7 +21,7 @@ import {
   Wrench,
   Store,
   AlertTriangle,
-  Image,
+  Calculator,
   Wallet,
   Smartphone,
   Banknote,
@@ -375,7 +375,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <NavItem href="/dashboard/customers" icon={Users} label="Clientes" active={pathname === "/dashboard/customers"} />
               )}
 
-              <NavItem href="/dashboard/pricelist" icon={Image} label="Lista Precios" active={pathname === "/dashboard/pricelist"} />
+              <NavItem href="/dashboard/simulator" icon={Calculator} label="Simulador de Costos" active={pathname === "/dashboard/simulator"} />
 
             </nav>
           </aside>
