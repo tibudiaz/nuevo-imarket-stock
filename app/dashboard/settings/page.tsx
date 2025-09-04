@@ -62,6 +62,19 @@ export default function SettingsPage() {
   const [pointRate, setPointRate] = useState(0);
   const [pointValue, setPointValue] = useState(0);
   const [pointsPaused, setPointsPaused] = useState(false);
+
+  const [financingConfig, setFinancingConfig] = useState<{
+    systemFee: number;
+    vat: number;
+    installments: Record<string, { interest: number; commerceCost?: number }>;
+  }>({
+    systemFee: 4.9,
+    vat: 21,
+    installments: {
+      "3": { interest: 7 },
+      "6": { interest: 14.5 },
+    },
+  });
   
   const [ruleName, setRuleName] = useState("");
   const [ruleType, setRuleType] = useState<'model_range' | 'model_start' | 'category'>('model_range');
@@ -122,6 +135,14 @@ export default function SettingsPage() {
         ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value }))
         : [];
       setUsers(userList);
+    });
+  }, []);
+
+  useEffect(() => {
+    const financingRef = ref(database, 'config/financing');
+    onValue(financingRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) setFinancingConfig(data);
     });
   }, []);
 
@@ -201,6 +222,47 @@ export default function SettingsPage() {
     } catch (error) {
       toast.error("Error al eliminar el usuario.");
     }
+  };
+
+  const handleFinancingChange = (field: string, value: number) => {
+    setFinancingConfig((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleInstallmentChange = (
+    count: string,
+    field: string,
+    value: number
+  ) => {
+    setFinancingConfig((prev: any) => ({
+      ...prev,
+      installments: {
+        ...prev.installments,
+        [count]: { ...prev.installments[count], [field]: value },
+      },
+    }));
+  };
+
+  const handleAddInstallment = () => {
+    const count = prompt("Cantidad de cuotas");
+    if (!count) return;
+    setFinancingConfig((prev: any) => ({
+      ...prev,
+      installments: { ...prev.installments, [count]: { interest: 0 } },
+    }));
+  };
+
+  const handleRemoveInstallment = (count: string) => {
+    setFinancingConfig((prev: any) => {
+      const inst = { ...prev.installments };
+      delete inst[count];
+      return { ...prev, installments: inst };
+    });
+  };
+
+  const saveFinancingConfig = async () => {
+    const financingRef = ref(database, 'config/financing');
+    await set(financingRef, financingConfig);
+    toast.success('Configuración guardada');
   };
 
   const handleSaveBundle = async () => {
@@ -296,6 +358,83 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold">Configuración</h1>
         
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+          <Card className="md:col-span-2 lg:col-span-3">
+            <CardHeader>
+              <CardTitle>Simulador de Costos</CardTitle>
+              <CardDescription>Configura tasas e intereses.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tasa del sistema (%)</Label>
+                  <Input
+                    type="number"
+                    value={financingConfig.systemFee}
+                    onChange={(e) =>
+                      handleFinancingChange("systemFee", Number(e.target.value))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>IVA (%)</Label>
+                  <Input
+                    type="number"
+                    value={financingConfig.vat}
+                    onChange={(e) =>
+                      handleFinancingChange("vat", Number(e.target.value))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {Object.entries(financingConfig.installments).map(
+                  ([count, data]) => (
+                    <div key={count} className="flex items-center gap-2">
+                      <span className="w-20">{count} cuotas</span>
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={data.interest}
+                        onChange={(e) =>
+                          handleInstallmentChange(
+                            count,
+                            "interest",
+                            Number(e.target.value)
+                          )
+                        }
+                        placeholder="Interés %"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={data.commerceCost ?? ""}
+                        onChange={(e) =>
+                          handleInstallmentChange(
+                            count,
+                            "commerceCost",
+                            Number(e.target.value)
+                          )
+                        }
+                        placeholder="Costo comercio %"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveInstallment(count)}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )
+                )}
+                <Button variant="outline" onClick={handleAddInstallment}>
+                  Agregar cuotas
+                </Button>
+              </div>
+              <Button onClick={saveFinancingConfig}>Guardar</Button>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
