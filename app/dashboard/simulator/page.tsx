@@ -60,14 +60,13 @@ export default function CostSimulatorPage() {
     const promoRate = (instCfg.commerceCost || 0) / 100;
 
     const vatAmount = net * vatRate;
-    const systemFeeBase = net + vatAmount;
-    const systemFee = systemFeeBase * systemRate;
-    const systemFeeVat = systemFee * vatRate;
-    const systemCharge = systemFee + systemFeeVat;
-    const subtotal = net + vatAmount + systemCharge;
-    const catAmount = subtotal * catRate;
-    const totalClient = subtotal + catAmount;
-    const bankAmount = net - systemFee - net * promoRate;
+    const desiredAmount = net + vatAmount;
+    const baseAmount =
+      desiredAmount / (1 - systemRate * (1 + vatRate));
+    const systemCharge = baseAmount - desiredAmount;
+    const catAmount = baseAmount * catRate;
+    const totalClient = baseAmount + catAmount;
+    const bankAmount = desiredAmount - net * promoRate;
     const installments = parseInt(selectedInstallment, 10);
     const perInstallment = totalClient / installments;
 
