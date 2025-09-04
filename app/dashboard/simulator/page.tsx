@@ -36,6 +36,7 @@ export default function CostSimulatorPage() {
           bank: number;
           vat: number;
           system: number;
+          posnet: number;
           installments: number;
           perInstallment: number;
         }
@@ -75,6 +76,7 @@ export default function CostSimulatorPage() {
       bank: bankAmount,
       vat: vatAmount,
       system: systemCharge,
+      posnet: baseAmount,
       installments,
       perInstallment,
     });
@@ -107,6 +109,10 @@ export default function CostSimulatorPage() {
         <Button onClick={calculate}>Calcular</Button>
         {result && (
           <div className="space-y-2">
+            <p className="text-xl font-semibold">
+              Monto a pasar en el posnet: ${" "}
+              {result.posnet.toFixed(2)}
+            </p>
             <p>IVA: ${result.vat.toFixed(2)}</p>
             <p>
               Cargo del sistema (4.9% + IVA): $
