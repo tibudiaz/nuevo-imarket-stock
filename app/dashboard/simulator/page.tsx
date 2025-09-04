@@ -67,7 +67,7 @@ export default function CostSimulatorPage() {
     const subtotal = net + vatAmount + systemCharge;
     const catAmount = subtotal * catRate;
     const totalClient = subtotal + catAmount;
-    const bankAmount = net - net * promoRate;
+    const bankAmount = net - systemFee - net * promoRate;
     const installments = parseInt(selectedInstallment, 10);
     const perInstallment = totalClient / installments;
 
