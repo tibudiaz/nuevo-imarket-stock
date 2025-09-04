@@ -29,7 +29,18 @@ export default function CostSimulatorPage() {
   const [config, setConfig] = useState<FinancingConfig | null>(null);
   const [amount, setAmount] = useState("");
   const [selectedInstallment, setSelectedInstallment] = useState("");
-  const [result, setResult] = useState<{ client: number; bank: number } | null>(null);
+  const [result, setResult] =
+    useState<
+      | {
+          client: number;
+          bank: number;
+          vat: number;
+          system: number;
+          installments: number;
+          perInstallment: number;
+        }
+      | null
+    >(null);
 
   useEffect(() => {
     const cfgRef = ref(database, "config/financing");
@@ -49,14 +60,25 @@ export default function CostSimulatorPage() {
     const promoRate = (instCfg.commerceCost || 0) / 100;
 
     const vatAmount = net * vatRate;
-    const systemFee = (net + vatAmount) * systemRate;
+    const systemFeeBase = net + vatAmount;
+    const systemFee = systemFeeBase * systemRate;
     const systemFeeVat = systemFee * vatRate;
-    const subtotal = net + vatAmount + systemFee + systemFeeVat;
+    const systemCharge = systemFee + systemFeeVat;
+    const subtotal = net + vatAmount + systemCharge;
     const catAmount = subtotal * catRate;
     const totalClient = subtotal + catAmount;
     const bankAmount = net - net * promoRate;
+    const installments = parseInt(selectedInstallment, 10);
+    const perInstallment = totalClient / installments;
 
-    setResult({ client: totalClient, bank: bankAmount });
+    setResult({
+      client: totalClient,
+      bank: bankAmount,
+      vat: vatAmount,
+      system: systemCharge,
+      installments,
+      perInstallment,
+    });
   };
 
   return (
@@ -86,9 +108,18 @@ export default function CostSimulatorPage() {
         <Button onClick={calculate}>Calcular</Button>
         {result && (
           <div className="space-y-2">
+            <p>IVA: ${result.vat.toFixed(2)}</p>
             <p>
-              Monto a cobrar al cliente: ${" "}
+              Cargo del sistema (4.9% + IVA): $
+              {result.system.toFixed(2)}
+            </p>
+            <p>
+              Total a pagar ({result.installments} cuotas): ${" "}
               {result.client.toFixed(2)}
+            </p>
+            <p>
+              Valor por cuota: ${" "}
+              {result.perInstallment.toFixed(2)}
             </p>
             <p>
               Monto a recibir en el banco: ${" "}
