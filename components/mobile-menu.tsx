@@ -111,18 +111,18 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
                   )}>
                     Todos los productos
                   </Link>
-                  {categories.map(cat => (
-                      <Link
-                        key={cat.id}
-                        href={`/dashboard/inventory?category=${encodeURIComponent(cat.name)}`}
-                        onClick={handleLinkClick}
-                        className={cn(
-                          "block rounded-md p-2 text-sm hover:bg-slate-100",
-                          currentCategory === cat.name && "bg-slate-200"
-                        )}
-                      >
-                          {cat.name}
-                      </Link>
+                  {categories.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      href={{ pathname: "/dashboard/inventory", query: { category: cat.name } }}
+                      onClick={handleLinkClick}
+                      className={cn(
+                        "block rounded-md p-2 text-sm hover:bg-slate-100",
+                        currentCategory === cat.name && "bg-slate-200"
+                      )}
+                    >
+                      {cat.name}
+                    </Link>
                   ))}
               </CollapsibleContent>
             </Collapsible>
