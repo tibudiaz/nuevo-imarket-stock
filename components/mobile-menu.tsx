@@ -11,8 +11,11 @@ import { cn } from "@/lib/utils"
 import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 
+type StoreOption = 'all' | 'local1' | 'local2'
+
 interface MobileMenuProps {
   userRole: string
+  selectedStore: StoreOption
 }
 
 interface Category {
@@ -20,7 +23,7 @@ interface Category {
   name: string;
 }
 
-export default function MobileMenu({ userRole }: MobileMenuProps) {
+export default function MobileMenu({ userRole, selectedStore }: MobileMenuProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentCategory = searchParams.get('category');
@@ -54,6 +57,13 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
     { href: "/dashboard/reserves", label: "Reservas", icon: ShoppingCart, active: pathname === "/dashboard/reserves", role: ["admin", "moderator"] },
     { href: "/dashboard/customers", label: "Clientes", icon: Users, active: pathname === "/dashboard/customers", role: ["admin"] },
   ];
+
+  const filteredRoutes = mainRoutes.filter((route) => {
+    if (selectedStore === 'local2' && route.href === "/dashboard/sales") {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="md:hidden">
@@ -128,7 +138,7 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
             </Collapsible>
 
             {/* Resto de las rutas filtradas por rol */}
-            {mainRoutes.filter(route => route.label !== 'Dashboard').map((route) => (
+            {filteredRoutes.filter(route => route.label !== 'Dashboard').map((route) => (
               route.role.includes(userRole) && (
                 <Link
                   key={route.href}
