@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,30 @@ interface Category {
   name: string;
 }
 
+const NEW_PRODUCT_STORAGE_KEY = "inventory-new-product";
+const NEW_PRODUCT_DIALOG_OPEN_KEY = "inventory-new-product-open";
+
+const getStoreFromSelection = (
+  store: "all" | "local1" | "local2",
+): "local1" | "local2" => (store === "local2" ? "local2" : "local1");
+
+const createEmptyNewProduct = (
+  store: "all" | "local1" | "local2",
+): NewProduct => ({
+  name: "",
+  brand: "",
+  model: "",
+  price: 0,
+  cost: 0,
+  stock: 0,
+  category: "",
+  barcode: "",
+  imei: "",
+  provider: "",
+  entryDate: new Date().toISOString().split("T")[0],
+  store: getStoreFromSelection(store),
+});
+
 export default function InventoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -121,21 +145,11 @@ export default function InventoryPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [newProduct, setNewProduct] = useState<NewProduct>({
-    name: "",
-    brand: "",
-    model: "",
-    price: 0,
-    cost: 0,
-    stock: 0,
-    category: "",
-    barcode: "",
-    imei: "",
-    provider: "",
-    entryDate: new Date().toISOString().split("T")[0],
-    store: selectedStore === "local2" ? "local2" : "local1",
-  });
+  const [newProduct, setNewProduct] = useState<NewProduct>(() =>
+    createEmptyNewProduct(selectedStore),
+  );
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const hasRestoredNewProduct = useRef(false);
 
   const isCellphoneCategory =
     newProduct.category === "Celulares" ||
@@ -154,14 +168,92 @@ export default function InventoryPage() {
     editingProduct?.category === "Celulares Nuevos";
 
   useEffect(() => {
-    if (isAddDialogOpen) {
-      setNewProduct((prev) => ({
-        ...prev,
-        store: selectedStore === "local2" ? "local2" : "local1",
-        entryDate: new Date().toISOString().split("T")[0],
-      }));
+    if (typeof window === "undefined") return;
+
+    const storeValue = getStoreFromSelection(selectedStore);
+
+    if (!hasRestoredNewProduct.current) {
+      hasRestoredNewProduct.current = true;
+
+      try {
+        const savedProduct = window.localStorage.getItem(
+          NEW_PRODUCT_STORAGE_KEY,
+        );
+
+        if (savedProduct) {
+          const parsedProduct = JSON.parse(savedProduct) as Partial<NewProduct>;
+
+          setNewProduct((prev) => ({
+            ...prev,
+            ...parsedProduct,
+            entryDate:
+              parsedProduct?.entryDate ||
+              prev.entryDate ||
+              new Date().toISOString().split("T")[0],
+            store: storeValue,
+          }));
+        } else {
+          setNewProduct((prev) =>
+            prev.store === storeValue
+              ? prev
+              : { ...prev, store: storeValue },
+          );
+        }
+
+        const shouldReopen =
+          window.localStorage.getItem(NEW_PRODUCT_DIALOG_OPEN_KEY) === "true";
+
+        if (shouldReopen) {
+          setIsAddDialogOpen(true);
+        }
+      } catch (error) {
+        console.error("Error al restaurar el producto en edición:", error);
+        window.localStorage.removeItem(NEW_PRODUCT_STORAGE_KEY);
+        window.localStorage.removeItem(NEW_PRODUCT_DIALOG_OPEN_KEY);
+        setNewProduct((prev) =>
+          prev.store === storeValue ? prev : { ...prev, store: storeValue },
+        );
+      }
+
+      return;
     }
+
+    setNewProduct((prev) =>
+      prev.store === storeValue ? prev : { ...prev, store: storeValue },
+    );
+  }, [selectedStore]);
+
+  useEffect(() => {
+    if (!isAddDialogOpen) return;
+
+    setNewProduct((prev) => ({
+      ...prev,
+      store: getStoreFromSelection(selectedStore),
+      entryDate:
+        prev.entryDate && prev.entryDate.trim() !== ""
+          ? prev.entryDate
+          : new Date().toISOString().split("T")[0],
+    }));
   }, [isAddDialogOpen, selectedStore]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (isAddDialogOpen) {
+      window.localStorage.setItem(NEW_PRODUCT_DIALOG_OPEN_KEY, "true");
+    } else {
+      window.localStorage.removeItem(NEW_PRODUCT_DIALOG_OPEN_KEY);
+    }
+  }, [isAddDialogOpen]);
+
+  useEffect(() => {
+    if (!isAddDialogOpen || typeof window === "undefined") return;
+
+    window.localStorage.setItem(
+      NEW_PRODUCT_STORAGE_KEY,
+      JSON.stringify(newProduct),
+    );
+  }, [newProduct, isAddDialogOpen]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -272,20 +364,11 @@ export default function InventoryPage() {
           : new Date().toISOString(),
         createdAt: new Date().toISOString(),
       });
-      setNewProduct({
-        name: "",
-        brand: "",
-        model: "",
-        price: 0,
-        cost: 0,
-        stock: 0,
-        category: "",
-        barcode: "",
-        imei: "",
-        provider: "",
-        entryDate: new Date().toISOString().split("T")[0],
-        store: selectedStore === "local2" ? "local2" : "local1",
-      });
+      setNewProduct(createEmptyNewProduct(selectedStore));
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(NEW_PRODUCT_STORAGE_KEY);
+        window.localStorage.removeItem(NEW_PRODUCT_DIALOG_OPEN_KEY);
+      }
       setIsAddDialogOpen(false);
       toast.success("Producto agregado", {
         description: "El producto ha sido agregado correctamente.",
