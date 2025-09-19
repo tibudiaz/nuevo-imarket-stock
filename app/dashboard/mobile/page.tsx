@@ -17,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Barcode,
   Package,
-  PlusCircle,
   Wrench,
   Smartphone,
   AlertTriangle,
@@ -26,6 +25,12 @@ import {
   TrendingUp,
   ClipboardList,
   User,
+  Wallet,
+  Bell,
+  Database,
+  Settings,
+  Calculator,
+  BarChart3,
 } from "lucide-react";
 import MobileScanner from "@/components/mobile-scanner";
 import {
@@ -393,28 +398,88 @@ export default function MobilePage() {
 
   const quickActions = [
     {
-      title: "Ver Inventario",
-      description: "Consulta el stock de todos los productos.",
+      title: "Inventario",
+      description: "Consulta y administra el stock de todos los productos.",
       icon: Package,
       action: () => router.push("/dashboard/inventory"),
     },
     {
-      title: "Nueva Venta",
-      description: "Registra una nueva venta de productos.",
-      icon: PlusCircle,
+      title: "Ventas",
+      description: "Gestiona ventas y registra nuevas operaciones.",
+      icon: ShoppingBag,
       action: () => router.push("/dashboard/sales"),
     },
     {
-      title: "Nueva Reparación",
-      description: "Registra el ingreso de un nuevo equipo para reparar.",
+      title: "Ventas de Celulares",
+      description: "Controla las ventas específicas de celulares.",
+      icon: Smartphone,
+      action: () => router.push("/dashboard/sales?type=celulares"),
+    },
+    {
+      title: "Reparaciones",
+      description: "Supervisa y actualiza el estado de las reparaciones.",
       icon: Wrench,
       action: () => router.push("/dashboard/repairs"),
     },
     {
-      title: "Gestionar Reservas",
-      description: "Controla las reservas activas y completadas.",
+      title: "Reservas",
+      description: "Gestiona las reservas activas y completadas.",
       icon: ClipboardList,
       action: () => router.push("/dashboard/reserves"),
+    },
+    {
+      title: "Bajo Stock",
+      description: "Revisa los productos con stock crítico.",
+      icon: AlertTriangle,
+      action: () => router.push("/dashboard/low-stock"),
+    },
+    {
+      title: "Clientes",
+      description: "Administra la información de tus clientes.",
+      icon: User,
+      action: () => router.push("/dashboard/customers"),
+    },
+    {
+      title: "Simulador de Costos",
+      description: "Calcula precios y márgenes rápidamente.",
+      icon: Calculator,
+      action: () => router.push("/dashboard/simulator"),
+    },
+    {
+      title: "Caja",
+      description: "Controla ingresos y extracciones de caja.",
+      icon: Wallet,
+      action: () => router.push("/dashboard/caja"),
+    },
+    {
+      title: "Finanzas",
+      description: "Analiza la rentabilidad y flujo financiero.",
+      icon: DollarSign,
+      action: () => router.push("/dashboard/finances"),
+    },
+    {
+      title: "Reportes",
+      description: "Genera reportes detallados del negocio.",
+      icon: BarChart3,
+      action: () => router.push("/dashboard/reports"),
+    },
+    {
+      title: "Notificaciones",
+      description: "Consulta las alertas y novedades del sistema.",
+      icon: Bell,
+      action: () => router.push("/dashboard/notifications"),
+    },
+    {
+      title: "Respaldo",
+      description: "Gestiona los respaldos de la base de datos.",
+      icon: Database,
+      action: () => router.push("/dashboard/backup"),
+    },
+    {
+      title: "Configuración",
+      description: "Personaliza la configuración del sistema.",
+      icon: Settings,
+      action: () => router.push("/dashboard/settings"),
     },
   ];
 
