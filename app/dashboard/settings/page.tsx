@@ -66,6 +66,7 @@ interface FinancingCard {
 }
 
 interface FinancingConfig {
+  preSystemFee: number;
   systemFee: number;
   vat: number;
   grossIncome: number;
@@ -73,6 +74,7 @@ interface FinancingConfig {
 }
 
 const createDefaultFinancingConfig = (): FinancingConfig => ({
+  preSystemFee: 0,
   systemFee: 4.9,
   vat: 21,
   grossIncome: 0,
@@ -111,6 +113,7 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
       };
     });
     return {
+      preSystemFee: data.preSystemFee ?? 0,
       systemFee: data.systemFee ?? 0,
       vat: data.vat ?? 0,
       grossIncome: data.grossIncome ?? 0,
@@ -119,6 +122,7 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
   }
 
   return {
+    preSystemFee: data?.preSystemFee ?? 0,
     systemFee: data?.systemFee ?? 0,
     vat: data?.vat ?? 0,
     grossIncome: data?.grossIncome ?? 0,
@@ -315,7 +319,7 @@ export default function SettingsPage() {
   };
 
   const handleFinancingChange = (
-    field: "systemFee" | "vat" | "grossIncome",
+    field: "preSystemFee" | "systemFee" | "vat" | "grossIncome",
     value: number
   ) => {
     setFinancingConfig((prev) => ({ ...prev, [field]: value }));
@@ -535,7 +539,17 @@ export default function SettingsPage() {
               <CardDescription>Configura tasas e intereses.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Nuevo costo de uso de sistema (%)</Label>
+                  <Input
+                    type="number"
+                    value={financingConfig.preSystemFee}
+                    onChange={(e) =>
+                      handleFinancingChange("preSystemFee", Number(e.target.value))
+                    }
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Tasa del sistema (%)</Label>
                   <Input
