@@ -17,17 +17,25 @@ import { ref, onValue } from "firebase/database";
 interface InstallmentConfig {
   interest: number;
   commerceCost?: number;
+  label?: string;
+}
+
+interface CardConfig {
+  name: string;
+  installments: Record<string, InstallmentConfig>;
 }
 
 interface FinancingConfig {
   systemFee: number;
   vat: number;
-  installments: Record<string, InstallmentConfig>;
+  cards: Record<string, CardConfig>;
+  installments?: Record<string, InstallmentConfig>; // Legacy support
 }
 
 export default function CostSimulatorPage() {
   const [config, setConfig] = useState<FinancingConfig | null>(null);
   const [amount, setAmount] = useState("");
+  const [selectedCard, setSelectedCard] = useState("");
   const [selectedInstallment, setSelectedInstallment] = useState("");
   const [result, setResult] =
     useState<
@@ -45,18 +53,59 @@ export default function CostSimulatorPage() {
 
   useEffect(() => {
     const cfgRef = ref(database, "config/financing");
-    onValue(cfgRef, (snapshot) => {
+    const unsubscribe = onValue(cfgRef, (snapshot) => {
       const data = snapshot.val();
-      if (data) setConfig(data);
+      if (!data) return;
+
+      let normalized: FinancingConfig;
+      if (data.cards) {
+        normalized = data as FinancingConfig;
+      } else {
+        normalized = {
+          systemFee: data.systemFee ?? 0,
+          vat: data.vat ?? 0,
+          cards: {
+            general: {
+              name: "General",
+              installments: data.installments ?? {},
+            },
+          },
+          installments: data.installments,
+        };
+      }
+
+      setConfig(normalized);
+      setSelectedCard((prev) => {
+        if (prev && normalized.cards[prev]) return prev;
+        const [firstCard] = Object.keys(normalized.cards);
+        return firstCard ?? "";
+      });
     });
+
+    return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!config || !selectedCard) return;
+    const card = config.cards[selectedCard];
+    if (!card) return;
+
+    setSelectedInstallment((prev) => {
+      if (prev && card.installments[prev]) return prev;
+      const [firstInstallment] = Object.keys(card.installments);
+      return firstInstallment ?? "";
+    });
+  }, [config, selectedCard]);
+
   const calculate = () => {
-    if (!config || !amount || !selectedInstallment) return;
+    if (!config || !amount || !selectedCard || !selectedInstallment) return;
     const net = parseFloat(amount);
     const vatRate = config.vat / 100;
     const systemRate = config.systemFee / 100;
-    const instCfg = config.installments[selectedInstallment] || { interest: 0 };
+    const card = config.cards[selectedCard];
+    if (!card) return;
+
+    const instCfg = card.installments[selectedInstallment] || { interest: 0 };
     const catRate = (instCfg.interest || 0) / 100;
     const promoRate = (instCfg.commerceCost || 0) / 100;
 
@@ -82,6 +131,12 @@ export default function CostSimulatorPage() {
     });
   };
 
+  const currentCard = selectedCard && config ? config.cards[selectedCard] : undefined;
+  const hasCards = !!(config && Object.keys(config.cards).length);
+  const hasInstallments = !!(
+    currentCard && Object.keys(currentCard.installments).length
+  );
+
   return (
     <DashboardLayout>
       <div className="max-w-md mx-auto space-y-4">
@@ -92,16 +147,38 @@ export default function CostSimulatorPage() {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
-        <Select value={selectedInstallment} onValueChange={setSelectedInstallment}>
+        <Select
+          value={selectedCard}
+          onValueChange={setSelectedCard}
+          disabled={!hasCards}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Tarjeta" />
+          </SelectTrigger>
+          <SelectContent>
+            {config &&
+              Object.entries(config.cards).map(([cardId, cardOption]) => (
+                <SelectItem key={cardId} value={cardId}>
+                  {cardOption.name || "Sin nombre"}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={selectedInstallment}
+          onValueChange={setSelectedInstallment}
+          disabled={!hasInstallments}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Cuotas" />
           </SelectTrigger>
           <SelectContent>
-            {config &&
-              config.installments &&
-              Object.keys(config.installments).map((count) => (
+            {currentCard &&
+              Object.entries(currentCard.installments).map(([count, data]) => (
                 <SelectItem key={count} value={count}>
-                  {count} cuotas
+                  {data.label
+                    ? `${data.label} (${count} cuotas)`
+                    : `${count} cuotas`}
                 </SelectItem>
               ))}
           </SelectContent>
