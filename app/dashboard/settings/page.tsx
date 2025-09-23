@@ -54,6 +54,90 @@ interface AppUser {
   updatedAt: string;
 }
 
+interface FinancingInstallment {
+  interest: number;
+  commerceCost?: number;
+  label?: string;
+}
+
+interface FinancingCard {
+  name: string;
+  installments: Record<string, FinancingInstallment>;
+}
+
+interface FinancingConfig {
+  systemFee: number;
+  vat: number;
+  cards: Record<string, FinancingCard>;
+}
+
+const createDefaultFinancingConfig = (): FinancingConfig => ({
+  systemFee: 4.9,
+  vat: 21,
+  cards: {
+    general: {
+      name: "General",
+      installments: {
+        "3": { interest: 7 },
+        "6": { interest: 14.5 },
+      },
+    },
+  },
+});
+
+const normalizeFinancingConfig = (data: any): FinancingConfig => {
+  if (data?.cards) {
+    const cards: Record<string, FinancingCard> = {};
+    Object.entries(data.cards).forEach(([cardId, cardValue]) => {
+      const value = cardValue as Partial<FinancingCard> & {
+        installments?: Record<string, FinancingInstallment>;
+      };
+      cards[cardId] = {
+        name: value.name ?? "",
+        installments: Object.entries(value.installments ?? {}).reduce(
+          (acc, [count, inst]) => {
+            const installment = inst as FinancingInstallment;
+            acc[count] = {
+              interest: installment.interest ?? 0,
+              commerceCost: installment.commerceCost,
+              label: installment.label,
+            };
+            return acc;
+          },
+          {} as Record<string, FinancingInstallment>
+        ),
+      };
+    });
+    return {
+      systemFee: data.systemFee ?? 0,
+      vat: data.vat ?? 0,
+      cards,
+    };
+  }
+
+  return {
+    systemFee: data?.systemFee ?? 0,
+    vat: data?.vat ?? 0,
+    cards: {
+      general: {
+        name: "General",
+        installments: Object.entries(data?.installments ?? {}).reduce(
+          (acc, [count, inst]) => {
+            const installment = inst as FinancingInstallment;
+            acc[count] = {
+              interest: installment.interest ?? 0,
+              commerceCost: installment.commerceCost,
+              label: installment.label,
+            };
+            return acc;
+          },
+          {} as Record<string, FinancingInstallment>
+        ),
+      },
+    },
+  };
+};
+
 export default function SettingsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -63,18 +147,10 @@ export default function SettingsPage() {
   const [pointValue, setPointValue] = useState(0);
   const [pointsPaused, setPointsPaused] = useState(false);
 
-  const [financingConfig, setFinancingConfig] = useState<{
-    systemFee: number;
-    vat: number;
-    installments: Record<string, { interest: number; commerceCost?: number }>;
-  }>({
-    systemFee: 4.9,
-    vat: 21,
-    installments: {
-      "3": { interest: 7 },
-      "6": { interest: 14.5 },
-    },
-  });
+  const [financingConfig, setFinancingConfig] = useState<FinancingConfig>(
+    createDefaultFinancingConfig
+  );
+  const [selectedFinancingCard, setSelectedFinancingCard] = useState<string>("");
   
   const [ruleName, setRuleName] = useState("");
   const [ruleType, setRuleType] = useState<'model_range' | 'model_start' | 'category'>('model_range');
@@ -140,10 +216,20 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const financingRef = ref(database, 'config/financing');
-    onValue(financingRef, (snapshot) => {
+    const unsubscribe = onValue(financingRef, (snapshot) => {
       const data = snapshot.val();
-      if (data) setFinancingConfig(data);
+      const normalized = data
+        ? normalizeFinancingConfig(data)
+        : createDefaultFinancingConfig();
+      setFinancingConfig(normalized);
+      setSelectedFinancingCard((prev) => {
+        if (prev && normalized.cards[prev]) return prev;
+        const [firstCard] = Object.keys(normalized.cards);
+        return firstCard ?? "";
+      });
     });
+
+    return () => unsubscribe();
   }, []);
 
   const resetForm = () => {
@@ -224,38 +310,114 @@ export default function SettingsPage() {
     }
   };
 
-  const handleFinancingChange = (field: string, value: number) => {
-    setFinancingConfig((prev: any) => ({ ...prev, [field]: value }));
-  };
-
-  const handleInstallmentChange = (
-    count: string,
-    field: string,
+  const handleFinancingChange = (
+    field: "systemFee" | "vat",
     value: number
   ) => {
-    setFinancingConfig((prev: any) => ({
+    setFinancingConfig((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCardNameChange = (cardId: string, name: string) => {
+    setFinancingConfig((prev) => {
+      const card = prev.cards[cardId];
+      if (!card) return prev;
+      return {
+        ...prev,
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...card,
+            name,
+          },
+        },
+      };
+    });
+  };
+
+  const handleAddCard = () => {
+    const name = window.prompt("Nombre de la tarjeta");
+    if (!name) return;
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `card-${Date.now()}`;
+    setFinancingConfig((prev) => ({
       ...prev,
-      installments: {
-        ...prev.installments,
-        [count]: { ...prev.installments[count], [field]: value },
+      cards: {
+        ...prev.cards,
+        [id]: { name, installments: {} },
       },
     }));
+    setSelectedFinancingCard(id);
   };
 
-  const handleAddInstallment = () => {
-    const count = prompt("Cantidad de cuotas");
+  const handleRemoveCard = (cardId: string) => {
+    if (!window.confirm("¿Estás seguro de que quieres eliminar esta tarjeta?"))
+      return;
+    let nextSelected = selectedFinancingCard;
+    setFinancingConfig((prev) => {
+      const newCards = { ...prev.cards };
+      delete newCards[cardId];
+      const remainingIds = Object.keys(newCards);
+      if (!remainingIds.includes(nextSelected)) {
+        nextSelected = remainingIds[0] ?? "";
+      }
+      return { ...prev, cards: newCards };
+    });
+    setSelectedFinancingCard(nextSelected);
+  };
+
+  const updateInstallment = (
+    cardId: string,
+    count: string,
+    changes: Partial<FinancingInstallment>
+  ) => {
+    setFinancingConfig((prev) => {
+      const card = prev.cards[cardId];
+      if (!card) return prev;
+      const current = card.installments[count] ?? { interest: 0 };
+      return {
+        ...prev,
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...card,
+            installments: {
+              ...card.installments,
+              [count]: { ...current, ...changes },
+            },
+          },
+        },
+      };
+    });
+  };
+
+  const handleAddInstallment = (cardId: string) => {
+    if (!cardId) {
+      toast.error("Selecciona una tarjeta para agregar cuotas.");
+      return;
+    }
+    const count = window.prompt("Cantidad de cuotas");
     if (!count) return;
-    setFinancingConfig((prev: any) => ({
-      ...prev,
-      installments: { ...prev.installments, [count]: { interest: 0 } },
-    }));
+    updateInstallment(cardId, count, { interest: 0, label: "" });
   };
 
-  const handleRemoveInstallment = (count: string) => {
-    setFinancingConfig((prev: any) => {
-      const inst = { ...prev.installments };
-      delete inst[count];
-      return { ...prev, installments: inst };
+  const handleRemoveInstallment = (cardId: string, count: string) => {
+    setFinancingConfig((prev) => {
+      const card = prev.cards[cardId];
+      if (!card) return prev;
+      const updatedInstallments = { ...card.installments };
+      delete updatedInstallments[count];
+      return {
+        ...prev,
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...card,
+            installments: updatedInstallments,
+          },
+        },
+      };
     });
   };
 
@@ -352,6 +514,10 @@ export default function SettingsPage() {
     }
   };
 
+  const currentFinancingCard = selectedFinancingCard
+    ? financingConfig.cards[selectedFinancingCard]
+    : undefined;
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-8">
@@ -364,8 +530,8 @@ export default function SettingsPage() {
               <CardTitle>Simulador de Costos</CardTitle>
               <CardDescription>Configura tasas e intereses.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Tasa del sistema (%)</Label>
                   <Input
@@ -388,50 +554,134 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                {Object.entries(financingConfig.installments).map(
-                  ([count, data]) => (
-                    <div key={count} className="flex items-center gap-2">
-                      <span className="w-20">{count} cuotas</span>
+                <Label>Tarjeta</Label>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select
+                    value={selectedFinancingCard}
+                    onValueChange={setSelectedFinancingCard}
+                  >
+                    <SelectTrigger className="sm:w-64">
+                      <SelectValue placeholder="Selecciona una tarjeta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(financingConfig.cards).map(
+                        ([cardId, card]) => (
+                          <SelectItem key={cardId} value={cardId}>
+                            {card.name || "Sin nombre"}
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={handleAddCard}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Agregar tarjeta
+                  </Button>
+                </div>
+              </div>
+              {currentFinancingCard ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nombre de la tarjeta</Label>
+                    <div className="flex items-center gap-2">
                       <Input
-                        type="number"
-                        className="w-24"
-                        value={data.interest}
+                        value={currentFinancingCard.name}
                         onChange={(e) =>
-                          handleInstallmentChange(
-                            count,
-                            "interest",
-                            Number(e.target.value)
+                          handleCardNameChange(
+                            selectedFinancingCard,
+                            e.target.value
                           )
                         }
-                        placeholder="Interés %"
-                      />
-                      <Input
-                        type="number"
-                        className="w-24"
-                        value={data.commerceCost ?? ""}
-                        onChange={(e) =>
-                          handleInstallmentChange(
-                            count,
-                            "commerceCost",
-                            Number(e.target.value)
-                          )
-                        }
-                        placeholder="Costo comercio %"
+                        placeholder="Ej. Visa"
                       />
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleRemoveInstallment(count)}
+                        onClick={() => handleRemoveCard(selectedFinancingCard)}
+                        disabled={Object.keys(financingConfig.cards).length <= 1}
                       >
                         <Trash className="h-4 w-4" />
                       </Button>
                     </div>
-                  )
-                )}
-                <Button variant="outline" onClick={handleAddInstallment}>
-                  Agregar cuotas
-                </Button>
-              </div>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(currentFinancingCard.installments).length ? (
+                      Object.entries(currentFinancingCard.installments).map(
+                        ([count, data]) => (
+                          <div
+                            key={count}
+                            className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center"
+                          >
+                            <span className="font-medium sm:w-24">
+                              {count} cuotas
+                            </span>
+                            <Input
+                              className="sm:flex-1"
+                              placeholder="Nombre de las cuotas"
+                              value={data.label ?? ""}
+                              onChange={(e) =>
+                                updateInstallment(selectedFinancingCard, count, {
+                                  label: e.target.value,
+                                })
+                              }
+                            />
+                            <Input
+                              type="number"
+                              className="sm:w-28"
+                              value={data.interest}
+                              onChange={(e) =>
+                                updateInstallment(selectedFinancingCard, count, {
+                                  interest: Number(e.target.value),
+                                })
+                              }
+                              placeholder="Interés %"
+                            />
+                            <Input
+                              type="number"
+                              className="sm:w-32"
+                              value={data.commerceCost ?? ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                updateInstallment(selectedFinancingCard, count, {
+                                  commerceCost:
+                                    value === "" ? undefined : Number(value),
+                                });
+                              }}
+                              placeholder="Costo comercio %"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleRemoveInstallment(
+                                  selectedFinancingCard,
+                                  count
+                                )
+                              }
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )
+                      )
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No hay cuotas configuradas para esta tarjeta.
+                      </p>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={() => handleAddInstallment(selectedFinancingCard)}
+                    >
+                      Agregar cuotas
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Agrega una tarjeta para configurar sus cuotas.
+                </p>
+              )}
               <Button onClick={saveFinancingConfig}>Guardar</Button>
             </CardContent>
           </Card>
