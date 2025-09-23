@@ -28,6 +28,7 @@ interface CardConfig {
 interface FinancingConfig {
   systemFee: number;
   vat: number;
+  grossIncome: number;
   cards: Record<string, CardConfig>;
   installments?: Record<string, InstallmentConfig>; // Legacy support
 }
@@ -45,6 +46,7 @@ export default function CostSimulatorPage() {
           vat: number;
           system: number;
           posnet: number;
+          grossIncome: number;
           installments: number;
           perInstallment: number;
         }
@@ -59,11 +61,18 @@ export default function CostSimulatorPage() {
 
       let normalized: FinancingConfig;
       if (data.cards) {
-        normalized = data as FinancingConfig;
+        normalized = {
+          systemFee: data.systemFee ?? 0,
+          vat: data.vat ?? 0,
+          grossIncome: data.grossIncome ?? 0,
+          cards: data.cards as Record<string, CardConfig>,
+          installments: data.installments,
+        };
       } else {
         normalized = {
           systemFee: data.systemFee ?? 0,
           vat: data.vat ?? 0,
+          grossIncome: data.grossIncome ?? 0,
           cards: {
             general: {
               name: "General",
@@ -111,12 +120,14 @@ export default function CostSimulatorPage() {
 
     const vatAmount = net * vatRate;
     const desiredAmount = net + vatAmount;
+    const grossIncomeRate = (config.grossIncome ?? 0) / 100;
     const baseAmount =
       desiredAmount / (1 - systemRate * (1 + vatRate));
     const systemCharge = baseAmount - desiredAmount;
     const catAmount = baseAmount * catRate;
     const totalClient = baseAmount + catAmount;
-    const bankAmount = desiredAmount - net * promoRate;
+    const grossIncomeAmount = desiredAmount * grossIncomeRate;
+    const bankAmount = desiredAmount - net * promoRate - grossIncomeAmount;
     const installments = parseInt(selectedInstallment, 10);
     const perInstallment = totalClient / installments;
 
@@ -126,6 +137,7 @@ export default function CostSimulatorPage() {
       vat: vatAmount,
       system: systemCharge,
       posnet: baseAmount,
+      grossIncome: grossIncomeAmount,
       installments,
       perInstallment,
     });
@@ -192,8 +204,12 @@ export default function CostSimulatorPage() {
             </p>
             <p>IVA: ${result.vat.toFixed(2)}</p>
             <p>
-              Cargo del sistema (4.9% + IVA): $
+              Cargo del sistema ({config?.systemFee ?? 0}% + IVA): $
               {result.system.toFixed(2)}
+            </p>
+            <p>
+              Ingresos Brutos ({config?.grossIncome ?? 0}%): $
+              {result.grossIncome.toFixed(2)}
             </p>
             <p>
               Total a pagar ({result.installments} cuotas): ${" "}
