@@ -26,6 +26,7 @@ interface CardConfig {
 }
 
 interface FinancingConfig {
+  preSystemFee: number;
   systemFee: number;
   vat: number;
   grossIncome: number;
@@ -45,6 +46,8 @@ export default function CostSimulatorPage() {
           bank: number;
           vat: number;
           system: number;
+          preSystem: number;
+          mainSystem: number;
           posnet: number;
           grossIncome: number;
           installments: number;
@@ -62,6 +65,7 @@ export default function CostSimulatorPage() {
       let normalized: FinancingConfig;
       if (data.cards) {
         normalized = {
+          preSystemFee: data.preSystemFee ?? 0,
           systemFee: data.systemFee ?? 0,
           vat: data.vat ?? 0,
           grossIncome: data.grossIncome ?? 0,
@@ -70,6 +74,7 @@ export default function CostSimulatorPage() {
         };
       } else {
         normalized = {
+          preSystemFee: data.preSystemFee ?? 0,
           systemFee: data.systemFee ?? 0,
           vat: data.vat ?? 0,
           grossIncome: data.grossIncome ?? 0,
@@ -123,23 +128,39 @@ export default function CostSimulatorPage() {
     const grossIncomeBase = net + vatAmount;
     const grossIncomeAmount = grossIncomeBase * grossIncomeRate;
     const desiredAmount = grossIncomeBase + grossIncomeAmount;
-    const baseAmount =
-      desiredAmount / (1 - systemRate * (1 + vatRate));
-    const systemCharge = baseAmount - desiredAmount;
+    const preSystemRate = (config.preSystemFee ?? 0) / 100;
+    const preSystemMultiplier = 1 - preSystemRate;
+    if (preSystemMultiplier <= 0) {
+      setResult(null);
+      return;
+    }
+    const amountAfterPreSystem = desiredAmount / preSystemMultiplier;
+    const preSystemCharge = amountAfterPreSystem - desiredAmount;
+    const systemMultiplier = 1 - systemRate * (1 + vatRate);
+    if (systemMultiplier <= 0) {
+      setResult(null);
+      return;
+    }
+    const baseAmount = amountAfterPreSystem / systemMultiplier;
+    const mainSystemCharge = baseAmount - amountAfterPreSystem;
+    const totalSystemCharge = preSystemCharge + mainSystemCharge;
     const catAmount = baseAmount * catRate;
     const totalClient = baseAmount + catAmount;
     const bankAmount = desiredAmount - net * promoRate;
     const installments = parseInt(selectedInstallment, 10);
-    const perInstallment = totalClient / installments;
+    const safeInstallments = Number.isFinite(installments) && installments > 0 ? installments : 1;
+    const perInstallment = totalClient / safeInstallments;
 
     setResult({
       client: totalClient,
       bank: bankAmount,
       vat: vatAmount,
-      system: systemCharge,
+      system: totalSystemCharge,
+      preSystem: preSystemCharge,
+      mainSystem: mainSystemCharge,
       posnet: baseAmount,
       grossIncome: grossIncomeAmount,
-      installments,
+      installments: safeInstallments,
       perInstallment,
     });
   };
@@ -204,10 +225,26 @@ export default function CostSimulatorPage() {
               {result.posnet.toFixed(2)}
             </p>
             <p>IVA: ${result.vat.toFixed(2)}</p>
+            {result.preSystem > 0 && (
+              <p>
+                Nuevo costo de uso de sistema ({config?.preSystemFee ?? 0}%): $
+                {result.preSystem.toFixed(2)}
+              </p>
+            )}
             <p>
-              Cargo del sistema ({config?.systemFee ?? 0}% + IVA): $
-              {result.system.toFixed(2)}
+              Cargo del sistema (
+              {config?.preSystemFee
+                ? `${config?.preSystemFee ?? 0}% + ${config?.systemFee ?? 0}% + IVA`
+                : `${config?.systemFee ?? 0}% + IVA`
+              }
+              ): ${result.system.toFixed(2)}
             </p>
+            {result.preSystem > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Incluye cargo principal ({config?.systemFee ?? 0}% + IVA): $
+                {result.mainSystem.toFixed(2)}
+              </p>
+            )}
             <p>
               Ingresos Brutos ({config?.grossIncome ?? 0}%): $
               {result.grossIncome.toFixed(2)}
