@@ -146,6 +146,60 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
   };
 };
 
+const sanitizeFinancingConfig = (
+  config: FinancingConfig
+): FinancingConfig => {
+  const sanitizedCards = Object.entries(config.cards).reduce(
+    (acc, [cardId, card]) => {
+      const sanitizedInstallments = Object.entries(card.installments).reduce(
+        (installmentsAcc, [count, installment]) => {
+          const sanitizedInstallment: FinancingInstallment = {
+            interest:
+              typeof installment.interest === "number" &&
+              !Number.isNaN(installment.interest)
+                ? installment.interest
+                : 0,
+          };
+
+          if (
+            typeof installment.commerceCost === "number" &&
+            !Number.isNaN(installment.commerceCost)
+          ) {
+            sanitizedInstallment.commerceCost = installment.commerceCost;
+          }
+
+          if (typeof installment.label !== "undefined") {
+            sanitizedInstallment.label = installment.label;
+          }
+
+          installmentsAcc[count] = sanitizedInstallment;
+          return installmentsAcc;
+        },
+        {} as Record<string, FinancingInstallment>
+      );
+
+      acc[cardId] = {
+        name: card.name,
+        installments: sanitizedInstallments,
+      };
+
+      return acc;
+    },
+    {} as Record<string, FinancingCard>
+  );
+
+  return {
+    preSystemFee:
+      typeof config.preSystemFee === "number" ? config.preSystemFee : 0,
+    systemFee:
+      typeof config.systemFee === "number" ? config.systemFee : 0,
+    vat: typeof config.vat === "number" ? config.vat : 0,
+    grossIncome:
+      typeof config.grossIncome === "number" ? config.grossIncome : 0,
+    cards: sanitizedCards,
+  };
+};
+
 export default function SettingsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -431,8 +485,14 @@ export default function SettingsPage() {
 
   const saveFinancingConfig = async () => {
     const financingRef = ref(database, 'config/financing');
-    await set(financingRef, financingConfig);
-    toast.success('Configuración guardada');
+    try {
+      const sanitizedConfig = sanitizeFinancingConfig(financingConfig);
+      await set(financingRef, sanitizedConfig);
+      toast.success('Configuración guardada');
+    } catch (error) {
+      console.error('Error al guardar la configuración de financiación:', error);
+      toast.error('No se pudo guardar la configuración de cuotas.');
+    }
   };
 
   const handleSaveBundle = async () => {
