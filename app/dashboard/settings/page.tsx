@@ -73,6 +73,32 @@ interface FinancingConfig {
   cards: Record<string, FinancingCard>;
 }
 
+const parseNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+};
+
+const parseOptionalNumber = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
 const createDefaultFinancingConfig = (): FinancingConfig => ({
   preSystemFee: 0,
   systemFee: 4.9,
@@ -102,8 +128,8 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
           (acc, [count, inst]) => {
             const installment = inst as FinancingInstallment;
             acc[count] = {
-              interest: installment.interest ?? 0,
-              commerceCost: installment.commerceCost,
+              interest: parseNumber(installment.interest, 0),
+              commerceCost: parseOptionalNumber(installment.commerceCost),
               label: installment.label,
             };
             return acc;
@@ -113,19 +139,19 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
       };
     });
     return {
-      preSystemFee: data.preSystemFee ?? 0,
-      systemFee: data.systemFee ?? 0,
-      vat: data.vat ?? 0,
-      grossIncome: data.grossIncome ?? 0,
+      preSystemFee: parseNumber(data.preSystemFee, 0),
+      systemFee: parseNumber(data.systemFee, 0),
+      vat: parseNumber(data.vat, 0),
+      grossIncome: parseNumber(data.grossIncome, 0),
       cards,
     };
   }
 
   return {
-    preSystemFee: data?.preSystemFee ?? 0,
-    systemFee: data?.systemFee ?? 0,
-    vat: data?.vat ?? 0,
-    grossIncome: data?.grossIncome ?? 0,
+    preSystemFee: parseNumber(data?.preSystemFee, 0),
+    systemFee: parseNumber(data?.systemFee, 0),
+    vat: parseNumber(data?.vat, 0),
+    grossIncome: parseNumber(data?.grossIncome, 0),
     cards: {
       general: {
         name: "General",
@@ -133,8 +159,8 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
           (acc, [count, inst]) => {
             const installment = inst as FinancingInstallment;
             acc[count] = {
-              interest: installment.interest ?? 0,
-              commerceCost: installment.commerceCost,
+              interest: parseNumber(installment.interest, 0),
+              commerceCost: parseOptionalNumber(installment.commerceCost),
               label: installment.label,
             };
             return acc;
@@ -154,18 +180,12 @@ const sanitizeFinancingConfig = (
       const sanitizedInstallments = Object.entries(card.installments).reduce(
         (installmentsAcc, [count, installment]) => {
           const sanitizedInstallment: FinancingInstallment = {
-            interest:
-              typeof installment.interest === "number" &&
-              !Number.isNaN(installment.interest)
-                ? installment.interest
-                : 0,
+            interest: parseNumber(installment.interest, 0),
           };
 
-          if (
-            typeof installment.commerceCost === "number" &&
-            !Number.isNaN(installment.commerceCost)
-          ) {
-            sanitizedInstallment.commerceCost = installment.commerceCost;
+          const commerceCost = parseOptionalNumber(installment.commerceCost);
+          if (typeof commerceCost !== "undefined") {
+            sanitizedInstallment.commerceCost = commerceCost;
           }
 
           if (typeof installment.label !== "undefined") {
@@ -189,13 +209,10 @@ const sanitizeFinancingConfig = (
   );
 
   return {
-    preSystemFee:
-      typeof config.preSystemFee === "number" ? config.preSystemFee : 0,
-    systemFee:
-      typeof config.systemFee === "number" ? config.systemFee : 0,
-    vat: typeof config.vat === "number" ? config.vat : 0,
-    grossIncome:
-      typeof config.grossIncome === "number" ? config.grossIncome : 0,
+    preSystemFee: parseNumber(config.preSystemFee, 0),
+    systemFee: parseNumber(config.systemFee, 0),
+    vat: parseNumber(config.vat, 0),
+    grossIncome: parseNumber(config.grossIncome, 0),
     cards: sanitizedCards,
   };
 };
