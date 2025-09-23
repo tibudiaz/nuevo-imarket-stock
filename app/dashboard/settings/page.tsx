@@ -68,12 +68,14 @@ interface FinancingCard {
 interface FinancingConfig {
   systemFee: number;
   vat: number;
+  grossIncome: number;
   cards: Record<string, FinancingCard>;
 }
 
 const createDefaultFinancingConfig = (): FinancingConfig => ({
   systemFee: 4.9,
   vat: 21,
+  grossIncome: 0,
   cards: {
     general: {
       name: "General",
@@ -111,6 +113,7 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
     return {
       systemFee: data.systemFee ?? 0,
       vat: data.vat ?? 0,
+      grossIncome: data.grossIncome ?? 0,
       cards,
     };
   }
@@ -118,6 +121,7 @@ const normalizeFinancingConfig = (data: any): FinancingConfig => {
   return {
     systemFee: data?.systemFee ?? 0,
     vat: data?.vat ?? 0,
+    grossIncome: data?.grossIncome ?? 0,
     cards: {
       general: {
         name: "General",
@@ -311,7 +315,7 @@ export default function SettingsPage() {
   };
 
   const handleFinancingChange = (
-    field: "systemFee" | "vat",
+    field: "systemFee" | "vat" | "grossIncome",
     value: number
   ) => {
     setFinancingConfig((prev) => ({ ...prev, [field]: value }));
@@ -531,7 +535,7 @@ export default function SettingsPage() {
               <CardDescription>Configura tasas e intereses.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Tasa del sistema (%)</Label>
                   <Input
@@ -549,6 +553,16 @@ export default function SettingsPage() {
                     value={financingConfig.vat}
                     onChange={(e) =>
                       handleFinancingChange("vat", Number(e.target.value))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Ingresos Brutos (%)</Label>
+                  <Input
+                    type="number"
+                    value={financingConfig.grossIncome}
+                    onChange={(e) =>
+                      handleFinancingChange("grossIncome", Number(e.target.value))
                     }
                   />
                 </div>
