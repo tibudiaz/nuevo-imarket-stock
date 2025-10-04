@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Search, Plus, Trash2, Loader2, Gift } from "lucide-react";
 import { toast } from "sonner";
+import { shouldRemoveProductFromInventory } from "@/lib/utils";
 
 interface Product {
   id: string;
@@ -189,8 +190,8 @@ export default function QuickSaleDialog({ isOpen, onClose, store }: QuickSaleDia
         const currentStock = productData.stock || 0;
         const newStock = currentStock - item.quantity;
         if (newStock <= 0) {
-          const category = productData.category;
-          if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+          const category = productData.category as string | undefined;
+          if (shouldRemoveProductFromInventory(category)) {
             await remove(productRef);
           } else {
             await update(productRef, { stock: 0 });
