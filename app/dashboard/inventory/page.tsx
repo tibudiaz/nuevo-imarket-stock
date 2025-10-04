@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import SellProductModal from "@/components/sell-product-modal";
 import TransferProductDialog from "@/components/transfer-product-dialog";
 import QuickSaleDialog from "@/components/quick-sale-dialog";
+import { shouldRemoveProductFromInventory } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -466,9 +467,9 @@ export default function InventoryPage() {
           p.category === product.category
       );
 
-      const shouldDeleteRecord =
-        product.category === "Celulares Nuevos" ||
-        product.category === "Celulares Usados";
+      const shouldDeleteRecord = shouldRemoveProductFromInventory(
+        product.category,
+      );
 
       if (existing) {
         const existingRef = ref(database, `products/${existing.id}`);
