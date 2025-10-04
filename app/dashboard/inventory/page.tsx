@@ -322,9 +322,7 @@ export default function InventoryPage() {
       const searchable = `${(product.name || "")} ${(product.brand || "")} ${(product.model || "")} ${(product.category || "")} ${(product.barcode || "")} ${(product.imei || "")}`.toLowerCase();
       const searchMatch = terms.every((t) => searchable.includes(t));
 
-      const stockMatch = (product.stock || 0) > 0;
-
-      return storeMatch && categoryMatch && searchMatch && stockMatch;
+      return storeMatch && categoryMatch && searchMatch;
     });
   }, [products, selectedStore, categorySearch, searchTerm]);
 
@@ -468,6 +466,10 @@ export default function InventoryPage() {
           p.category === product.category
       );
 
+      const shouldDeleteRecord =
+        product.category === "Celulares Nuevos" ||
+        product.category === "Celulares Usados";
+
       if (existing) {
         const existingRef = ref(database, `products/${existing.id}`);
         await update(existingRef, {
@@ -476,7 +478,14 @@ export default function InventoryPage() {
         });
 
         if (quantity >= currentStock) {
-          await remove(productRef);
+          if (shouldDeleteRecord) {
+            await remove(productRef);
+          } else {
+            await update(productRef, {
+              stock: 0,
+              lastTransfer: new Date().toISOString(),
+            });
+          }
         } else {
           await update(productRef, {
             stock: currentStock - quantity,
