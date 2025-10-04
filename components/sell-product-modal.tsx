@@ -22,6 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { convertPrice, convertPriceToUSD, formatCurrency } from "../lib/price-converter"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
+import { isPhoneWithMandatoryDeletion } from "@/lib/product-categories"
 
 // --- Interfaces para Tipado Fuerte ---
 interface CartProduct {
@@ -412,7 +413,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
                 if (newStock <= 0) {
                     const category = productData.category;
-                    if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+                    if (isPhoneWithMandatoryDeletion(category)) {
                         await remove(productRef);
                     } else {
                         await update(productRef, { stock: 0 });
@@ -578,7 +579,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         const newStock = currentStock - reservedQuantity;
         if (newStock <= 0) {
             const category = productData.category;
-            if (category === "Celulares Nuevos" || category === "Celulares Usados") {
+            if (isPhoneWithMandatoryDeletion(category)) {
                 await remove(productRef);
             } else {
                 await update(productRef, { stock: 0 });

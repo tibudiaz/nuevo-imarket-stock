@@ -61,6 +61,10 @@ import {
 import { useMobile } from "@/hooks/use-mobile";
 import { useStore } from "@/hooks/use-store";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  isPhoneCategory,
+  isPhoneWithMandatoryDeletion,
+} from "@/lib/product-categories";
 
 // --- Interfaces ---
 interface User {
@@ -151,21 +155,15 @@ export default function InventoryPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const hasRestoredNewProduct = useRef(false);
 
-  const isCellphoneCategory =
-    newProduct.category === "Celulares" ||
-    newProduct.category === "Celulares Usados" ||
-    newProduct.category === "Celulares Nuevos";
+  const isCellphoneCategory = isPhoneCategory(newProduct.category);
   const isCellphoneWithoutModelCategory =
-    newProduct.category === "Celulares Usados" ||
-    newProduct.category === "Celulares Nuevos";
+    isPhoneWithMandatoryDeletion(newProduct.category);
 
-  const isEditingCellphoneCategory =
-    editingProduct?.category === "Celulares" ||
-    editingProduct?.category === "Celulares Usados" ||
-    editingProduct?.category === "Celulares Nuevos";
+  const isEditingCellphoneCategory = isPhoneCategory(
+    editingProduct?.category,
+  );
   const isEditingCellphoneWithoutModelCategory =
-    editingProduct?.category === "Celulares Usados" ||
-    editingProduct?.category === "Celulares Nuevos";
+    isPhoneWithMandatoryDeletion(editingProduct?.category);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -322,9 +320,7 @@ export default function InventoryPage() {
       const searchable = `${(product.name || "")} ${(product.brand || "")} ${(product.model || "")} ${(product.category || "")} ${(product.barcode || "")} ${(product.imei || "")}`.toLowerCase();
       const searchMatch = terms.every((t) => searchable.includes(t));
 
-      const stockMatch = (product.stock || 0) > 0;
-
-      return storeMatch && categoryMatch && searchMatch && stockMatch;
+      return storeMatch && categoryMatch && searchMatch;
     });
   }, [products, selectedStore, categorySearch, searchTerm]);
 
@@ -440,10 +436,8 @@ export default function InventoryPage() {
   };
 
   const handleCategoryChange = (value: string) => {
-    const isUsed = value === "Celulares Usados";
-    const isNew = value === "Celulares Nuevos";
-    const withoutModel = isUsed || isNew;
-    const isCellphone = value === "Celulares" || withoutModel;
+    const withoutModel = isPhoneWithMandatoryDeletion(value);
+    const isCellphone = isPhoneCategory(value);
 
     setNewProduct((prev) => ({
       ...prev,
@@ -468,6 +462,10 @@ export default function InventoryPage() {
           p.category === product.category
       );
 
+      const shouldDeleteRecord = isPhoneWithMandatoryDeletion(
+        product.category,
+      );
+
       if (existing) {
         const existingRef = ref(database, `products/${existing.id}`);
         await update(existingRef, {
@@ -476,7 +474,14 @@ export default function InventoryPage() {
         });
 
         if (quantity >= currentStock) {
-          await remove(productRef);
+          if (shouldDeleteRecord) {
+            await remove(productRef);
+          } else {
+            await update(productRef, {
+              stock: 0,
+              lastTransfer: new Date().toISOString(),
+            });
+          }
         } else {
           await update(productRef, {
             stock: currentStock - quantity,
