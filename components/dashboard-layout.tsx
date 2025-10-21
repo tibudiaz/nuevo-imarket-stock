@@ -48,7 +48,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { motion, AnimatePresence } from "framer-motion"
 import MobileMenu from "@/components/mobile-menu"
 import { useStore } from "@/hooks/use-store"
-import { Reserve } from "@/components/complete-reserve-modal"
+import { Reserve } from "@/components/sell-product-modal"
 import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
 import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog"
 import { toast } from "sonner"

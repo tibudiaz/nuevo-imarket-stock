@@ -52,7 +52,7 @@ import {
 import { ref, onValue } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
-import { Reserve } from "@/components/complete-reserve-modal";
+import { Reserve } from "@/components/sell-product-modal";
 
 interface Category {
   id: string;

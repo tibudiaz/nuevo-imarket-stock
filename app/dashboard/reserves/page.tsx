@@ -13,7 +13,7 @@ import { ref, onValue, update, get, set } from "firebase/database"
 import { formatUsdCurrency } from "@/lib/price-converter"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
-import CompleteReserveModal, { Reserve } from "@/components/complete-reserve-modal"
+import SellProductModal, { Reserve } from "@/components/sell-product-modal"
 import { useAuth } from "@/hooks/use-auth"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -141,8 +141,12 @@ export default function ReservesPage() {
   }
 
   const handleReserveCompleted = () => {
-    setIsCompleteModalOpen(false)
     toast.success("Venta completada con éxito.")
+  }
+
+  const handleCloseCompleteModal = () => {
+    setIsCompleteModalOpen(false)
+    setSelectedReserve(null)
   }
 
   const filteredReserves = useMemo(() => {
@@ -323,14 +327,14 @@ export default function ReservesPage() {
         </div>
       </div>
 
-      {selectedReserve && (
-        <CompleteReserveModal
-          isOpen={isCompleteModalOpen}
-          onClose={() => setIsCompleteModalOpen(false)}
-          reserve={selectedReserve}
-          onReserveCompleted={handleReserveCompleted}
-        />
-      )}
+      <SellProductModal
+        isOpen={isCompleteModalOpen}
+        onClose={handleCloseCompleteModal}
+        product={null}
+        onProductSold={() => {}}
+        reserveToComplete={selectedReserve}
+        onReserveCompletion={handleReserveCompleted}
+      />
     </DashboardLayout>
   )
 }

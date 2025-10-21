@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { ref, set, push, get, update, onValue, query, orderByChild, equalTo, remove, runTransaction } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -76,10 +76,13 @@ interface Sale {
     pointsAccumulated?: number;
     pointsPaused?: boolean;
     store: "local1" | "local2";
+    reserveId?: string;
+    reserveReceiptNumber?: string;
+    reserveDownPayment?: number;
 }
 
 // Interfaz para los datos de la reserva
-interface Reserve {
+export interface Reserve {
     id: string;
     receiptNumber: string;
     date: string;
@@ -107,9 +110,11 @@ interface SellProductModalProps {
   onClose: () => void;
   product: CartProduct | null;
   onProductSold: () => void;
+  reserveToComplete?: Reserve | null;
+  onReserveCompletion?: (reserve: Reserve, sale: Sale) => void;
 }
 
-export default function SellProductModal({ isOpen, onClose, product, onProductSold }: SellProductModalProps) {
+export default function SellProductModal({ isOpen, onClose, product, onProductSold, reserveToComplete, onReserveCompletion }: SellProductModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [customer, setCustomer] = useState({ name: "", dni: "", phone: "", email: "" })
@@ -142,6 +147,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [pointValue, setPointValue] = useState(DEFAULT_POINT_VALUE);
   const [pointsPaused, setPointsPaused] = useState(false);
   const [saleStore, setSaleStore] = useState<"local1" | "local2" | null>(null);
+  const reservePrefilledId = useRef<string | null>(null);
+
+  const isCompletingReserve = !!reserveToComplete;
 
   useEffect(() => {
     if (paymentMethod !== "multiple") {
@@ -201,8 +209,94 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setUsePoints(false);
       setPointsPaused(false);
       setSaleStore(null);
+      setReserveAmount(0);
+      setReserveExpirationDate("");
+      setIsReserveDialogOpen(false);
+      setCompletedSale(null);
+      setIsPdfDialogOpen(false);
+      setCompletedReserve(null);
+      setIsReservePdfDialogOpen(false);
+      setPaymentMethod("efectivo");
+      setCashAmount(0);
+      setCashUsdAmount(0);
+      setTransferAmount(0);
+      setCardAmount(0);
+      reservePrefilledId.current = null;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !reserveToComplete) {
+      return;
+    }
+
+    if (reservePrefilledId.current === reserveToComplete.id) {
+      return;
+    }
+
+    const reservedQuantity = reserveToComplete.quantity || 1;
+    const productFromInventory = allProducts.find((p) => p.id === reserveToComplete.productId);
+    const productSource = productFromInventory || (reserveToComplete.productData as CartProduct | undefined);
+
+    const fallbackUnitPrice = reservedQuantity > 0
+      ? reserveToComplete.productPrice / reservedQuantity
+      : reserveToComplete.productPrice;
+
+    const cartItem: CartProduct = {
+      id: reserveToComplete.productId,
+      name: reserveToComplete.productName || productSource?.name || "Producto reservado",
+      price: productSource?.price ?? fallbackUnitPrice,
+      stock: productSource?.stock ?? reservedQuantity,
+      quantity: reservedQuantity,
+      imei: (productSource as any)?.imei,
+      barcode: (productSource as any)?.barcode,
+      category: productSource?.category,
+      model: (productSource as any)?.model,
+      brand: (productSource as any)?.brand,
+      provider: (productSource as any)?.provider,
+      store: productSource?.store,
+      cost: (productSource as any)?.cost,
+    };
+
+    setCart([cartItem]);
+    setInitialProductProcessed(true);
+    setSaleStore((productSource?.store as "local1" | "local2" | undefined) ?? reserveToComplete.store ?? null);
+    setCustomer({
+      name: reserveToComplete.customerName || "",
+      dni: reserveToComplete.customerDni || "",
+      phone: reserveToComplete.customerPhone || "",
+      email: "",
+    });
+    setProductSearchTerm("");
+    setIsTradeIn(false);
+    setUsePoints(false);
+    setPaymentMethod("efectivo");
+    setCashAmount(0);
+    setCashUsdAmount(0);
+    setTransferAmount(0);
+    setCardAmount(0);
+    reservePrefilledId.current = reserveToComplete.id;
+  }, [isOpen, reserveToComplete, allProducts]);
+
+  useEffect(() => {
+    const fetchCustomerPoints = async () => {
+      if (!isOpen || !reserveToComplete?.customerId) {
+        return;
+      }
+      try {
+        const customerRef = ref(database, `customers/${reserveToComplete.customerId}`);
+        const customerSnapshot = await get(customerRef);
+        if (customerSnapshot.exists()) {
+          const customerData = customerSnapshot.val();
+          setAvailablePoints(Number(customerData.points ?? 0));
+        }
+      } catch (error) {
+        console.error("Error al cargar los puntos del cliente reservado:", error);
+      }
+    };
+
+    fetchCustomerPoints();
+  }, [isOpen, reserveToComplete]);
 
   const searchCustomerByDni = async () => {
     if (!customer.dni) {
@@ -399,13 +493,25 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId, points: 0 });
         }
 
+        const reservedProductId = reserveToComplete?.productId;
+        const reservedQuantity = reserveToComplete?.quantity || 0;
+
         for (const item of cart) {
+            let quantityToDeduct = item.quantity;
+            if (reserveToComplete && item.id === reservedProductId) {
+                quantityToDeduct = Math.max(item.quantity - reservedQuantity, 0);
+            }
+
+            if (quantityToDeduct <= 0) {
+                continue;
+            }
+
             const productRef = ref(database, `products/${item.id}`);
             const productSnapshot = await get(productRef);
             if (productSnapshot.exists()) {
                 const productData = productSnapshot.val();
                 const currentStock = productData.stock || 0;
-                const newStock = currentStock - item.quantity;
+                const newStock = currentStock - quantityToDeduct;
 
                 if (newStock < 0) {
                     throw new Error(`Stock insuficiente para ${item.name}.`);
@@ -503,6 +609,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     pointsEarned,
                     pointsAccumulated: updatedPoints,
                 }),
+            ...(reserveToComplete
+                ? {
+                    reserveId: reserveToComplete.id,
+                    reserveReceiptNumber: reserveToComplete.receiptNumber,
+                    reserveDownPayment: reserveToComplete.downPayment,
+                }
+                : {}),
         };
         await set(newSaleRef, saleData);
 
@@ -511,7 +624,29 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             await update(customerRef, { points: updatedPoints, lastPurchase: new Date().toISOString() });
             setAvailablePoints(updatedPoints);
         }
-        
+
+        if (reserveToComplete) {
+            try {
+                const reserveRef = ref(database, `reserves/${reserveToComplete.id}`);
+                await update(reserveRef, {
+                    status: "completed",
+                    completedAt: new Date().toISOString(),
+                    saleId: saleData.id,
+                    saleReceiptNumber: saleData.receiptNumber,
+                    remainingAmount: 0,
+                });
+
+                if (reserveToComplete.productId) {
+                    const productRef = ref(database, `products/${reserveToComplete.productId}`);
+                    await update(productRef, { reserved: false });
+                }
+
+                onReserveCompletion?.(reserveToComplete, saleData);
+            } catch (error) {
+                console.error("Error al actualizar la reserva después de la venta:", error);
+            }
+        }
+
         setCompletedSale(saleData);
         onProductSold();
         toast.success("Venta completada con éxito.");
@@ -824,7 +959,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               </div>
               <div className="flex gap-2">
                   <Button variant="outline" onClick={onClose}>Cancelar</Button>
-                  <Button variant="secondary" onClick={() => setIsReserveDialogOpen(true)} disabled={cart.length === 0 || !saleStore}>Reservar</Button>
+                  {!isCompletingReserve && (
+                    <Button variant="secondary" onClick={() => setIsReserveDialogOpen(true)} disabled={cart.length === 0 || !saleStore}>Reservar</Button>
+                  )}
                   <Button onClick={handleSellProduct} disabled={isLoading || cart.length === 0 || !saleStore}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Completar Venta</Button>
               </div>
             </div>
@@ -853,28 +990,30 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         </Dialog>
       )}
 
-      <Dialog open={isReserveDialogOpen} onOpenChange={setIsReserveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reservar Producto</DialogTitle>
-            <DialogDescription>Ingrese monto de seña y fecha límite para retirar.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="reserve-amount">Monto de Seña (ARS)</Label>
-              <Input id="reserve-amount" type="number" value={reserveAmount} onChange={(e) => setReserveAmount(Number(e.target.value))} />
+      {!isCompletingReserve && (
+        <Dialog open={isReserveDialogOpen} onOpenChange={setIsReserveDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reservar Producto</DialogTitle>
+              <DialogDescription>Ingrese monto de seña y fecha límite para retirar.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="reserve-amount">Monto de Seña (ARS)</Label>
+                <Input id="reserve-amount" type="number" value={reserveAmount} onChange={(e) => setReserveAmount(Number(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reserve-date" className="flex items-center gap-1.5"><Calendar className="h-4 w-4"/>Fecha Límite</Label>
+                <Input id="reserve-date" type="date" value={reserveExpirationDate} onChange={(e) => setReserveExpirationDate(e.target.value)} />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="reserve-date" className="flex items-center gap-1.5"><Calendar className="h-4 w-4"/>Fecha Límite</Label>
-              <Input id="reserve-date" type="date" value={reserveExpirationDate} onChange={(e) => setReserveExpirationDate(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsReserveDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleReserveProduct} disabled={isLoading || reserveAmount <= 0 || !reserveExpirationDate}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar Reserva</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsReserveDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleReserveProduct} disabled={isLoading || reserveAmount <= 0 || !reserveExpirationDate}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar Reserva</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   )
 }
