@@ -52,6 +52,7 @@ import {
 import { ref, onValue } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
+import { useStore } from "@/hooks/use-store";
 import { Reserve } from "@/components/complete-reserve-modal";
 
 interface Category {
@@ -99,6 +100,7 @@ export default function MobilePage() {
   const router = useRouter();
   const isMobile = useMobile();
   const { user, loading: authLoading } = useAuth();
+  const { selectedStore } = useStore();
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState({
@@ -483,6 +485,15 @@ export default function MobilePage() {
     },
   ];
 
+  const filteredQuickActions = quickActions.filter((action) => {
+    if (selectedStore === "local2") {
+      if (action.title === "Ventas" || action.title === "Simulador de Costos") {
+        return false;
+      }
+    }
+    return true;
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-6 p-4">
@@ -587,7 +598,7 @@ export default function MobilePage() {
             </CardHeader>
           </Card>
 
-          {quickActions.map((action) => (
+          {filteredQuickActions.map((action) => (
             <Card
               key={action.title}
               className="cursor-pointer transition-shadow hover:shadow-lg"

@@ -231,7 +231,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex min-h-screen w-full flex-col bg-slate-50">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
           <div className="flex items-center gap-2">
-            <MobileMenu userRole={user.role} />
+            <MobileMenu userRole={user.role} selectedStore={selectedStore} />
             <Link href="/dashboard" className="hidden md:flex items-center gap-2 font-semibold">
               <Package className="h-6 w-6" />
               <span className="text-xl">iMarket</span>
@@ -354,7 +354,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               <NavItem href="/dashboard/low-stock" icon={AlertTriangle} label="Bajo Stock" active={pathname === "/dashboard/low-stock"} />
 
-              <NavItem href="/dashboard/sales" icon={ShoppingCart} label="Ventas" active={pathname === "/dashboard/sales" && currentSalesType !== 'celulares'} />
+              {selectedStore !== 'local2' && (
+                <NavItem
+                  href="/dashboard/sales"
+                  icon={ShoppingCart}
+                  label="Ventas"
+                  active={pathname === "/dashboard/sales" && currentSalesType !== 'celulares'}
+                />
+              )}
               <NavItem href="/dashboard/sales?type=celulares" icon={Smartphone} label="Ventas de Celulares" active={pathname === "/dashboard/sales" && currentSalesType === 'celulares'} />
 
               <Collapsible open={isReservesOpen} onOpenChange={setIsReservesOpen} className="w-full">
@@ -375,7 +382,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <NavItem href="/dashboard/customers" icon={Users} label="Clientes" active={pathname === "/dashboard/customers"} />
               )}
 
-              <NavItem href="/dashboard/simulator" icon={Calculator} label="Simulador de Costos" active={pathname === "/dashboard/simulator"} />
+              {selectedStore !== 'local2' && (
+                <NavItem
+                  href="/dashboard/simulator"
+                  icon={Calculator}
+                  label="Simulador de Costos"
+                  active={pathname === "/dashboard/simulator"}
+                />
+              )}
 
             </nav>
           </aside>
