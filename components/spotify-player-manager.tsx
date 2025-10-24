@@ -101,8 +101,17 @@ export function SpotifyPlayerManager() {
         playerRef.current.disconnect()
         playerRef.current = null
       }
-      setDeviceId(null)
-      setPlaybackState({ isPlaying: false, track: null })
+
+      const { deviceId: currentDeviceId, isPlaying, currentTrack } = useSpotifyPlayerStore.getState()
+
+      if (currentDeviceId !== null) {
+        setDeviceId(null)
+      }
+
+      if (isPlaying || currentTrack !== null) {
+        setPlaybackState({ isPlaying: false, track: null })
+      }
+
       return
     }
 
