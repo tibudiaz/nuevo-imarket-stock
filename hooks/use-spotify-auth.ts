@@ -1,13 +1,13 @@
 "use client"
 
 import { useCallback } from "react"
-import { refreshAccessToken } from "@/lib/spotify"
+import { SPOTIFY_CLIENT_ID, refreshAccessToken } from "@/lib/spotify"
 import { useSpotifyPlayerStore } from "./use-spotify-player"
 
 const REFRESH_THRESHOLD = 60 * 1000
 
 export function useSpotifyAuth() {
-  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || ""
+  const clientId = SPOTIFY_CLIENT_ID
   const { accessToken, refreshToken, expiresAt, setTokens, clearTokens } = useSpotifyPlayerStore(
     (state) => ({
       accessToken: state.accessToken,

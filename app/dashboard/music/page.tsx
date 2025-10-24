@@ -8,7 +8,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { SPOTIFY_SCOPES, buildAuthorizeUrl, fetchSpotify, generateCodeChallenge, generateCodeVerifier, getRedirectUri, requestTokens, spotifyEndpoints } from "@/lib/spotify"
+import {
+  SPOTIFY_CLIENT_ID,
+  SPOTIFY_SCOPES,
+  buildAuthorizeUrl,
+  fetchSpotify,
+  generateCodeChallenge,
+  generateCodeVerifier,
+  getRedirectUri,
+  requestTokens,
+  spotifyEndpoints,
+} from "@/lib/spotify"
 import { useSpotifyAuth } from "@/hooks/use-spotify-auth"
 import { useSpotifyPlayerStore } from "@/hooks/use-spotify-player"
 import { Loader2, LogOut, Search, Headphones, Music2, Radio, Link as LinkIcon } from "lucide-react"
@@ -52,7 +62,7 @@ const STATE_KEY = "spotify_auth_state"
 export default function MusicPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || ""
+  const clientId = SPOTIFY_CLIENT_ID
   const { accessToken, setTokens, clearTokens, getValidAccessToken } = useSpotifyAuth()
   const { deviceId, currentTrack } = useSpotifyPlayerStore((state) => ({
     deviceId: state.deviceId,
