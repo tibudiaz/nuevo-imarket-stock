@@ -25,6 +25,7 @@ import {
   Wallet,
   Smartphone,
   Banknote,
+  Music2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -52,6 +53,8 @@ import { Reserve } from "@/components/sell-product-modal"
 import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
 import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog"
 import { toast } from "sonner"
+import { SpotifyPlayerManager } from "@/components/spotify-player-manager"
+import { SpotifyHeaderMiniPlayer } from "@/components/spotify-header-mini-player"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -229,6 +232,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex min-h-screen w-full flex-col bg-slate-50">
+        <SpotifyPlayerManager />
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
           <div className="flex items-center gap-2">
             <MobileMenu userRole={user.role} />
@@ -238,6 +242,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </Link>
           </div>
           <div className="flex items-center gap-4">
+            <SpotifyHeaderMiniPlayer />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -376,6 +381,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
 
               <NavItem href="/dashboard/simulator" icon={Calculator} label="Simulador de Costos" active={pathname === "/dashboard/simulator"} />
+              <NavItem href="/dashboard/music" icon={Music2} label="Música" active={pathname === "/dashboard/music"} />
 
             </nav>
           </aside>
