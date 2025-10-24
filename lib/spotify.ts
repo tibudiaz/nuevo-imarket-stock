@@ -1,6 +1,19 @@
 const SPOTIFY_ACCOUNTS_BASE = "https://accounts.spotify.com"
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 
+const DEFAULT_SPOTIFY_CLIENT_ID = "65f4deea9af04d7db118d47dcc544ebb"
+const DEFAULT_SPOTIFY_CLIENT_SECRET = "2c0c9c4d5e014aab867325526db9128c"
+
+export const SPOTIFY_CLIENT_ID =
+  process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
+  process.env.SPOTIFY_CLIENT_ID ||
+  DEFAULT_SPOTIFY_CLIENT_ID
+
+export const SPOTIFY_CLIENT_SECRET =
+  process.env.SPOTIFY_CLIENT_SECRET ||
+  process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET ||
+  DEFAULT_SPOTIFY_CLIENT_SECRET
+
 export const SPOTIFY_SCOPES = [
   "user-read-email",
   "user-read-private",
@@ -58,12 +71,22 @@ export function buildAuthorizeUrl(params: Record<string, string>) {
 }
 
 export async function requestTokens(body: Record<string, string>) {
+  const params = new URLSearchParams(body)
+
+  if (!params.has("client_id") && SPOTIFY_CLIENT_ID) {
+    params.set("client_id", SPOTIFY_CLIENT_ID)
+  }
+
+  if (!params.has("client_secret") && SPOTIFY_CLIENT_SECRET) {
+    params.set("client_secret", SPOTIFY_CLIENT_SECRET)
+  }
+
   const response = await fetch(spotifyEndpoints.token, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams(body).toString(),
+    body: params.toString(),
   })
 
   if (!response.ok) {
