@@ -147,8 +147,8 @@ export default function MusicPage() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setUserProfile(null)
-      setPlaylists([])
+      setUserProfile((previous) => (previous !== null ? null : previous))
+      setPlaylists((previous) => (previous.length > 0 ? [] : previous))
       return
     }
 
