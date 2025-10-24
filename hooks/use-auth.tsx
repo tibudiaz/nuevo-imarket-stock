@@ -20,13 +20,46 @@ export function useAuth() {
           ? "admin"
           : "moderator";
         const currentUser = { username: firebaseUser.email, role };
-        setUser(currentUser);
-        localStorage.setItem("user", JSON.stringify(currentUser));
+
+        setUser((previous) => {
+          if (
+            previous?.username === currentUser.username &&
+            previous?.role === currentUser.role
+          ) {
+            return previous;
+          }
+          return currentUser;
+        });
+        const stored = localStorage.getItem("user");
+        if (!stored) {
+          localStorage.setItem("user", JSON.stringify(currentUser));
+        } else {
+          try {
+            const parsed = JSON.parse(stored) as User;
+            if (
+              parsed.username !== currentUser.username ||
+              parsed.role !== currentUser.role
+            ) {
+              localStorage.setItem("user", JSON.stringify(currentUser));
+            }
+          } catch {
+            localStorage.setItem("user", JSON.stringify(currentUser));
+          }
+        }
       } else {
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
           try {
-            setUser(JSON.parse(storedUser));
+            const parsed = JSON.parse(storedUser) as User;
+            setUser((previous) => {
+              if (
+                previous?.username === parsed.username &&
+                previous?.role === parsed.role
+              ) {
+                return previous;
+              }
+              return parsed;
+            });
           } catch {
             localStorage.removeItem("user");
             setUser(null);
