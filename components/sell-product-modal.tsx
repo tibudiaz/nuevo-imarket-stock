@@ -148,6 +148,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [pointsPaused, setPointsPaused] = useState(false);
   const [saleStore, setSaleStore] = useState<"local1" | "local2" | null>(null);
   const reservePrefilledId = useRef<string | null>(null);
+  const pdfChoiceRef = useRef(false);
+  const closingPdfDialogRef = useRef(false);
 
   const isCompletingReserve = !!reserveToComplete;
 
@@ -214,6 +216,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setIsReserveDialogOpen(false);
       setCompletedSale(null);
       setIsPdfDialogOpen(false);
+      pdfChoiceRef.current = false;
+      closingPdfDialogRef.current = false;
       setCompletedReserve(null);
       setIsReservePdfDialogOpen(false);
       setPaymentMethod("efectivo");
@@ -648,7 +652,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
 
         setCompletedSale(saleData);
-        onProductSold();
         toast.success("Venta completada con éxito.");
         setIsPdfDialogOpen(true);
 
@@ -775,12 +778,28 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
   };
 
-  const handlePdfDialogClose = async (generatePdfOption: boolean) => {
-    setIsPdfDialogOpen(false);
-    if (generatePdfOption && completedSale) {
-        await generateSaleReceiptPdf(completedSale);
+  const finalizePdfDialogClose = useCallback(async () => {
+    const shouldGenerate = pdfChoiceRef.current;
+    pdfChoiceRef.current = false;
+
+    try {
+        if (shouldGenerate && completedSale) {
+            await generateSaleReceiptPdf(completedSale);
+        }
+    } catch (error) {
+        console.error("Error al generar el comprobante:", error);
+    } finally {
+        closingPdfDialogRef.current = false;
+        onProductSold();
+        onClose();
     }
-    onClose();
+  }, [completedSale, onClose, onProductSold]);
+
+  const handlePdfDialogClose = (generatePdfOption: boolean) => {
+    pdfChoiceRef.current = generatePdfOption;
+    closingPdfDialogRef.current = true;
+    setIsPdfDialogOpen(false);
+    void finalizePdfDialogClose();
   };
   
   const handleReservePdfDialogClose = async (generatePdfOption: boolean) => {
@@ -970,7 +989,24 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       </Dialog>
       
       {completedSale && (
-        <Dialog open={isPdfDialogOpen} onOpenChange={() => setIsPdfDialogOpen(false)}>
+        <Dialog
+          open={isPdfDialogOpen}
+          onOpenChange={(open) => {
+            if (open) {
+              setIsPdfDialogOpen(true);
+              return;
+            }
+
+            setIsPdfDialogOpen(false);
+
+            if (closingPdfDialogRef.current) {
+              return;
+            }
+
+            pdfChoiceRef.current = false;
+            void finalizePdfDialogClose();
+          }}
+        >
           <DialogContent><DialogHeader><DialogTitle>Venta Completada</DialogTitle><DialogDescription>¿Deseas generar el comprobante de la venta en PDF?</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => handlePdfDialogClose(false)}>No, gracias</Button><Button onClick={() => handlePdfDialogClose(true)}><FileText className="mr-2 h-4 w-4" />Generar PDF</Button></DialogFooter></DialogContent>
         </Dialog>
       )}
