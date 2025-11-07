@@ -23,6 +23,7 @@ import { convertPrice, convertPriceToUSD, formatCurrency } from "../lib/price-co
 import { shouldRemoveProductFromInventory } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 // --- Interfaces para Tipado Fuerte ---
 interface CartProduct {
@@ -100,6 +101,17 @@ export interface Reserve {
     status: 'reserved' | 'completed' | 'cancelled';
     store: "local1" | "local2";
     productData?: any;
+    usdRate?: number;
+    productPriceArs?: number;
+    downPaymentArs?: number;
+    remainingAmountArs?: number;
+    tradeIn?: {
+        name: string;
+        price: number;
+        priceArs?: number;
+        imei?: string;
+        serialNumber?: string;
+    } | null;
 }
 
 const DEFAULT_POINT_EARN_RATE = 50000;
@@ -131,6 +143,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [reserveAmount, setReserveAmount] = useState(0)
   const [reserveExpirationDate, setReserveExpirationDate] = useState("")
   const [receiptNumber, setReceiptNumber] = useState("")
+  const [reservePdfCurrency, setReservePdfCurrency] = useState<"USD" | "ARS">("USD")
 
   const [cart, setCart] = useState<CartProduct[]>([])
   const [allProducts, setAllProducts] = useState<CartProduct[]>([])
@@ -220,6 +233,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       closingPdfDialogRef.current = false;
       setCompletedReserve(null);
       setIsReservePdfDialogOpen(false);
+      setReservePdfCurrency("USD");
       setPaymentMethod("efectivo");
       setCashAmount(0);
       setCashUsdAmount(0);
@@ -272,7 +286,18 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       email: "",
     });
     setProductSearchTerm("");
-    setIsTradeIn(false);
+    if (reserveToComplete.tradeIn) {
+      setIsTradeIn(true);
+      setTradeInProduct({
+        name: reserveToComplete.tradeIn.name || "",
+        imei: reserveToComplete.tradeIn.imei || "",
+        serialNumber: reserveToComplete.tradeIn.serialNumber || "",
+        price: reserveToComplete.tradeIn.price || 0,
+      });
+    } else {
+      setIsTradeIn(false);
+      setTradeInProduct({ name: "", imei: "", price: 0, serialNumber: "" });
+    }
     setUsePoints(false);
     setPaymentMethod("efectivo");
     setCashAmount(0);
@@ -683,6 +708,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         toast.error("No se detectó el local");
         return;
     }
+    if (usdRate <= 0) {
+        toast.error("Cotización de dólar inválida");
+        return;
+    }
 
     setIsLoading(true);
     try {
@@ -745,6 +774,21 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         const newReserveRef = push(ref(database, 'reserves'));
         const productPriceUSD = convertPriceToUSD(item.price, usdRate) * item.quantity;
         const downPaymentUSD = reserveAmount / usdRate;
+        const tradeInValueUSD = isTradeIn ? Math.max(tradeInProduct.price, 0) : 0;
+        const productPriceARS = convertPrice(item.price, usdRate) * item.quantity;
+        const downPaymentARS = reserveAmount;
+        const tradeInValueARS = tradeInValueUSD * usdRate;
+        const remainingAmountUSD = Math.max(productPriceUSD - downPaymentUSD - tradeInValueUSD, 0);
+        const remainingAmountARS = Math.max(productPriceARS - downPaymentARS - tradeInValueARS, 0);
+        const tradeInData = isTradeIn && tradeInProduct.name
+          ? {
+              name: tradeInProduct.name,
+              imei: tradeInProduct.imei || undefined,
+              serialNumber: tradeInProduct.serialNumber || undefined,
+              price: tradeInProduct.price,
+              priceArs: tradeInValueARS,
+            }
+          : null;
         const reserveData: Reserve = {
             id: newReserveRef.key!,
             receiptNumber: newReceiptNumber,
@@ -759,10 +803,15 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             quantity: reservedQuantity,
             productPrice: productPriceUSD,
             downPayment: downPaymentUSD,
-            remainingAmount: productPriceUSD - downPaymentUSD,
+            remainingAmount: remainingAmountUSD,
             status: 'reserved',
             store: saleStore,
             productData: productSnapshot.val(),
+            usdRate,
+            productPriceArs: productPriceARS,
+            downPaymentArs: downPaymentARS,
+            remainingAmountArs: remainingAmountARS,
+            tradeIn: tradeInData,
         };
         await set(newReserveRef, reserveData);
         
@@ -802,10 +851,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     void finalizePdfDialogClose();
   };
   
-  const handleReservePdfDialogClose = async (generatePdfOption: boolean) => {
+  const handleReservePdfDialogClose = async (generatePdfOption: boolean, currency: "USD" | "ARS" = "USD") => {
     setIsReservePdfDialogOpen(false);
     if (generatePdfOption && completedReserve) {
-      await generateReserveReceiptPdf(completedReserve);
+      await generateReserveReceiptPdf(completedReserve, currency);
     }
     onProductSold();
     onClose();
@@ -1018,9 +1067,26 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     <DialogTitle>Reserva Completada</DialogTitle>
                     <DialogDescription>¿Deseas generar el comprobante de la reserva en PDF?</DialogDescription>
                 </DialogHeader>
+                <div className="py-2 space-y-3">
+                  <Label className="text-sm font-medium">Moneda del comprobante</Label>
+                  <RadioGroup
+                    className="flex flex-col gap-2"
+                    value={reservePdfCurrency}
+                    onValueChange={(value) => setReservePdfCurrency(value as "USD" | "ARS")}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem id="reserve-currency-usd" value="USD" />
+                      <Label htmlFor="reserve-currency-usd" className="font-normal">Dólares estadounidenses</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem id="reserve-currency-ars" value="ARS" />
+                      <Label htmlFor="reserve-currency-ars" className="font-normal">Pesos argentinos</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => handleReservePdfDialogClose(false)}>No, gracias</Button>
-                    <Button onClick={() => handleReservePdfDialogClose(true)}><FileText className="mr-2 h-4 w-4" />Generar PDF</Button>
+                    <Button onClick={() => handleReservePdfDialogClose(true, reservePdfCurrency)}><FileText className="mr-2 h-4 w-4" />Generar PDF</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
