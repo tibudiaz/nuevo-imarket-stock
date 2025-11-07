@@ -75,6 +75,17 @@ interface Reserve {
     remainingAmount: number;
     status: 'reserved' | 'completed' | 'cancelled';
     store?: 'local1' | 'local2';
+    usdRate?: number;
+    productPriceArs?: number;
+    downPaymentArs?: number;
+    remainingAmountArs?: number;
+    tradeIn?: {
+        name: string;
+        price: number;
+        priceArs?: number;
+        imei?: string;
+        serialNumber?: string;
+    } | null;
 }
 
 interface Customer {
@@ -555,7 +566,7 @@ const drawDeliveryPdfContent = (page: any, repair: Repair, fonts: Fonts) => {
 };
 
 // --- Generador de PDF para Reservas (Señas) ---
-export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
+export const generateReserveReceiptPdf = async (reserveData: Reserve, currency: "USD" | "ARS" = "USD") => {
   if (!reserveData) {
     toast.error("Error", { description: "No hay datos de la reserva para generar el PDF." });
     return;
@@ -591,11 +602,11 @@ export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const firstPage = pdfDoc.getPages()[0];
     
-    drawReservePdfContent(firstPage, reserveData, { helveticaFont, helveticaBold });
+    drawReservePdfContent(firstPage, reserveData, { helveticaFont, helveticaBold }, currency);
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
-        drawReservePdfContent(secondPage, reserveData, { helveticaFont, helveticaBold }, true);
+        drawReservePdfContent(secondPage, reserveData, { helveticaFont, helveticaBold }, currency, true);
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -616,7 +627,13 @@ export const generateReserveReceiptPdf = async (reserveData: Reserve) => {
   }
 };
 
-const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts, isSecondPage = false) => {
+const drawReservePdfContent = (
+    page: any,
+    reserve: Reserve,
+    fonts: Fonts,
+    currency: "USD" | "ARS",
+    isSecondPage = false,
+) => {
     const { helveticaFont, helveticaBold } = fonts;
     const fromTop = (y: number) => page.getHeight() - y;
     const positions = {
@@ -638,6 +655,51 @@ const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts, isSeco
     const formattedDate = reserve.date ? new Date(reserve.date).toLocaleDateString() : 'N/A';
     const formattedExpirationDate = formatDateForPdf(reserve.expirationDate);
 
+    const usdRate = reserve.usdRate ?? 0;
+    const useUsd = currency === "USD";
+    const safeNumber = (value: number | undefined | null) => {
+        if (typeof value !== 'number' || Number.isNaN(value)) {
+            return 0;
+        }
+        return value;
+    };
+
+    const productPriceValue = Math.max(safeNumber(reserve.productPrice), 0);
+    const downPaymentValue = Math.max(safeNumber(reserve.downPayment), 0);
+    const remainingAmountValue = Math.max(safeNumber(reserve.remainingAmount), 0);
+
+    const productPriceArs = Math.max(
+        reserve.productPriceArs ?? (usdRate > 0 ? productPriceValue * usdRate : productPriceValue),
+        0,
+    );
+    const downPaymentArs = Math.max(
+        reserve.downPaymentArs ?? (usdRate > 0 ? downPaymentValue * usdRate : downPaymentValue),
+        0,
+    );
+    const remainingAmountArs = Math.max(
+        reserve.remainingAmountArs ?? (usdRate > 0 ? remainingAmountValue * usdRate : remainingAmountValue),
+        0,
+    );
+
+    const productPriceText = useUsd
+        ? formatUsdCurrencyForPdf(productPriceValue)
+        : formatCurrencyForPdf(productPriceArs);
+    const downPaymentText = useUsd
+        ? formatUsdCurrencyForPdf(downPaymentValue)
+        : formatCurrencyForPdf(downPaymentArs);
+    const remainingAmountText = useUsd
+        ? formatUsdCurrencyForPdf(remainingAmountValue)
+        : formatCurrencyForPdf(remainingAmountArs);
+
+    const tradeInValueUsd = Math.max(reserve.tradeIn?.price ?? 0, 0);
+    const tradeInValueArs = Math.max(
+        reserve.tradeIn?.priceArs ?? (usdRate > 0 ? tradeInValueUsd * usdRate : tradeInValueUsd),
+        0,
+    );
+    const tradeInValueText = useUsd
+        ? formatUsdCurrencyForPdf(tradeInValueUsd)
+        : formatCurrencyForPdf(tradeInValueArs);
+
     page.drawText(String(reserve.receiptNumber || 'N/A'), { ...positions.numeroRecibo, size: 10, font: helveticaFont });
     page.drawText(formattedDate, { ...positions.fecha, size: 10, font: helveticaFont });
     page.drawText(String(reserve.customerName || ''), { ...positions.nombreCliente, size: 10, font: helveticaFont });
@@ -645,11 +707,29 @@ const drawReservePdfContent = (page: any, reserve: Reserve, fonts: Fonts, isSeco
     page.drawText(String(reserve.customerPhone || ''), { ...positions.celCliente, size: 10, font: helveticaFont });
 
     page.drawText(reserve.productName || 'Producto sin nombre', { x: positions.itemStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
-    page.drawText(formatUsdCurrencyForPdf(reserve.productPrice), { x: positions.priceStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
+    page.drawText(productPriceText, { x: positions.priceStartX, y: positions.itemStartY, size: 10, font: helveticaFont });
 
-    page.drawText(formatUsdCurrencyForPdf(reserve.productPrice), { ...positions.total, size: 10, font: helveticaFont });
-    page.drawText(formatUsdCurrencyForPdf(reserve.downPayment), { ...positions.entrega, size: 10, font: helveticaFont });
-    page.drawText(formatUsdCurrencyForPdf(reserve.remainingAmount), { ...positions.saldo, size: 12, font: helveticaBold });
+    let nextLineY = positions.itemStartY - 18;
+    if (reserve.tradeIn && (reserve.tradeIn.name || reserve.tradeIn.imei || reserve.tradeIn.serialNumber || tradeInValueUsd > 0)) {
+        page.drawText('Equipo entregado en parte de pago:', { x: positions.itemStartX, y: nextLineY, size: 9, font: helveticaBold });
+        nextLineY -= 12;
+        page.drawText(reserve.tradeIn.name || 'Sin descripción', { x: positions.itemStartX, y: nextLineY, size: 9, font: helveticaFont });
+        page.drawText(tradeInValueText, { x: positions.priceStartX, y: nextLineY, size: 9, font: helveticaFont });
+        if (reserve.tradeIn.imei || reserve.tradeIn.serialNumber) {
+            nextLineY -= 12;
+            const identifiers = [
+                reserve.tradeIn.imei ? `IMEI: ${reserve.tradeIn.imei}` : null,
+                reserve.tradeIn.serialNumber ? `Serie: ${reserve.tradeIn.serialNumber}` : null,
+            ].filter(Boolean).join('  /  ');
+            if (identifiers) {
+                page.drawText(identifiers, { x: positions.itemStartX, y: nextLineY, size: 8, font: helveticaFont });
+            }
+        }
+    }
+
+    page.drawText(productPriceText, { ...positions.total, size: 10, font: helveticaFont });
+    page.drawText(downPaymentText, { ...positions.entrega, size: 10, font: helveticaFont });
+    page.drawText(remainingAmountText, { ...positions.saldo, size: 12, font: helveticaBold });
 
     // Imprimir fecha de retiro
     page.drawText(formattedExpirationDate, { ...positions.fechaRetiro1, size: 12, font: helveticaFont });
