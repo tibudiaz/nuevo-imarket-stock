@@ -63,6 +63,7 @@ const STATE_KEY = "spotify_auth_state"
 export default function MusicPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const searchParamsString = useMemo(() => searchParams?.toString() ?? "", [searchParams])
   const clientId = SPOTIFY_CLIENT_ID
   const { accessToken, setTokens, clearTokens, getValidAccessToken } = useSpotifyAuth()
   const { deviceId, currentTrack } = useSpotifyPlayerStore((state) => ({
@@ -98,8 +99,9 @@ export default function MusicPage() {
   const isAuthenticated = useMemo(() => Boolean(accessToken), [accessToken])
 
   useEffect(() => {
-    const code = searchParams?.get("code")
-    const errorParam = searchParams?.get("error")
+    const params = new URLSearchParams(searchParamsString)
+    const code = params.get("code")
+    const errorParam = params.get("error")
 
     if (!code && !errorParam) {
       return
@@ -120,7 +122,7 @@ export default function MusicPage() {
         "No se pudo validar el estado de seguridad de la autenticación con Spotify.",
       )
       const storedState = storedStateResult.value
-      const returnedState = searchParams.get("state")
+      const returnedState = params.get("state")
       if (storedState && storedState !== returnedState) {
         toast.error("La verificación del inicio de sesión falló. Intentá nuevamente.")
         handleStorageResult(
@@ -183,7 +185,7 @@ export default function MusicPage() {
     }
 
     handleAuthResponse()
-  }, [searchParams, router, clientId, setTokens, clearTokens])
+  }, [searchParamsString, router, clientId, setTokens, clearTokens])
 
   useEffect(() => {
     if (!isAuthenticated) {
