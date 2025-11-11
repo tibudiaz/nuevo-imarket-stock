@@ -73,7 +73,11 @@ type StoreSummary = {
   products: number
   newPhones: number
   usedPhones: number
+  productsCount: number
+  newPhonesCount: number
+  usedPhonesCount: number
   total: number
+  totalCount: number
 }
 
 const storeLabels: Record<SummaryKey, string> = {
@@ -88,9 +92,36 @@ const currencyFormatter = new Intl.NumberFormat("es-AR", {
 })
 
 const createEmptySummary = (): Record<SummaryKey, StoreSummary> => ({
-  all: { products: 0, newPhones: 0, usedPhones: 0, total: 0 },
-  local1: { products: 0, newPhones: 0, usedPhones: 0, total: 0 },
-  local2: { products: 0, newPhones: 0, usedPhones: 0, total: 0 },
+  all: {
+    products: 0,
+    newPhones: 0,
+    usedPhones: 0,
+    productsCount: 0,
+    newPhonesCount: 0,
+    usedPhonesCount: 0,
+    total: 0,
+    totalCount: 0,
+  },
+  local1: {
+    products: 0,
+    newPhones: 0,
+    usedPhones: 0,
+    productsCount: 0,
+    newPhonesCount: 0,
+    usedPhonesCount: 0,
+    total: 0,
+    totalCount: 0,
+  },
+  local2: {
+    products: 0,
+    newPhones: 0,
+    usedPhones: 0,
+    productsCount: 0,
+    newPhonesCount: 0,
+    usedPhonesCount: 0,
+    total: 0,
+    totalCount: 0,
+  },
 })
 
 export default function Dashboard() {
@@ -233,19 +264,33 @@ export default function Dashboard() {
           const isToday = !!(saleDate && saleDate >= startOfDay && saleDate <= endOfDay)
 
           if (isToday) {
-            const saleCategoryTotals: StoreSummary = { products: 0, newPhones: 0, usedPhones: 0, total: 0 }
+            const saleCategoryTotals: StoreSummary = {
+              products: 0,
+              newPhones: 0,
+              usedPhones: 0,
+              productsCount: 0,
+              newPhonesCount: 0,
+              usedPhonesCount: 0,
+              total: 0,
+              totalCount: 0,
+            }
 
             sale.items?.forEach((item) => {
               const quantity = Number(item.quantity) || 0
               const price = Number(item.price) || 0
               const lineTotal = price * quantity
 
+              saleCategoryTotals.totalCount += quantity
+
               if (item.category === "Celulares Nuevos") {
                 saleCategoryTotals.newPhones += lineTotal
+                saleCategoryTotals.newPhonesCount += quantity
               } else if (item.category === "Celulares Usados") {
                 saleCategoryTotals.usedPhones += lineTotal
+                saleCategoryTotals.usedPhonesCount += quantity
               } else {
                 saleCategoryTotals.products += lineTotal
+                saleCategoryTotals.productsCount += quantity
               }
             })
 
@@ -261,12 +306,20 @@ export default function Dashboard() {
             summary[saleStore].products += saleCategoryTotals.products
             summary[saleStore].newPhones += saleCategoryTotals.newPhones
             summary[saleStore].usedPhones += saleCategoryTotals.usedPhones
+            summary[saleStore].productsCount += saleCategoryTotals.productsCount
+            summary[saleStore].newPhonesCount += saleCategoryTotals.newPhonesCount
+            summary[saleStore].usedPhonesCount += saleCategoryTotals.usedPhonesCount
             summary[saleStore].total += saleTotalForSummary
+            summary[saleStore].totalCount += saleCategoryTotals.totalCount
 
             summary.all.products += saleCategoryTotals.products
             summary.all.newPhones += saleCategoryTotals.newPhones
             summary.all.usedPhones += saleCategoryTotals.usedPhones
+            summary.all.productsCount += saleCategoryTotals.productsCount
+            summary.all.newPhonesCount += saleCategoryTotals.newPhonesCount
+            summary.all.usedPhonesCount += saleCategoryTotals.usedPhonesCount
             summary.all.total += saleTotalForSummary
+            summary.all.totalCount += saleCategoryTotals.totalCount
 
             if (selectedStore === "all" || saleStore === selectedStore) {
               filteredDailySales.push(sale)
@@ -479,9 +532,18 @@ export default function Dashboard() {
                         </Badge>
                       </div>
                       <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                        <p>Productos: {currencyFormatter.format(summary.products)}</p>
-                        <p>Celulares nuevos: {currencyFormatter.format(summary.newPhones)}</p>
-                        <p>Celulares usados: {currencyFormatter.format(summary.usedPhones)}</p>
+                        <p>
+                          Productos: {currencyFormatter.format(summary.products)} · {summary.productsCount}{" "}
+                          {summary.productsCount === 1 ? "unidad" : "unidades"}
+                        </p>
+                        <p>
+                          Celulares nuevos: {currencyFormatter.format(summary.newPhones)} · {summary.newPhonesCount}{" "}
+                          {summary.newPhonesCount === 1 ? "unidad" : "unidades"}
+                        </p>
+                        <p>
+                          Celulares usados: {currencyFormatter.format(summary.usedPhones)} · {summary.usedPhonesCount}{" "}
+                          {summary.usedPhonesCount === 1 ? "unidad" : "unidades"}
+                        </p>
                       </div>
                     </div>
                   )
@@ -502,9 +564,18 @@ export default function Dashboard() {
                     {selectedStoreSummary.total > 0 ? "Con ventas hoy" : "Sin ventas hoy"}
                   </Badge>
                 </div>
-                <p>Productos: {currencyFormatter.format(selectedStoreSummary.products)}</p>
-                <p>Celulares nuevos: {currencyFormatter.format(selectedStoreSummary.newPhones)}</p>
-                <p>Celulares usados: {currencyFormatter.format(selectedStoreSummary.usedPhones)}</p>
+                <p>
+                  Productos: {currencyFormatter.format(selectedStoreSummary.products)} · {selectedStoreSummary.productsCount}{" "}
+                  {selectedStoreSummary.productsCount === 1 ? "unidad" : "unidades"}
+                </p>
+                <p>
+                  Celulares nuevos: {currencyFormatter.format(selectedStoreSummary.newPhones)} · {selectedStoreSummary.newPhonesCount}{" "}
+                  {selectedStoreSummary.newPhonesCount === 1 ? "unidad" : "unidades"}
+                </p>
+                <p>
+                  Celulares usados: {currencyFormatter.format(selectedStoreSummary.usedPhones)} · {selectedStoreSummary.usedPhonesCount}{" "}
+                  {selectedStoreSummary.usedPhonesCount === 1 ? "unidad" : "unidades"}
+                </p>
               </div>
             </CardContent>
           </Card>
