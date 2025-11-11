@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { safeLocalStorage } from "@/lib/safe-storage";
 
 interface User {
   username: string;
@@ -30,27 +31,27 @@ export function useAuth() {
           }
           return currentUser;
         });
-        const stored = localStorage.getItem("user");
-        if (!stored) {
-          localStorage.setItem("user", JSON.stringify(currentUser));
+        const stored = safeLocalStorage.getItem("user");
+        if (!stored.ok || !stored.value) {
+          safeLocalStorage.setItem("user", JSON.stringify(currentUser));
         } else {
           try {
-            const parsed = JSON.parse(stored) as User;
+            const parsed = JSON.parse(stored.value) as User;
             if (
               parsed.username !== currentUser.username ||
               parsed.role !== currentUser.role
             ) {
-              localStorage.setItem("user", JSON.stringify(currentUser));
+              safeLocalStorage.setItem("user", JSON.stringify(currentUser));
             }
           } catch {
-            localStorage.setItem("user", JSON.stringify(currentUser));
+            safeLocalStorage.setItem("user", JSON.stringify(currentUser));
           }
         }
       } else {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
+        const storedUser = safeLocalStorage.getItem("user");
+        if (storedUser.ok && storedUser.value) {
           try {
-            const parsed = JSON.parse(storedUser) as User;
+            const parsed = JSON.parse(storedUser.value) as User;
             setUser((previous) => {
               if (
                 previous?.username === parsed.username &&
@@ -61,7 +62,7 @@ export function useAuth() {
               return parsed;
             });
           } catch {
-            localStorage.removeItem("user");
+            safeLocalStorage.removeItem("user");
             setUser(null);
           }
         } else {

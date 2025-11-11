@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ import { useSpotifyPlayerStore } from "@/hooks/use-spotify-player"
 import { Loader2, LogOut, Search, Headphones, Music2, Radio, Link as LinkIcon } from "lucide-react"
 import Image from "next/image"
 import { toast } from "sonner"
+import { safeLocalStorage, type SafeStorageResult } from "@/lib/safe-storage"
 
 interface SpotifyUserProfile {
   id: string
@@ -76,6 +77,23 @@ export default function MusicPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<SearchResults>({ tracks: [], playlists: [] })
   const [isSearching, setIsSearching] = useState(false)
+  const storageErrorRef = useRef(false)
+
+  const handleStorageResult = (
+    result: SafeStorageResult<unknown>,
+    description: string,
+  ) => {
+    if (!result.ok) {
+      if (!storageErrorRef.current) {
+        storageErrorRef.current = true
+        toast.error("No se pudo acceder a los datos guardados de Spotify", {
+          description,
+        })
+      }
+    } else if (storageErrorRef.current) {
+      storageErrorRef.current = false
+    }
+  }
 
   const isAuthenticated = useMemo(() => Boolean(accessToken), [accessToken])
 
@@ -96,17 +114,33 @@ export default function MusicPage() {
         return
       }
 
-      const storedState = localStorage.getItem(STATE_KEY)
+      const storedStateResult = safeLocalStorage.getItem(STATE_KEY)
+      handleStorageResult(
+        storedStateResult,
+        "No se pudo validar el estado de seguridad de la autenticación con Spotify.",
+      )
+      const storedState = storedStateResult.value
       const returnedState = searchParams.get("state")
       if (storedState && storedState !== returnedState) {
         toast.error("La verificación del inicio de sesión falló. Intentá nuevamente.")
-        localStorage.removeItem(CODE_VERIFIER_KEY)
-        localStorage.removeItem(STATE_KEY)
+        handleStorageResult(
+          safeLocalStorage.removeItem(CODE_VERIFIER_KEY),
+          "No se pudieron limpiar los datos temporales de la autenticación.",
+        )
+        handleStorageResult(
+          safeLocalStorage.removeItem(STATE_KEY),
+          "No se pudieron limpiar los datos temporales de la autenticación.",
+        )
         router.replace("/dashboard/music")
         return
       }
 
-      const codeVerifier = localStorage.getItem(CODE_VERIFIER_KEY)
+      const codeVerifierResult = safeLocalStorage.getItem(CODE_VERIFIER_KEY)
+      handleStorageResult(
+        codeVerifierResult,
+        "No se pudo recuperar el código temporal necesario para conectar Spotify.",
+      )
+      const codeVerifier = codeVerifierResult.value
       if (!codeVerifier || !clientId) {
         toast.error("Faltan datos para completar la conexión con Spotify.")
         router.replace("/dashboard/music")
@@ -136,8 +170,14 @@ export default function MusicPage() {
         toast.error("No se pudo conectar con Spotify")
         clearTokens()
       } finally {
-        localStorage.removeItem(CODE_VERIFIER_KEY)
-        localStorage.removeItem(STATE_KEY)
+        handleStorageResult(
+          safeLocalStorage.removeItem(CODE_VERIFIER_KEY),
+          "No se pudieron limpiar los datos temporales de la autenticación.",
+        )
+        handleStorageResult(
+          safeLocalStorage.removeItem(STATE_KEY),
+          "No se pudieron limpiar los datos temporales de la autenticación.",
+        )
         router.replace("/dashboard/music")
       }
     }
@@ -189,8 +229,14 @@ export default function MusicPage() {
       const challenge = await generateCodeChallenge(verifier)
       const state = crypto.randomUUID()
 
-      localStorage.setItem(CODE_VERIFIER_KEY, verifier)
-      localStorage.setItem(STATE_KEY, state)
+      handleStorageResult(
+        safeLocalStorage.setItem(CODE_VERIFIER_KEY, verifier),
+        "No se pudo guardar la información temporal para iniciar sesión con Spotify.",
+      )
+      handleStorageResult(
+        safeLocalStorage.setItem(STATE_KEY, state),
+        "No se pudo guardar la información temporal para iniciar sesión con Spotify.",
+      )
 
       const authorizeUrl = buildAuthorizeUrl({
         client_id: clientId,

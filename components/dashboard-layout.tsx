@@ -54,6 +54,7 @@ import { Reserve } from "@/components/sell-product-modal"
 import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
 import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog"
 import { toast } from "sonner"
+import { safeLocalStorage } from "@/lib/safe-storage"
 const SpotifyPlayerManager = dynamic(
   () => import("@/components/spotify-player-manager").then((mod) => mod.SpotifyPlayerManager),
   { ssr: false }
@@ -201,7 +202,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const handleLogout = async () => {
     const auth = getAuth();
     try {
-      localStorage.removeItem("user");
+      safeLocalStorage.removeItem("user");
       await signOut(auth);
       router.push("/");
     } catch (error) {

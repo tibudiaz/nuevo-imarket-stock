@@ -52,6 +52,7 @@ import SellProductModal from "@/components/sell-product-modal";
 import TransferProductDialog from "@/components/transfer-product-dialog";
 import QuickSaleDialog from "@/components/quick-sale-dialog";
 import { shouldRemoveProductFromInventory } from "@/lib/utils";
+import { safeLocalStorage, type SafeStorageResult } from "@/lib/safe-storage";
 import {
   Select,
   SelectContent,
@@ -151,6 +152,23 @@ export default function InventoryPage() {
   );
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const hasRestoredNewProduct = useRef(false);
+  const storageWarningRef = useRef(false);
+
+  const notifyStorageIssue = (
+    result: SafeStorageResult<unknown>,
+    description: string,
+  ) => {
+    if (!result.ok) {
+      if (!storageWarningRef.current) {
+        storageWarningRef.current = true;
+        toast.error("No se pudo acceder al almacenamiento local", {
+          description,
+        });
+      }
+    } else if (storageWarningRef.current) {
+      storageWarningRef.current = false;
+    }
+  };
 
   const isCellphoneCategory =
     newProduct.category === "Celulares" ||
@@ -176,13 +194,19 @@ export default function InventoryPage() {
     if (!hasRestoredNewProduct.current) {
       hasRestoredNewProduct.current = true;
 
-      try {
-        const savedProduct = window.localStorage.getItem(
-          NEW_PRODUCT_STORAGE_KEY,
-        );
+      const savedProductResult = safeLocalStorage.getItem(
+        NEW_PRODUCT_STORAGE_KEY,
+      );
+      notifyStorageIssue(
+        savedProductResult,
+        "No se pudieron recuperar los datos guardados del formulario de producto.",
+      );
 
-        if (savedProduct) {
-          const parsedProduct = JSON.parse(savedProduct) as Partial<NewProduct>;
+      if (savedProductResult.ok && savedProductResult.value) {
+        try {
+          const parsedProduct = JSON.parse(
+            savedProductResult.value,
+          ) as Partial<NewProduct>;
 
           setNewProduct((prev) => ({
             ...prev,
@@ -193,27 +217,41 @@ export default function InventoryPage() {
               new Date().toISOString().split("T")[0],
             store: storeValue,
           }));
-        } else {
+        } catch (error) {
+          console.error("Error al restaurar el producto en edición:", error);
+          const removeDraftResult = safeLocalStorage.removeItem(
+            NEW_PRODUCT_STORAGE_KEY,
+          );
+          notifyStorageIssue(
+            removeDraftResult,
+            "No se pudo limpiar el borrador del producto almacenado localmente.",
+          );
+          const removeDialogResult = safeLocalStorage.removeItem(
+            NEW_PRODUCT_DIALOG_OPEN_KEY,
+          );
+          notifyStorageIssue(
+            removeDialogResult,
+            "No se pudo limpiar el estado del formulario almacenado localmente.",
+          );
           setNewProduct((prev) =>
-            prev.store === storeValue
-              ? prev
-              : { ...prev, store: storeValue },
+            prev.store === storeValue ? prev : { ...prev, store: storeValue },
           );
         }
-
-        const shouldReopen =
-          window.localStorage.getItem(NEW_PRODUCT_DIALOG_OPEN_KEY) === "true";
-
-        if (shouldReopen) {
-          setIsAddDialogOpen(true);
-        }
-      } catch (error) {
-        console.error("Error al restaurar el producto en edición:", error);
-        window.localStorage.removeItem(NEW_PRODUCT_STORAGE_KEY);
-        window.localStorage.removeItem(NEW_PRODUCT_DIALOG_OPEN_KEY);
+      } else {
         setNewProduct((prev) =>
           prev.store === storeValue ? prev : { ...prev, store: storeValue },
         );
+      }
+
+      const shouldReopenResult = safeLocalStorage.getItem(
+        NEW_PRODUCT_DIALOG_OPEN_KEY,
+      );
+      notifyStorageIssue(
+        shouldReopenResult,
+        "No se pudo restaurar si el formulario de alta de producto estaba abierto.",
+      );
+      if (shouldReopenResult.value === "true") {
+        setIsAddDialogOpen(true);
       }
 
       return;
@@ -238,21 +276,34 @@ export default function InventoryPage() {
   }, [isAddDialogOpen, selectedStore]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     if (isAddDialogOpen) {
-      window.localStorage.setItem(NEW_PRODUCT_DIALOG_OPEN_KEY, "true");
+      const result = safeLocalStorage.setItem(
+        NEW_PRODUCT_DIALOG_OPEN_KEY,
+        "true",
+      );
+      notifyStorageIssue(
+        result,
+        "No se pudo recordar que el formulario para agregar productos está abierto.",
+      );
     } else {
-      window.localStorage.removeItem(NEW_PRODUCT_DIALOG_OPEN_KEY);
+      const result = safeLocalStorage.removeItem(NEW_PRODUCT_DIALOG_OPEN_KEY);
+      notifyStorageIssue(
+        result,
+        "No se pudo limpiar el estado del formulario para agregar productos.",
+      );
     }
   }, [isAddDialogOpen]);
 
   useEffect(() => {
-    if (!isAddDialogOpen || typeof window === "undefined") return;
+    if (!isAddDialogOpen) return;
 
-    window.localStorage.setItem(
+    const result = safeLocalStorage.setItem(
       NEW_PRODUCT_STORAGE_KEY,
       JSON.stringify(newProduct),
+    );
+    notifyStorageIssue(
+      result,
+      "No se pudieron guardar los cambios del formulario de producto.",
     );
   }, [newProduct, isAddDialogOpen]);
 
@@ -364,10 +415,20 @@ export default function InventoryPage() {
         createdAt: new Date().toISOString(),
       });
       setNewProduct(createEmptyNewProduct(selectedStore));
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem(NEW_PRODUCT_STORAGE_KEY);
-        window.localStorage.removeItem(NEW_PRODUCT_DIALOG_OPEN_KEY);
-      }
+      const removeDraftResult = safeLocalStorage.removeItem(
+        NEW_PRODUCT_STORAGE_KEY,
+      );
+      notifyStorageIssue(
+        removeDraftResult,
+        "No se pudo limpiar el borrador del formulario después de crear el producto.",
+      );
+      const removeDialogResult = safeLocalStorage.removeItem(
+        NEW_PRODUCT_DIALOG_OPEN_KEY,
+      );
+      notifyStorageIssue(
+        removeDialogResult,
+        "No se pudo limpiar el estado del formulario después de crear el producto.",
+      );
       setIsAddDialogOpen(false);
       toast.success("Producto agregado", {
         description: "El producto ha sido agregado correctamente.",
