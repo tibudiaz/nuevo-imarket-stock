@@ -12,6 +12,7 @@ import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts"
 import { useStore } from "@/hooks/use-store"
+import { safeLocalStorage } from "@/lib/safe-storage"
 
 // --- Interfaces de Datos ---
 interface User {
@@ -80,19 +81,19 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
-      router.push("/");
+    const storedUser = safeLocalStorage.getItem("user")
+    if (!storedUser.ok || !storedUser.value) {
+      router.push("/")
       return
     }
     try {
-      const parsedUser = JSON.parse(storedUser)
+      const parsedUser = JSON.parse(storedUser.value)
       setUser(parsedUser)
       if (parsedUser.role !== "admin") {
         router.push("/dashboard")
       }
     } catch (e) {
-      localStorage.removeItem("user")
+      safeLocalStorage.removeItem("user")
       router.push("/")
     }
 

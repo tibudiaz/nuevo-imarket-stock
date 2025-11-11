@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import ScheduleBackupModal from "@/components/schedule-backup-modal"
+import { safeLocalStorage } from "@/lib/safe-storage"
 
 // Definición de interfaces
 interface Backup {
@@ -63,14 +64,14 @@ export default function BackupPage() {
 
   useEffect(() => {
     // Verificar autenticación y rol
-    const storedUser = localStorage.getItem("user")
-    if (!storedUser) {
+    const storedUser = safeLocalStorage.getItem("user")
+    if (!storedUser.ok || !storedUser.value) {
       router.push("/")
       return
     }
 
     try {
-      const parsedUser = JSON.parse(storedUser)
+      const parsedUser = JSON.parse(storedUser.value)
       setUser(parsedUser)
 
       // Redirigir si no es administrador
@@ -78,7 +79,7 @@ export default function BackupPage() {
         router.push("/dashboard")
       }
     } catch (e) {
-      localStorage.removeItem("user")
+      safeLocalStorage.removeItem("user")
       router.push("/")
     }
 

@@ -1,7 +1,8 @@
 "use client"
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { safeStorageLike } from '@/lib/safe-storage';
 
 type StoreState = {
   selectedStore: 'all' | 'local1' | 'local2';
@@ -16,6 +17,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'imarket-store-selection', // Nombre de la clave en localStorage
+      storage: createJSONStorage(() => safeStorageLike),
     }
   )
 );
