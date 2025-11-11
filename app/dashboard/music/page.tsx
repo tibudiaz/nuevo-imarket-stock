@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -62,8 +62,28 @@ const STATE_KEY = "spotify_auth_state"
 
 export default function MusicPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const searchParamsString = useMemo(() => searchParams?.toString() ?? "", [searchParams])
+  const [spotifyAuthParams, setSpotifyAuthParams] = useState({
+    code: null as string | null,
+    error: null as string | null,
+    state: null as string | null,
+  })
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    setSpotifyAuthParams({
+      code: params.get("code"),
+      error: params.get("error"),
+      state: params.get("state"),
+    })
+  }, [])
+
+  const spotifyAuthCode = spotifyAuthParams.code
+  const spotifyAuthError = spotifyAuthParams.error
+  const spotifyAuthState = spotifyAuthParams.state
   const clientId = SPOTIFY_CLIENT_ID
   const { accessToken, setTokens, clearTokens, getValidAccessToken } = useSpotifyAuth()
   const { deviceId, currentTrack } = useSpotifyPlayerStore((state) => ({
@@ -99,20 +119,17 @@ export default function MusicPage() {
   const isAuthenticated = useMemo(() => Boolean(accessToken), [accessToken])
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParamsString)
-    const code = params.get("code")
-    const errorParam = params.get("error")
-
-    if (!code && !errorParam) {
+    if (!spotifyAuthCode && !spotifyAuthError) {
       return
     }
 
     const handleAuthResponse = async () => {
-      if (errorParam) {
+      if (spotifyAuthError) {
         toast.error("Spotify rechazó la autenticación", {
           description: "Intentá nuevamente o verificá los permisos de la aplicación.",
         })
         router.replace("/dashboard/music")
+        setSpotifyAuthParams({ code: null, error: null, state: null })
         return
       }
 
@@ -122,8 +139,7 @@ export default function MusicPage() {
         "No se pudo validar el estado de seguridad de la autenticación con Spotify.",
       )
       const storedState = storedStateResult.value
-      const returnedState = params.get("state")
-      if (storedState && storedState !== returnedState) {
+      if (storedState && storedState !== spotifyAuthState) {
         toast.error("La verificación del inicio de sesión falló. Intentá nuevamente.")
         handleStorageResult(
           safeLocalStorage.removeItem(CODE_VERIFIER_KEY),
@@ -134,6 +150,7 @@ export default function MusicPage() {
           "No se pudieron limpiar los datos temporales de la autenticación.",
         )
         router.replace("/dashboard/music")
+        setSpotifyAuthParams({ code: null, error: null, state: null })
         return
       }
 
@@ -143,7 +160,7 @@ export default function MusicPage() {
         "No se pudo recuperar el código temporal necesario para conectar Spotify.",
       )
       const codeVerifier = codeVerifierResult.value
-      if (!codeVerifier || !clientId) {
+      if (!spotifyAuthCode || !codeVerifier || !clientId) {
         toast.error("Faltan datos para completar la conexión con Spotify.")
         router.replace("/dashboard/music")
         return
@@ -153,7 +170,7 @@ export default function MusicPage() {
         const tokenResponse = await requestTokens({
           client_id: clientId,
           grant_type: "authorization_code",
-          code,
+          code: spotifyAuthCode,
           redirect_uri: getRedirectUri(),
           code_verifier: codeVerifier,
         })
@@ -181,11 +198,12 @@ export default function MusicPage() {
           "No se pudieron limpiar los datos temporales de la autenticación.",
         )
         router.replace("/dashboard/music")
+        setSpotifyAuthParams({ code: null, error: null, state: null })
       }
     }
 
     handleAuthResponse()
-  }, [searchParamsString, router, clientId, setTokens, clearTokens])
+  }, [spotifyAuthCode, spotifyAuthError, spotifyAuthState, router, clientId, setTokens, clearTokens])
 
   useEffect(() => {
     if (!isAuthenticated) {

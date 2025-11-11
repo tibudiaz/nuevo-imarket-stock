@@ -114,6 +114,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const lastDashboardSearch = React.useRef<string | null>(null)
+  const [dashboardFilters, setDashboardFilters] = React.useState({
+    currentCategory: null as string | null,
+    currentReserveStatus: null as string | null,
+    currentSalesType: null as string | null,
+  })
+
+  React.useEffect(() => {
+    const nextParamsString = searchParams?.toString() ?? ""
+    if (lastDashboardSearch.current === nextParamsString) {
+      return
+    }
+
+    lastDashboardSearch.current = nextParamsString
+
+    if (!nextParamsString) {
+      setDashboardFilters({ currentCategory: null, currentReserveStatus: null, currentSalesType: null })
+      return
+    }
+
+    const params = new URLSearchParams(nextParamsString)
+    setDashboardFilters({
+      currentCategory: params.get("category"),
+      currentReserveStatus: params.get("status"),
+      currentSalesType: params.get("type"),
+    })
+  }, [searchParams])
+
+  const { currentCategory, currentReserveStatus, currentSalesType } = dashboardFilters
   const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<string[]>([])
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
@@ -210,10 +239,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }
   
-  const currentCategory = searchParams.get('category')
-  const currentReserveStatus = searchParams.get('status');
-  const currentSalesType = searchParams.get('type');
-
   const pageVariants = {
     initial: { opacity: 0, y: 5 },
     in: { opacity: 1, y: 0 },
