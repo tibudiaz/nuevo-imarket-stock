@@ -15,6 +15,7 @@ import AddRepairForm from "@/components/add-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
 import { generateRepairReceiptPdf } from "@/lib/pdf-generator"
 import { useStore } from "@/hooks/use-store"
+import type { RepairPhoto } from "@/types/repair"
 
 // --- INTERFAZ UNIFICADA Y DEFINITIVA ---
 // Esta es la estructura de datos consistente que se usará en ambos componentes.
@@ -38,6 +39,8 @@ interface Repair {
   finalPrice?: number;
   technicianNotes?: string;
   store?: string;
+  photos?: RepairPhoto[];
+  uploadSessionId?: string;
   [key: string]: any;
 }
 
@@ -73,7 +76,15 @@ export default function RepairsPage() {
       const repairsData: Repair[] = []
       if (snapshot.exists()) {
         snapshot.forEach((childSnapshot) => {
-          repairsData.push({ id: childSnapshot.key!, ...childSnapshot.val() })
+          const rawValue = childSnapshot.val() || {}
+          const photosObject = rawValue.photos || null
+          const photos: RepairPhoto[] = photosObject
+            ? Object.entries(photosObject).map(([photoId, value]) => ({
+                id: photoId,
+                ...(value as Omit<RepairPhoto, "id">),
+              }))
+            : []
+          repairsData.push({ id: childSnapshot.key!, ...rawValue, photos })
         })
         setRepairs(repairsData.sort((a, b) => b.createdAt - a.createdAt))
       } else {
@@ -88,7 +99,11 @@ export default function RepairsPage() {
     return () => unsubscribe()
   }, [])
 
-  const handleAddRepair = useCallback(async (repairData: RepairFormData, customerData: CustomerData) => {
+  const handleAddRepair = useCallback(async (
+    repairData: RepairFormData,
+    customerData: CustomerData,
+    options?: { photos?: RepairPhoto[]; sessionId?: string }
+  ) => {
     try {
       const customersRef = ref(database, "customers");
       const q = query(customersRef, orderByChild('dni'), equalTo(customerData.dni));
@@ -128,6 +143,14 @@ export default function RepairsPage() {
       const newRepairId = newRepairRef.key;
       if (!newRepairId) throw new Error("No se pudo generar el ID para la reparación.");
 
+      const photosRecord = options?.photos?.length
+        ? options.photos.reduce((acc, photo) => {
+            const { id: photoId, ...photoData } = photo
+            acc[photoId] = photoData
+            return acc
+          }, {} as Record<string, Omit<RepairPhoto, "id">>)
+        : undefined
+
       const finalRepairData = {
           id: newRepairId,
           receiptNumber: newReceiptNumber,
@@ -144,10 +167,21 @@ export default function RepairsPage() {
           createdAt: Date.now(),
           status: 'pending' as const,
           store: selectedStore === 'all' ? 'local1' : selectedStore,
+          ...(photosRecord ? { photos: photosRecord } : {}),
+          ...(options?.sessionId ? { uploadSessionId: options.sessionId } : {}),
       };
-      
+
       await set(newRepairRef, finalRepairData);
-      
+
+      if (options?.sessionId) {
+        const sessionRef = ref(database, `repairUploadSessions/${options.sessionId}`)
+        await update(sessionRef, {
+          status: "linked",
+          repairId: newRepairId,
+          linkedAt: new Date().toISOString(),
+        })
+      }
+
       await generateRepairReceiptPdf(finalRepairData, customerData, selectedStore === 'local2' ? 'local2' : 'local1');
 
       toast.success("Reparación agregada correctamente.", { description: `Recibo N°: ${newReceiptNumber}` });

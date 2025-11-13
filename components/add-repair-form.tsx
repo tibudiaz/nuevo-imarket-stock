@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,15 +14,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Loader2, Search } from "lucide-react"
+import { Loader2, Search, Copy, Smartphone } from "lucide-react"
 import { toast } from "sonner"
-import { ref, get, query, orderByChild, equalTo } from "firebase/database"
-import { database } from "@/lib/firebase"
+import { ref, get, query, orderByChild, equalTo, onValue, push, set, remove } from "firebase/database"
+import { database, storage } from "@/lib/firebase"
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
+import type { RepairPhoto } from "@/types/repair"
+import QRCode from "qrcode"
 
 interface AddRepairFormProps {
   isOpen: boolean
   onClose: () => void
-  onAddRepair: (repairData: any, customerData: any) => Promise<void>
+  onAddRepair: (
+    repairData: any,
+    customerData: any,
+    options?: { photos?: RepairPhoto[]; sessionId?: string }
+  ) => Promise<void>
 }
 
 const initialCustomerState = { dni: '', name: '', phone: '', email: '' };
@@ -32,6 +40,11 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
   const [isSearching, setIsSearching] = useState(false);
   const [customerData, setCustomerData] = useState(initialCustomerState);
   const [repairData, setRepairData] = useState(initialRepairState);
+  const [uploadSessionId, setUploadSessionId] = useState<string | null>(null);
+  const [sessionPhotos, setSessionPhotos] = useState<RepairPhoto[]>([]);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [origin, setOrigin] = useState<string>("");
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
 
   // Resetea el estado del formulario cuando el modal se abre.
   useEffect(() => {
@@ -40,18 +53,114 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       setRepairData(initialRepairState);
       setIsLoading(false);
       setIsSearching(false);
+      setSessionPhotos([]);
+      const newSession = crypto.randomUUID();
+      setUploadSessionId(newSession);
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      if (uploadSessionId) {
+        const sessionRef = ref(database, `repairUploadSessions/${uploadSessionId}`);
+        remove(sessionRef).catch(() => null);
+      }
+      setUploadSessionId(null);
+      setQrDataUrl("");
+    }
+  }, [isOpen, uploadSessionId]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !uploadSessionId) return;
+
+    const sessionRef = ref(database, `repairUploadSessions/${uploadSessionId}`);
+    set(sessionRef, {
+      createdAt: new Date().toISOString(),
+      status: "pending",
+    }).catch((error) => {
+      console.error("Error al crear la sesión de carga:", error);
+    });
+
+    const photosRef = ref(database, `repairUploadSessions/${uploadSessionId}/photos`);
+    const unsubscribe = onValue(photosRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setSessionPhotos([]);
+        return;
+      }
+      const photos: RepairPhoto[] = Object.entries(snapshot.val()).map(([photoId, value]) => ({
+        id: photoId,
+        ...(value as Omit<RepairPhoto, "id">),
+      }));
+      setSessionPhotos(photos.sort((a, b) => new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()));
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, uploadSessionId]);
+
+  useEffect(() => {
+    if (!uploadSessionId || !origin) {
+      setQrDataUrl("");
+      return;
+    }
+    const url = `${origin}/repairs/mobile-upload/${uploadSessionId}`;
+    QRCode.toDataURL(url, { width: 300 })
+      .then(setQrDataUrl)
+      .catch((error) => {
+        console.error("No se pudo generar el código QR", error);
+      });
+  }, [origin, uploadSessionId]);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    const setter = name in customerData ? setCustomerData : setRepairData;
-    
+    const isCustomerField = Object.prototype.hasOwnProperty.call(initialCustomerState, name);
+    const setter = isCustomerField ? setCustomerData : setRepairData;
+
     setter(prev => ({
         ...prev,
         [name]: type === 'number' ? parseFloat(value) || 0 : value
     }));
   }, []);
+
+  const addPhotoToSession = useCallback(async (file: File, source: "desktop" | "mobile" = "desktop") => {
+    if (!uploadSessionId) return;
+    const storagePath = `repair-uploads/${uploadSessionId}/${Date.now()}-${file.name}`;
+    const fileRef = storageRef(storage, storagePath);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    const photosRef = ref(database, `repairUploadSessions/${uploadSessionId}/photos`);
+    await push(photosRef, {
+      url,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: source,
+      name: file.name,
+    });
+  }, [uploadSessionId]);
+
+  const handleLocalPhotos = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files?.length || !uploadSessionId) return;
+    const files = Array.from(event.target.files);
+    setIsUploadingPhotos(true);
+    try {
+      for (const file of files) {
+        await addPhotoToSession(file, "desktop");
+      }
+      toast.success("Fotos agregadas correctamente.");
+    } catch (error) {
+      console.error("Error al subir fotos:", error);
+      toast.error("No se pudieron subir las fotos", {
+        description: (error as Error).message,
+      });
+    } finally {
+      event.target.value = "";
+      setIsUploadingPhotos(false);
+    }
+  };
 
   const searchCustomerByDni = async () => {
     if (!customerData.dni || customerData.dni.length < 7) {
@@ -94,8 +203,19 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       return;
     }
     setIsLoading(true);
-    await onAddRepair(repairData, customerData);
-    setIsLoading(false);
+    try {
+      await onAddRepair(repairData, customerData, {
+        photos: sessionPhotos,
+        sessionId: uploadSessionId || undefined,
+      });
+    } catch (error) {
+      console.error("Error al guardar la reparación:", error);
+      toast.error("No se pudo guardar la reparación", {
+        description: (error as Error).message,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -110,7 +230,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
           </DialogHeader>
 
           <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-            
+
             {/* SECCIÓN CLIENTE */}
             <h3 className="text-lg font-medium border-b pb-2">Datos del Cliente</h3>
             <div className="space-y-2">
@@ -153,6 +273,92 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
                 <Label htmlFor="estimatedPrice">Presupuesto Estimado ($)</Label>
                 <Input name="estimatedPrice" id="estimatedPrice" type="number" placeholder="0.00" value={repairData.estimatedPrice} onChange={handleChange}/>
               </div>
+
+            {/* SECCIÓN FOTOS */}
+            <h3 className="text-lg font-medium border-b pb-2 mt-4">Fotos del Equipo</h3>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Podés subir fotos desde esta PC o escanear el código QR para cargarlas directamente desde tu celular personal.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-[auto,1fr] sm:items-center">
+                <div className="flex flex-col items-center gap-2 rounded-md border p-3">
+                  {qrDataUrl ? (
+                    <Image src={qrDataUrl} alt="Código QR para subir fotos" width={128} height={128} className="h-32 w-32" />
+                  ) : (
+                    <div className="flex h-32 w-32 items-center justify-center text-muted-foreground text-sm text-center">
+                      Generando QR...
+                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground text-center">Escanealo con tu celular</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => {
+                      if (!uploadSessionId || !origin) return;
+                      const link = `${origin}/repairs/mobile-upload/${uploadSessionId}`;
+                      if (navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText(link)
+                          .then(() => toast.success("Enlace copiado al portapapeles"))
+                          .catch(() => toast.error("No se pudo copiar el enlace"));
+                      } else {
+                        toast.error("No se pudo copiar el enlace", {
+                          description: "Copiá la URL manualmente desde el botón 'Abrir en el celular'.",
+                        });
+                      }
+                    }}>
+                      <Copy className="mr-2 h-4 w-4" /> Copiar enlace
+                    </Button>
+                    <a
+                      href={uploadSessionId && origin ? `${origin}/repairs/mobile-upload/${uploadSessionId}` : "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      <Smartphone className="h-4 w-4" /> Abrir en el celular
+                    </a>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="repair-photos" className="text-sm font-medium">Subir desde esta PC</Label>
+                    <Input
+                      id="repair-photos"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      capture="environment"
+                      onChange={handleLocalPhotos}
+                      disabled={isUploadingPhotos || !uploadSessionId}
+                    />
+                    {isUploadingPhotos && (
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Subiendo fotos...
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {sessionPhotos.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {sessionPhotos.map((photo) => (
+                    <div key={photo.id} className="space-y-1">
+                      <div className="relative aspect-square w-full overflow-hidden rounded-md border bg-muted">
+                        <Image
+                          src={photo.url}
+                          alt={photo.name || "Foto de reparación"}
+                          fill
+                          className="object-cover"
+                          sizes="150px"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {photo.uploadedBy === "mobile" ? "Desde celular" : "Desde PC"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aún no hay fotos agregadas.</p>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
