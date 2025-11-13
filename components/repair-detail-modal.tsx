@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ref, runTransaction } from "firebase/database";
 import { database } from "@/lib/firebase";
@@ -20,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { generateDeliveryReceiptPdf } from "@/lib/pdf-generator";
 import { useStore } from "@/hooks/use-store";
+import type { RepairPhoto } from "@/types/repair";
 
 // --- INTERFAZ UNIFICADA Y DEFINITIVA ---
 // Usando la misma estructura que la página principal para consistencia.
@@ -39,6 +41,7 @@ interface Repair {
   finalPrice?: number;
   deliveredAt?: string;
   deliveryReceiptNumber?: string;
+  photos?: RepairPhoto[];
   [key: string]: any;
 }
 
@@ -92,8 +95,10 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
         deliveryReceiptNumber = `${newCounterData.prefix}${String(newCounterData.value).padStart(5, '0')}`;
       }
 
+      const { photos: _ignoredPhotos, ...restOfEditable } = editableRepair;
+
       const updatedData = {
-          ...editableRepair,
+          ...restOfEditable,
           deliveredAt: editableRepair.status === 'delivered' && !repair.deliveredAt
               ? new Date().toISOString()
               : repair.deliveredAt,
@@ -145,9 +150,34 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
                 <Label htmlFor="description" className="font-semibold">Falla reportada</Label>
                 <Textarea id="description" value={editableRepair.description || ''} onChange={handleChange} className="mt-1" />
             </div>
-             <div className="mt-4">
+            <div className="mt-4">
                 <Label htmlFor="technicianNotes" className="font-semibold">Notas del técnico</Label>
                 <Textarea id="technicianNotes" value={editableRepair.technicianNotes || ''} onChange={handleChange} className="mt-1" />
+            </div>
+            <div className="mt-4">
+              <h4 className="font-semibold mb-2">Fotos adjuntas</h4>
+              {repair.photos && repair.photos.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {repair.photos.map((photo) => (
+                    <div key={photo.id} className="space-y-1">
+                      <div className="relative aspect-square overflow-hidden rounded-md border">
+                        <Image
+                          src={photo.url}
+                          alt={photo.name || "Foto de reparación"}
+                          fill
+                          className="object-cover"
+                          sizes="200px"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(photo.uploadedAt).toLocaleString()} · {photo.uploadedBy === 'mobile' ? 'Celular' : 'PC'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No hay fotos adjuntas para esta reparación.</p>
+              )}
             </div>
           </div>
           <div>
