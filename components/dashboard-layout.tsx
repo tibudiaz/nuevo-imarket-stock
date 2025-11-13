@@ -4,7 +4,6 @@
 
 import * as React from "react"
 import { useState, useEffect } from "react"
-import dynamic from "next/dynamic"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -26,7 +25,6 @@ import {
   Wallet,
   Smartphone,
   Banknote,
-  Music2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -55,14 +53,6 @@ import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
 import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog"
 import { toast } from "sonner"
 import { safeLocalStorage } from "@/lib/safe-storage"
-const SpotifyPlayerManager = dynamic(
-  () => import("@/components/spotify-player-manager").then((mod) => mod.SpotifyPlayerManager),
-  { ssr: false }
-)
-const SpotifyHeaderMiniPlayer = dynamic(
-  () => import("@/components/spotify-header-mini-player").then((mod) => mod.SpotifyHeaderMiniPlayer),
-  { ssr: false }
-)
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -150,7 +140,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
   const [isDolarLoading, setIsDolarLoading] = useState(true);
   const [expiringReserves, setExpiringReserves] = useState(false);
-  const [shouldLoadMusic, setShouldLoadMusic] = useState(false);
 
   const { selectedStore, setSelectedStore } = useStore();
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
@@ -222,12 +211,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setIsReservesOpen(pathname.startsWith("/dashboard/reserves"));
   }, [pathname]);
 
-  useEffect(() => {
-    if (pathname.startsWith("/dashboard/music")) {
-      setShouldLoadMusic(true);
-    }
-  }, [pathname]);
-
   const handleLogout = async () => {
     const auth = getAuth();
     try {
@@ -272,7 +255,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex min-h-screen w-full flex-col bg-slate-50">
-        {shouldLoadMusic && <SpotifyPlayerManager />}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6">
           <div className="flex items-center gap-2">
             <MobileMenu userRole={user.role} />
@@ -282,7 +264,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            {shouldLoadMusic && <SpotifyHeaderMiniPlayer />}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -421,7 +402,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
 
               <NavItem href="/dashboard/simulator" icon={Calculator} label="Simulador de Costos" active={pathname === "/dashboard/simulator"} />
-              <NavItem href="/dashboard/music" icon={Music2} label="Música" active={pathname === "/dashboard/music"} />
 
             </nav>
           </aside>
