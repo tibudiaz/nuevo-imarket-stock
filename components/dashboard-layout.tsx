@@ -25,10 +25,11 @@ import {
   Wallet,
   Smartphone,
   Banknote,
+  Copy,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
-import { ref, onValue } from "firebase/database"
+import { ref, onValue, query, orderByChild, equalTo } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -53,9 +54,17 @@ import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
 import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog"
 import { toast } from "sonner"
 import { safeLocalStorage } from "@/lib/safe-storage"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
+}
+
+interface PendingUploadSession {
+  id: string
+  createdAt?: string
+  repairId?: string | null
 }
 
 const NavItem = ({ href, icon: Icon, label, active, children, isCollapsible = false, alert = false }) => {
@@ -134,12 +143,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const { currentCategory, currentReserveStatus, currentSalesType } = dashboardFilters
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useMobile();
   const [categories, setCategories] = useState<string[]>([])
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
   const [isReservesOpen, setIsReservesOpen] = useState(false);
   const [dolarBlueRate, setDolarBlueRate] = useState<number | null>(null);
   const [isDolarLoading, setIsDolarLoading] = useState(true);
   const [expiringReserves, setExpiringReserves] = useState(false);
+  const [pendingUploadSessions, setPendingUploadSessions] = useState<PendingUploadSession[]>([]);
+  const [appOrigin, setAppOrigin] = useState<string>("");
 
   const { selectedStore, setSelectedStore } = useStore();
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
@@ -205,6 +217,62 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         unsubscribeReserves();
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAppOrigin(window.location.origin);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user?.username) {
+      setPendingUploadSessions([]);
+      return;
+    }
+
+    const sessionsQuery = query(
+      ref(database, "repairUploadSessions"),
+      orderByChild("createdBy"),
+      equalTo(user.username)
+    );
+
+    const unsubscribe = onValue(
+      sessionsQuery,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          setPendingUploadSessions([]);
+          return;
+        }
+
+        const sessions: PendingUploadSession[] = [];
+        snapshot.forEach((child) => {
+          if (!child.key) return;
+          const value = child.val() || {};
+          const hasPhotos = value.photos && Object.keys(value.photos).length > 0;
+          const isPending = value.pendingUpload ?? !hasPhotos;
+          if (!isPending) {
+            return;
+          }
+          sessions.push({
+            id: child.key,
+            createdAt: value.createdAt,
+            repairId: value.repairId ?? null,
+          });
+        });
+
+        sessions.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+
+        setPendingUploadSessions(sessions);
+      },
+      () => setPendingUploadSessions([])
+    );
+
+    return () => unsubscribe();
+  }, [user?.username]);
 
   useEffect(() => {
     setIsInventoryOpen(pathname.startsWith("/dashboard/inventory"));
@@ -417,6 +485,58 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 className="p-4 md:p-6"
               >
+                {pendingUploadSessions.length > 0 && (
+                  <div className="mb-4 space-y-3">
+                    {pendingUploadSessions.map((session) => {
+                      const sessionLink = `/repairs/mobile-upload/${session.id}`
+                      const absoluteLink = appOrigin ? `${appOrigin}${sessionLink}` : ""
+                      return (
+                        <Alert
+                          key={session.id}
+                          className="border-amber-200 bg-amber-50 text-amber-900"
+                        >
+                          <AlertTitle>Fotos pendientes de carga</AlertTitle>
+                          <AlertDescription>
+                            {session.repairId
+                              ? `Tenés imágenes pendientes para la reparación #${session.repairId}.`
+                              : "Tenés una sesión de carga de imágenes pendiente para completar."}
+                          </AlertDescription>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button asChild size="sm" className="bg-amber-600 text-white hover:bg-amber-700">
+                              <Link href={sessionLink}>
+                                <Smartphone className="mr-2 h-4 w-4" />
+                                {isMobile ? "Abrir cámara" : "Continuar desde el celular"}
+                              </Link>
+                            </Button>
+                            {absoluteLink && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (!navigator.clipboard) {
+                                    toast.error("No se pudo copiar el enlace");
+                                    return;
+                                  }
+                                  navigator.clipboard
+                                    .writeText(absoluteLink)
+                                    .then(() =>
+                                      toast.success("Enlace copiado", {
+                                        description: "Pegalo en tu dispositivo móvil para continuar.",
+                                      })
+                                    )
+                                    .catch(() => toast.error("No se pudo copiar el enlace"));
+                                }}
+                              >
+                                <Copy className="mr-2 h-4 w-4" /> Copiar enlace
+                              </Button>
+                            )}
+                          </div>
+                        </Alert>
+                      )
+                    })}
+                  </div>
+                )}
                 {children}
               </motion.main>
             </AnimatePresence>

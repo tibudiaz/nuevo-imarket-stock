@@ -20,6 +20,9 @@ export default function MobileUploadPage() {
   const [photos, setPhotos] = useState<RepairPhoto[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [status, setStatus] = useState<string>("pending")
+  const [pendingUpload, setPendingUpload] = useState(true)
+  const [canUpload, setCanUpload] = useState(true)
+  const [repairId, setRepairId] = useState<string | null>(null)
   const [isValidSession, setIsValidSession] = useState(true)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
 
@@ -52,6 +55,11 @@ export default function MobileUploadPage() {
       }
       const sessionData = snapshot.val()
       setStatus(sessionData.status || "pending")
+      setPendingUpload(
+        sessionData.pendingUpload ?? !(sessionData.photos && Object.keys(sessionData.photos).length > 0)
+      )
+      setCanUpload(sessionData.allowUploads !== false && sessionData.status !== "locked" && sessionData.status !== "closed")
+      setRepairId(sessionData.repairId ?? null)
       if (sessionData.photos) {
         const photosList: RepairPhoto[] = Object.entries(sessionData.photos).map(([photoId, value]) => ({
           id: photoId,
@@ -71,7 +79,7 @@ export default function MobileUploadPage() {
   }, [sessionId])
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files?.length || !sessionId) return
+    if (!event.target.files?.length || !sessionId || !canUpload) return
     const files = Array.from(event.target.files)
     setIsUploading(true)
     try {
@@ -88,6 +96,13 @@ export default function MobileUploadPage() {
           name: file.name,
         })
       }
+      const sessionRef = databaseRef(database, `repairUploadSessions/${sessionId}`)
+      await update(sessionRef, {
+        pendingUpload: false,
+        lastUploadedAt: new Date().toISOString(),
+        lastUploadedFrom: "mobile",
+      }).catch(() => null)
+      setPendingUpload(false)
       toast.success("Fotos subidas correctamente")
     } catch (error) {
       console.error("Error al subir fotos desde el celular:", error)
@@ -135,8 +150,6 @@ export default function MobileUploadPage() {
     )
   }
 
-  const isLinked = status === "linked"
-
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-4 p-6">
       <Card>
@@ -147,6 +160,30 @@ export default function MobileUploadPage() {
           <p className="text-sm text-muted-foreground">
             Seleccioná una o varias fotos del equipo. Podés usar la cámara del teléfono o elegir imágenes de tu galería.
           </p>
+          {repairId && (
+            <Alert>
+              <AlertTitle>Reparación vinculada</AlertTitle>
+              <AlertDescription>
+                Las fotos que subas se asociarán automáticamente a la reparación #{repairId}.
+              </AlertDescription>
+            </Alert>
+          )}
+          {pendingUpload && photos.length === 0 && (
+            <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+              <AlertTitle>Carga pendiente</AlertTitle>
+              <AlertDescription>
+                Aún no se cargaron imágenes en esta sesión. Tomá las fotos del equipo o seleccioná desde tu galería.
+              </AlertDescription>
+            </Alert>
+          )}
+          {!canUpload && (
+            <Alert variant="destructive">
+              <AlertTitle>Sesión bloqueada</AlertTitle>
+              <AlertDescription>
+                Esta sesión de carga ya no acepta nuevas imágenes. Consultá con el equipo para habilitar una nueva sesión.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Input
               type="file"
@@ -154,20 +191,12 @@ export default function MobileUploadPage() {
               multiple
               capture="environment"
               onChange={handleUpload}
-              disabled={isUploading || isLinked}
+              disabled={isUploading || !canUpload}
             />
             {isUploading && (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Subiendo fotos...
               </p>
-            )}
-            {isLinked && (
-              <Alert>
-                <AlertTitle>Sesión vinculada</AlertTitle>
-                <AlertDescription>
-                  Las fotos ya fueron asociadas a una reparación. No se aceptarán más imágenes en esta sesión.
-                </AlertDescription>
-              </Alert>
             )}
           </div>
           {photos.length > 0 ? (
