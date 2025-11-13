@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/dialog"
 import { Loader2, Search, Copy, Smartphone } from "lucide-react"
 import { toast } from "sonner"
-import { ref, get, query, orderByChild, equalTo, onValue, push, set, remove } from "firebase/database"
+import { ref, get, query, orderByChild, equalTo, onValue, push, set, remove, update } from "firebase/database"
 import { database, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
 import type { RepairPhoto } from "@/types/repair"
 import QRCode from "qrcode"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useAuth } from "@/hooks/use-auth"
 
 interface AddRepairFormProps {
   isOpen: boolean
@@ -45,6 +47,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [origin, setOrigin] = useState<string>("");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const { user } = useAuth();
 
   // Resetea el estado del formulario cuando el modal se abre.
   useEffect(() => {
@@ -83,6 +86,8 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
     set(sessionRef, {
       createdAt: new Date().toISOString(),
       status: "pending",
+      createdBy: user?.username ?? null,
+      pendingUpload: true,
     }).catch((error) => {
       console.error("Error al crear la sesión de carga:", error);
     });
@@ -101,7 +106,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
     });
 
     return () => unsubscribe();
-  }, [isOpen, uploadSessionId]);
+  }, [isOpen, uploadSessionId, user?.username]);
 
   useEffect(() => {
     if (!uploadSessionId || !origin) {
@@ -140,6 +145,12 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       uploadedBy: source,
       name: file.name,
     });
+    const sessionRef = ref(database, `repairUploadSessions/${uploadSessionId}`);
+    await update(sessionRef, {
+      pendingUpload: false,
+      lastUploadedAt: new Date().toISOString(),
+      lastUploadedFrom: source,
+    }).catch(() => null);
   }, [uploadSessionId]);
 
   const handleLocalPhotos = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,6 +291,14 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
               <p className="text-sm text-muted-foreground">
                 Podés subir fotos desde esta PC o escanear el código QR para cargarlas directamente desde tu celular personal.
               </p>
+              {uploadSessionId && sessionPhotos.length === 0 && (
+                <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+                  <AlertTitle>Fotos pendientes en el celular</AlertTitle>
+                  <AlertDescription>
+                    Esta sesión de carga está esperando imágenes. Abrí el enlace desde tu celular para tomar las fotos del equipo.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="grid gap-2 sm:grid-cols-[auto,1fr] sm:items-center">
                 <div className="flex flex-col items-center gap-2 rounded-md border p-3">
                   {qrDataUrl ? (
