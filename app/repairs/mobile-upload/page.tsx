@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,17 @@ import type { RepairPhoto } from "@/types/repair"
 import { Loader2, UploadCloud } from "lucide-react"
 import { toast } from "sonner"
 
-export default function MobileUploadPage() {
+function MobileUploadFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" /> Cargando sesión...
+      </div>
+    </div>
+  )
+}
+
+function MobileUploadContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("sessionId") || undefined
 
@@ -227,5 +237,13 @@ export default function MobileUploadPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function MobileUploadPage() {
+  return (
+    <Suspense fallback={<MobileUploadFallback />}>
+      <MobileUploadContent />
+    </Suspense>
   )
 }
