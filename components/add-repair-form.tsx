@@ -37,6 +37,18 @@ interface AddRepairFormProps {
 const initialCustomerState = { dni: '', name: '', phone: '', email: '' };
 const initialRepairState = { productName: '', imei: '', description: '', estimatedPrice: 0 };
 
+const generateUploadSessionId = () => {
+  if (
+    typeof globalThis !== "undefined" &&
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepairFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -57,7 +69,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       setIsLoading(false);
       setIsSearching(false);
       setSessionPhotos([]);
-      const newSession = crypto.randomUUID();
+      const newSession = generateUploadSessionId();
       setUploadSessionId(newSession);
     }
   }, [isOpen]);
