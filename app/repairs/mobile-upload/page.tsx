@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Image from "next/image"
-import { useParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -14,8 +14,8 @@ import { Loader2, UploadCloud } from "lucide-react"
 import { toast } from "sonner"
 
 export default function MobileUploadPage() {
-  const params = useParams<{ sessionId: string }>()
-  const sessionId = params?.sessionId
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get("sessionId") || undefined
 
   const [photos, setPhotos] = useState<RepairPhoto[]>([])
   const [isUploading, setIsUploading] = useState(false)
