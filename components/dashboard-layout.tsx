@@ -488,7 +488,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 {pendingUploadSessions.length > 0 && (
                   <div className="mb-4 space-y-3">
                     {pendingUploadSessions.map((session) => {
-                      const sessionLink = `/repairs/mobile-upload/${session.id}`
+                      const sessionLink = `/repairs/mobile-upload?sessionId=${session.id}`
                       const absoluteLink = appOrigin ? `${appOrigin}${sessionLink}` : ""
                       return (
                         <Alert

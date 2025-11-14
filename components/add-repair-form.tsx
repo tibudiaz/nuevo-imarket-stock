@@ -113,7 +113,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       setQrDataUrl("");
       return;
     }
-    const url = `${origin}/repairs/mobile-upload/${uploadSessionId}`;
+    const url = `${origin}/repairs/mobile-upload?sessionId=${uploadSessionId}`;
     QRCode.toDataURL(url, { width: 300 })
       .then(setQrDataUrl)
       .catch((error) => {
@@ -314,7 +314,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
                   <div className="flex flex-wrap items-center gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={() => {
                       if (!uploadSessionId || !origin) return;
-                      const link = `${origin}/repairs/mobile-upload/${uploadSessionId}`;
+                      const link = `${origin}/repairs/mobile-upload?sessionId=${uploadSessionId}`;
                       if (navigator.clipboard?.writeText) {
                         navigator.clipboard.writeText(link)
                           .then(() => toast.success("Enlace copiado al portapapeles"))
@@ -328,7 +328,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
                       <Copy className="mr-2 h-4 w-4" /> Copiar enlace
                     </Button>
                     <a
-                      href={uploadSessionId && origin ? `${origin}/repairs/mobile-upload/${uploadSessionId}` : "#"}
+                      href={uploadSessionId && origin ? `${origin}/repairs/mobile-upload?sessionId=${uploadSessionId}` : "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted"
