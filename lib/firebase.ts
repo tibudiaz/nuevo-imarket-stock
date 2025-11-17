@@ -24,12 +24,22 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+const envVarMap: Record<keyof typeof firebaseConfig, string> = {
+  apiKey: "NEXT_PUBLIC_FIREBASE_API_KEY",
+  authDomain: "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+  databaseURL: "NEXT_PUBLIC_FIREBASE_DATABASE_URL",
+  projectId: "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  storageBucket: "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+  messagingSenderId: "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+  appId: "NEXT_PUBLIC_FIREBASE_APP_ID",
+};
+
 // Función para verificar que todas las claves necesarias están presentes
 function checkFirebaseConfig(config: typeof firebaseConfig): string | null {
-  const requiredKeys: (keyof typeof firebaseConfig)[] = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
-  for (const key of requiredKeys) {
+  for (const key of Object.keys(config) as (keyof typeof firebaseConfig)[]) {
     if (!config[key]) {
-      return `La variable de entorno NEXT_PUBLIC_FIREBASE_${key.toUpperCase()} no está definida en tu archivo .env.local.`;
+      const envVarName = envVarMap[key];
+      return `La variable de entorno ${envVarName} no está definida en tu archivo .env.local.`;
     }
   }
   return null;
