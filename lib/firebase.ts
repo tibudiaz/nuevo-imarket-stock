@@ -3,7 +3,15 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
-import { getAuth, setPersistence, browserLocalPersistence, type Auth } from "firebase/auth";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  inMemoryPersistence,
+  type Auth,
+  Persistence,
+} from "firebase/auth";
 
 // Lee las variables de entorno
 const firebaseConfig = {
@@ -36,6 +44,35 @@ let storage: FirebaseStorage;
 let auth: Auth;
 const configError = checkFirebaseConfig(firebaseConfig);
 
+const getAvailablePersistence = (): Persistence | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const isStorageAvailable = (storageType: "localStorage" | "sessionStorage") => {
+    try {
+      const storage = storageType === "localStorage" ? window.localStorage : window.sessionStorage;
+      const testKey = "__firebase_persistence_test__";
+      storage.setItem(testKey, "test");
+      storage.removeItem(testKey);
+      return true;
+    } catch (error) {
+      console.warn(`[firebase] ${storageType} no disponible, usando alternativa.`, error);
+      return false;
+    }
+  };
+
+  if (isStorageAvailable("localStorage")) {
+    return browserLocalPersistence;
+  }
+
+  if (isStorageAvailable("sessionStorage")) {
+    return browserSessionPersistence;
+  }
+
+  return inMemoryPersistence;
+};
+
 // Si no hay errores de configuración, procedemos a inicializar Firebase
 if (!configError) {
   // Si no hay ninguna app de Firebase inicializada, la creamos. Si ya existe, la obtenemos.
@@ -45,11 +82,13 @@ if (!configError) {
   database = getDatabase(app);
   storage = getStorage(app);
   auth = getAuth(app);
-  // Persist authentication state across refreshes
-  setPersistence(auth, browserLocalPersistence).catch((e) =>
-    console.error("Error setting auth persistence:", e)
-  );
-  
+  const persistence = getAvailablePersistence();
+  if (persistence) {
+    setPersistence(auth, persistence).catch((e) =>
+      console.error("Error setting auth persistence:", e)
+    );
+  }
+
   console.log("Firebase se ha inicializado correctamente.");
 } else {
   // Si hay un error de configuración, lo mostramos en la consola
