@@ -44,20 +44,43 @@ function MobileUploadContent() {
       setAuthError("No se pudo inicializar Firebase correctamente.")
       return
     }
+
+    let isMounted = true
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!isMounted) return
       if (user) {
+        setIsAuthReady(true)
+        setAuthError(null)
+      }
+    })
+
+    const attemptAnonymousSignIn = async (attempt = 1) => {
+      if (!isMounted) return
+      if (auth.currentUser) {
         setIsAuthReady(true)
         setAuthError(null)
         return
       }
 
-      signInAnonymously(auth).catch((error) => {
+      try {
+        await signInAnonymously(auth)
+      } catch (error) {
         console.error("No se pudo autenticar la sesión anónima:", error)
-        setAuthError("No se pudo establecer la sesión segura para subir las fotos.")
-      })
-    })
+        if (attempt < 3) {
+          setTimeout(() => attemptAnonymousSignIn(attempt + 1), 500 * attempt)
+        } else if (isMounted) {
+          setAuthError("No se pudo establecer la sesión segura para subir las fotos.")
+        }
+      }
+    }
 
-    return () => unsubscribe()
+    attemptAnonymousSignIn()
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
@@ -165,6 +188,17 @@ function MobileUploadContent() {
     )
   }
 
+  if (authError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <Alert variant="destructive">
+          <AlertTitle>No se pudo iniciar la sesión segura</AlertTitle>
+          <AlertDescription>{authError}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   if (isCheckingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -184,17 +218,6 @@ function MobileUploadContent() {
           <AlertDescription>
             La sesión de carga no está disponible. Solicita un nuevo código desde el sistema de reparaciones.
           </AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <Alert variant="destructive">
-          <AlertTitle>No se pudo iniciar la sesión segura</AlertTitle>
-          <AlertDescription>{authError}</AlertDescription>
         </Alert>
       </div>
     )
