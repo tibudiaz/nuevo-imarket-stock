@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Check, ChevronsUpDown, PlusCircle, Trash, X } from "lucide-react"
+import { Check, ChevronsUpDown, Loader2, PlusCircle, Trash, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { ref, onValue, set, push, remove } from "firebase/database"
+import { ref, onValue, set, push, remove, get, update } from "firebase/database"
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
-import { database } from "@/lib/firebase"
+import { database, storage } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,8 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator" // Importación añadida
+import { deleteObject, ref as storageRef } from "firebase/storage"
+import type { RepairPhoto } from "@/types/repair"
 
 // ... (Interfaces sin cambios)
 interface Product {
@@ -72,6 +74,21 @@ interface FinancingConfig {
   grossIncome: number;
   cards: Record<string, FinancingCard>;
 }
+
+type StoredRepairPhoto = Omit<RepairPhoto, "id">;
+
+const getStoragePathFromUrl = (url: string): string | null => {
+  try {
+    const [, pathWithParams] = url.split("/o/");
+    if (!pathWithParams) return null;
+    const [encodedPath] = pathWithParams.split("?");
+    if (!encodedPath) return null;
+    return decodeURIComponent(encodedPath);
+  } catch (error) {
+    console.error("No se pudo extraer la ruta del storage:", error);
+    return null;
+  }
+};
 
 const parseNumber = (value: unknown, fallback = 0): number => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -249,6 +266,8 @@ export default function SettingsPage() {
   const [newUserUsername, setNewUserUsername] = useState("");
   const [newUserRole, setNewUserRole] = useState<"admin" | "moderator">("moderator");
   const [newUserPassword, setNewUserPassword] = useState("");
+  const [photoCleanupDate, setPhotoCleanupDate] = useState("");
+  const [isCleaningRepairPhotos, setIsCleaningRepairPhotos] = useState(false);
 
   useEffect(() => {
     const productsRef = ref(database, 'products');
@@ -596,6 +615,95 @@ export default function SettingsPage() {
       toast.success('Datos del sistema eliminados.');
     } catch (error) {
       toast.error('Error al eliminar los datos.');
+    }
+  };
+
+  const handleCleanupRepairPhotos = async () => {
+    if (!photoCleanupDate) {
+      toast.error('Selecciona una fecha para continuar.');
+      return;
+    }
+
+    const cutoffDate = new Date(photoCleanupDate);
+    if (Number.isNaN(cutoffDate.getTime())) {
+      toast.error('La fecha seleccionada no es válida.');
+      return;
+    }
+    cutoffDate.setHours(23, 59, 59, 999);
+
+    setIsCleaningRepairPhotos(true);
+    try {
+      const repairsSnapshot = await get(ref(database, 'repairs'));
+      if (!repairsSnapshot.exists()) {
+        toast.info('No hay reparaciones registradas.');
+        return;
+      }
+
+      const photosToDelete: { storagePath: string; dbPath: string }[] = [];
+
+      repairsSnapshot.forEach((childSnapshot) => {
+        const repairData = childSnapshot.val() as {
+          status?: string;
+          photos?: Record<string, StoredRepairPhoto>;
+          deliveredAt?: string;
+          updatedAt?: string;
+          entryDate?: string;
+        };
+
+        if (!repairData?.photos) return;
+        if (repairData.status !== 'delivered' && repairData.status !== 'completed') {
+          return;
+        }
+
+        const referenceDateString = repairData.deliveredAt || repairData.updatedAt || repairData.entryDate;
+        if (!referenceDateString) return;
+        const referenceDate = new Date(referenceDateString);
+        if (Number.isNaN(referenceDate.getTime())) return;
+        if (referenceDate > cutoffDate) return;
+
+        Object.entries(repairData.photos).forEach(([photoId, photoValue]) => {
+          const storagePath = photoValue.path ?? getStoragePathFromUrl(photoValue.url);
+          if (!storagePath) {
+            return;
+          }
+          photosToDelete.push({
+            storagePath,
+            dbPath: `repairs/${childSnapshot.key}/photos/${photoId}`,
+          });
+        });
+      });
+
+      if (!photosToDelete.length) {
+        toast.info('No se encontraron fotos que coincidan con los filtros seleccionados.');
+        return;
+      }
+
+      const updatesPayload: Record<string, null> = {};
+      let deletedCount = 0;
+
+      for (const target of photosToDelete) {
+        try {
+          await deleteObject(storageRef(storage, target.storagePath));
+          updatesPayload[target.dbPath] = null;
+          deletedCount++;
+        } catch (error) {
+          console.error('No se pudo eliminar la foto del storage:', target.storagePath, error);
+        }
+      }
+
+      if (!deletedCount) {
+        toast.error('No se pudo eliminar ninguna foto.');
+        return;
+      }
+
+      await update(ref(database), updatesPayload);
+
+      toast.success(`Se eliminaron ${deletedCount} foto${deletedCount === 1 ? '' : 's'} de reparaciones finalizadas.`);
+    } catch (error) {
+      console.error('Error al eliminar las fotos de reparaciones:', error);
+      toast.error('No se pudieron eliminar las fotos seleccionadas.');
+    } finally {
+      setIsCleaningRepairPhotos(false);
     }
   };
 
@@ -952,6 +1060,36 @@ export default function SettingsPage() {
                           </div>)) : <p className="text-sm text-muted-foreground text-center py-10">No hay reglas de combos configuradas.</p>}
                   </ScrollArea>
                </div>
+            </CardContent>
+          </Card>
+          <Card className="md:col-span-2 lg:col-span-3">
+            <CardHeader>
+              <CardTitle>Limpieza de fotos de reparaciones</CardTitle>
+              <CardDescription>
+                Elimina definitivamente las imágenes de reparaciones entregadas o terminadas antes de una fecha.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Eliminar fotos cargadas hasta</Label>
+                <Input
+                  type="date"
+                  value={photoCleanupDate}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(event) => setPhotoCleanupDate(event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Solo se eliminarán fotos de reparaciones con estado Completado o Entregado. Esta acción no se puede deshacer.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                disabled={isCleaningRepairPhotos}
+                onClick={handleCleanupRepairPhotos}
+              >
+                {isCleaningRepairPhotos && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Eliminar fotos antiguas
+              </Button>
             </CardContent>
           </Card>
           <Card className="md:col-span-2 lg:col-span-3">

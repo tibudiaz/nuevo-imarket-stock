@@ -4,4 +4,5 @@ export interface RepairPhoto {
   uploadedAt: string;
   uploadedBy: "desktop" | "mobile";
   name?: string;
+  path?: string;
 }

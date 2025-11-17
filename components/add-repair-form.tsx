@@ -156,6 +156,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       uploadedAt: new Date().toISOString(),
       uploadedBy: source,
       name: file.name,
+      path: storagePath,
     });
     const sessionRef = ref(database, `repairUploadSessions/${uploadSessionId}`);
     await update(sessionRef, {
