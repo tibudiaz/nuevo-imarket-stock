@@ -57,6 +57,7 @@ import { toast } from "sonner"
 import { safeLocalStorage } from "@/lib/safe-storage"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useMobile } from "@/hooks/use-mobile"
+import { getAppBaseUrl } from "@/lib/base-url"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -221,10 +222,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setAppOrigin(window.location.origin);
-    }
-  }, []);
+    const resolvedOrigin = getAppBaseUrl()
+    setAppOrigin(resolvedOrigin)
+  }, [])
 
   useEffect(() => {
     if (!user?.username) {
