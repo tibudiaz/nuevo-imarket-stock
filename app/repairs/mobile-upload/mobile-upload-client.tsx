@@ -176,6 +176,7 @@ function MobileUploadContent() {
           uploadedAt: new Date().toISOString(),
           uploadedBy: "mobile",
           name: file.name,
+          path: storagePath,
         })
       }
       const sessionRef = databaseRef(database, `repairUploadSessions/${sessionId}`)
