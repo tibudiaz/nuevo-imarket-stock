@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { database, storage } from "@/lib/firebase"
+import { auth, database, storage } from "@/lib/firebase"
 import { ref as databaseRef, onValue, push, update, get } from "firebase/database"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
 import type { RepairPhoto } from "@/types/repair"
 import { Loader2, UploadCloud } from "lucide-react"
 import { toast } from "sonner"
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
 
 function MobileUploadFallback() {
   return (
@@ -35,9 +36,32 @@ function MobileUploadContent() {
   const [repairId, setRepairId] = useState<string | null>(null)
   const [isValidSession, setIsValidSession] = useState(true)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const [isAuthReady, setIsAuthReady] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!sessionId) return
+    if (!auth?.app) {
+      setAuthError("No se pudo inicializar Firebase correctamente.")
+      return
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsAuthReady(true)
+        setAuthError(null)
+        return
+      }
+
+      signInAnonymously(auth).catch((error) => {
+        console.error("No se pudo autenticar la sesión anónima:", error)
+        setAuthError("No se pudo establecer la sesión segura para subir las fotos.")
+      })
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!sessionId || !isAuthReady) return
 
     const sessionRef = databaseRef(database, `repairUploadSessions/${sessionId}`)
 
@@ -86,10 +110,15 @@ function MobileUploadContent() {
     }).catch(() => null)
 
     return () => unsubscribe()
-  }, [sessionId])
+  }, [sessionId, isAuthReady])
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files?.length || !sessionId || !canUpload) return
+    if (!event.target.files?.length || !sessionId || !canUpload || !isAuthReady) {
+      if (!isAuthReady) {
+        toast.error("La sesión segura aún no está lista. Espera unos segundos e intenta nuevamente.")
+      }
+      return
+    }
     const files = Array.from(event.target.files)
     setIsUploading(true)
     try {
@@ -155,6 +184,17 @@ function MobileUploadContent() {
           <AlertDescription>
             La sesión de carga no está disponible. Solicita un nuevo código desde el sistema de reparaciones.
           </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  if (authError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <Alert variant="destructive">
+          <AlertTitle>No se pudo iniciar la sesión segura</AlertTitle>
+          <AlertDescription>{authError}</AlertDescription>
         </Alert>
       </div>
     )
