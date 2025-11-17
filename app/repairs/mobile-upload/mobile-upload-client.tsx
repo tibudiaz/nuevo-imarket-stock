@@ -38,14 +38,34 @@ function MobileUploadContent() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authBypassed, setAuthBypassed] = useState(false)
 
   useEffect(() => {
-    if (!auth?.app) {
-      setAuthError("No se pudo inicializar Firebase correctamente.")
-      return
+    let isMounted = true
+
+    const enableAuthBypass = (reason?: string) => {
+      if (reason) {
+        console.warn(reason)
+      }
+      if (!isMounted) return
+      setAuthBypassed(true)
+      setIsAuthReady(true)
+      setAuthError(null)
     }
 
-    let isMounted = true
+    if (!auth?.app) {
+      enableAuthBypass("Firebase Auth no se inicializó; habilitando modo sin autenticación.")
+      return () => {
+        isMounted = false
+      }
+    }
+
+    if (typeof window !== "undefined" && window.isSecureContext === false) {
+      enableAuthBypass("Se detectó un contexto inseguro; continuando sin sesión segura.")
+      return () => {
+        isMounted = false
+      }
+    }
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!isMounted) return
@@ -70,7 +90,7 @@ function MobileUploadContent() {
         if (attempt < 3) {
           setTimeout(() => attemptAnonymousSignIn(attempt + 1), 500 * attempt)
         } else if (isMounted) {
-          setAuthError("No se pudo establecer la sesión segura para subir las fotos.")
+          enableAuthBypass("Fallo repetido al autenticar; habilitando modo sin autenticación.")
         }
       }
     }
@@ -233,6 +253,14 @@ function MobileUploadContent() {
           <p className="text-sm text-muted-foreground">
             Seleccioná una o varias fotos del equipo. Podés usar la cámara del teléfono o elegir imágenes de tu galería.
           </p>
+          {authBypassed && (
+            <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+              <AlertTitle>Sesión abierta sin autenticación</AlertTitle>
+              <AlertDescription>
+                Detectamos una conexión no segura. Las fotos se pueden subir igual, pero se recomienda usar HTTPS cuando sea posible.
+              </AlertDescription>
+            </Alert>
+          )}
           {repairId && (
             <Alert>
               <AlertTitle>Reparación vinculada</AlertTitle>
