@@ -23,6 +23,7 @@ import type { RepairPhoto } from "@/types/repair"
 import QRCode from "qrcode"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useAuth } from "@/hooks/use-auth"
+import { getAppBaseUrl } from "@/lib/base-url"
 
 interface AddRepairFormProps {
   isOpen: boolean
@@ -86,10 +87,9 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
   }, [isOpen, uploadSessionId]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
-    }
-  }, []);
+    const resolvedOrigin = getAppBaseUrl()
+    setOrigin(resolvedOrigin)
+  }, [])
 
   useEffect(() => {
     if (!isOpen || !uploadSessionId) return;
