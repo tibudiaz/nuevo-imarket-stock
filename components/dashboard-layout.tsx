@@ -26,10 +26,11 @@ import {
   Smartphone,
   Banknote,
   Copy,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
-import { ref, onValue, query, orderByChild, equalTo } from "firebase/database"
+import { ref, onValue, query, orderByChild, equalTo, update } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -152,6 +153,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [expiringReserves, setExpiringReserves] = useState(false);
   const [pendingUploadSessions, setPendingUploadSessions] = useState<PendingUploadSession[]>([]);
   const [appOrigin, setAppOrigin] = useState<string>("");
+  const [dismissLoadingIds, setDismissLoadingIds] = useState<Record<string, boolean>>({});
 
   const { selectedStore, setSelectedStore } = useStore();
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
@@ -278,6 +280,28 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setIsInventoryOpen(pathname.startsWith("/dashboard/inventory"));
     setIsReservesOpen(pathname.startsWith("/dashboard/reserves"));
   }, [pathname]);
+
+  const handleDismissUploadSession = React.useCallback(async (sessionId: string) => {
+    setDismissLoadingIds((prev) => ({ ...prev, [sessionId]: true }));
+    try {
+      const sessionRef = ref(database, `repairUploadSessions/${sessionId}`);
+      await update(sessionRef, {
+        pendingUpload: false,
+        dismissedAt: new Date().toISOString(),
+      });
+      setPendingUploadSessions((prev) => prev.filter((session) => session.id !== sessionId));
+      toast.success("Notificación cerrada");
+    } catch (error) {
+      console.error("Error al descartar la carga pendiente:", error);
+      toast.error("No se pudo descartar la carga pendiente.");
+    } finally {
+      setDismissLoadingIds((prev) => {
+        const next = { ...prev };
+        delete next[sessionId];
+        return next;
+      });
+    }
+  }, []);
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -531,6 +555,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                 <Copy className="mr-2 h-4 w-4" /> Copiar enlace
                               </Button>
                             )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-amber-900 hover:bg-amber-100"
+                              disabled={!!dismissLoadingIds[session.id]}
+                              onClick={() => handleDismissUploadSession(session.id)}
+                            >
+                              {dismissLoadingIds[session.id] ? (
+                                "Cerrando..."
+                              ) : (
+                                <>
+                                  <X className="mr-2 h-4 w-4" /> No cargar imágenes
+                                </>
+                              )}
+                            </Button>
                           </div>
                         </Alert>
                       )
