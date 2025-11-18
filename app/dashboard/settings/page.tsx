@@ -28,6 +28,7 @@ interface Product {
   name: string;
   category?: string;
   stock?: number;
+  store?: "local1" | "local2";
 }
 
 interface BundleRule {
