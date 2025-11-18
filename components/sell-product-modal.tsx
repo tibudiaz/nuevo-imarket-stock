@@ -403,10 +403,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 }
 
                 if (matchedRule) {
+                    const targetStore = productToAdd.store ?? saleStore ?? null;
                     matchedRule.accessories.forEach(acc => {
                         const accessoryProduct = allProducts.find(p =>
                             p.category?.toLowerCase() === acc.category?.toLowerCase() &&
-                            p.model?.toLowerCase() === mainProductModel.toLowerCase()
+                            p.model?.toLowerCase() === mainProductModel.toLowerCase() &&
+                            (!targetStore || !p.store || p.store === targetStore)
                         );
 
                         if (accessoryProduct) {
@@ -416,7 +418,12 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                                 toast.warning(`Sin stock`, { description: `El accesorio para "${mainProductModel}" no tiene stock.` });
                             }
                         } else {
-                            toast.error(`Accesorio no encontrado`, { description: `No se encontró un producto de categoría "${acc.category}" para el modelo "${mainProductModel}".` });
+                            const storeLabel = targetStore === 'local2' ? 'Local 2' : 'Local 1';
+                            toast.error(`Accesorio no encontrado`, {
+                              description: targetStore
+                                ? `No se encontró un producto de categoría "${acc.category}" para el modelo "${mainProductModel}" en ${storeLabel}.`
+                                : `No se encontró un producto de categoría "${acc.category}" para el modelo "${mainProductModel}".`
+                            });
                         }
                     });
 
