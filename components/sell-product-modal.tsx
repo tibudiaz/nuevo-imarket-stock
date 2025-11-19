@@ -405,24 +405,27 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 if (matchedRule) {
                     const targetStore = productToAdd.store ?? saleStore ?? null;
                     matchedRule.accessories.forEach(acc => {
-                        const accessoryProduct = allProducts.find(p =>
-                            p.category?.toLowerCase() === acc.category?.toLowerCase() &&
-                            p.model?.toLowerCase() === mainProductModel.toLowerCase() &&
-                            (!targetStore || !p.store || p.store === targetStore)
-                        );
+                        const accessoryProduct = allProducts.find(p => p.id === acc.id);
 
                         if (accessoryProduct) {
+                            const belongsToStore = !targetStore || !accessoryProduct.store || accessoryProduct.store === targetStore;
+
+                            if (!belongsToStore) {
+                                const storeLabel = targetStore === 'local2' ? 'Local 2' : 'Local 1';
+                                toast.error(`Accesorio no disponible en ${storeLabel}`, {
+                                  description: `El producto "${accessoryProduct.name}" configurado en el combo pertenece a otro local.`,
+                                });
+                                return;
+                            }
+
                             if (accessoryProduct.stock > 0 && !newCart.find(item => item.id === accessoryProduct.id)) {
                                 accessoriesToAdd.push({ ...accessoryProduct, quantity: 1, price: 0 });
                             } else if (accessoryProduct.stock <= 0) {
-                                toast.warning(`Sin stock`, { description: `El accesorio para "${mainProductModel}" no tiene stock.` });
+                                toast.warning(`Sin stock`, { description: `"${accessoryProduct.name}" no tiene stock.` });
                             }
                         } else {
-                            const storeLabel = targetStore === 'local2' ? 'Local 2' : 'Local 1';
                             toast.error(`Accesorio no encontrado`, {
-                              description: targetStore
-                                ? `No se encontró un producto de categoría "${acc.category}" para el modelo "${mainProductModel}" en ${storeLabel}.`
-                                : `No se encontró un producto de categoría "${acc.category}" para el modelo "${mainProductModel}".`
+                              description: `No se encontró el producto "${acc.name}" configurado en el combo.`,
                             });
                         }
                     });
