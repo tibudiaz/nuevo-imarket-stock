@@ -384,6 +384,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           };
 
           const productCategory = productToAdd.category || "";
+          const normalizedCategory = productCategory.trim().toLowerCase();
+          const eligiblePhoneCategories = ["celulares nuevos", "celulares usados"];
+          const isPhoneCategory = eligiblePhoneCategories.includes(normalizedCategory);
+
+          if (!isPhoneCategory) {
+            return [...newCart];
+          }
+
           const productModelNumber = parseModelNumber(productToAdd.model || productToAdd.name || "");
 
           const matchedRules = bundles.filter(rule => {
