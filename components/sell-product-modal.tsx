@@ -377,63 +377,99 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               setProductSearchTerm("");
           }
 
-          const isCellphone = productToAdd.category?.toLowerCase().includes('celular');
-          if (isCellphone) {
-            const parseModelFromProductName = (name: string): string => {
-              const match = name.match(/^(\d+\s*(?:pro|max|pro max|plus)?)/i);
-              return match ? match[1].trim().replace(/\s+/g, ' ') : name;
-            };
+          const parseModelNumber = (value?: string | null) => {
+            if (!value) return null;
+            const digits = value.replace(/[^0-9]/g, '');
+            return digits ? parseInt(digits, 10) : null;
+          };
 
-            const mainProductModel = parseModelFromProductName(productToAdd.name || "");
-            if (mainProductModel) {
-                let matchedRule: BundleRule | undefined;
-                for (const rule of bundles) {
-                    const { start, end, category } = rule.conditions;
-                    const productCategory = productToAdd.category || "";
-                    const modelNumber = parseInt(mainProductModel.replace(/[^0-9]/g, ''), 10);
-                    const startNumber = start ? parseInt(start.replace(/[^0-9]/g, ''), 10) : 0;
-                    const endNumber = end ? parseInt(end.replace(/[^0-9]/g, ''), 10) : 0;
+          const productCategory = productToAdd.category || "";
+          const productModelNumber = parseModelNumber(productToAdd.model || productToAdd.name || "");
 
-                    if ((rule.type === 'category' && productCategory === category) ||
-                        (rule.type === 'model_range' && start && end && modelNumber >= startNumber && modelNumber <= endNumber) ||
-                        (rule.type === 'model_start' && start && modelNumber >= startNumber)) {
-                        matchedRule = rule;
-                        break;
-                    }
-                }
+          const matchedRules = bundles.filter(rule => {
+            const { start, end, category } = rule.conditions;
 
-                if (matchedRule) {
-                    const targetStore = productToAdd.store ?? saleStore ?? null;
-                    matchedRule.accessories.forEach(acc => {
-                        const accessoryProduct = allProducts.find(p => p.id === acc.id);
+            if (rule.type === 'category') {
+              return !!category && productCategory.toLowerCase() === category.toLowerCase();
+            }
 
-                        if (accessoryProduct) {
-                            const belongsToStore = !targetStore || !accessoryProduct.store || accessoryProduct.store === targetStore;
+            if (rule.type === 'model_range') {
+              const startNumber = parseModelNumber(start || "");
+              const endNumber = parseModelNumber(end || "");
+              return (
+                productModelNumber !== null &&
+                startNumber !== null &&
+                endNumber !== null &&
+                productModelNumber >= startNumber &&
+                productModelNumber <= endNumber
+              );
+            }
 
-                            if (!belongsToStore) {
-                                const storeLabel = targetStore === 'local2' ? 'Local 2' : 'Local 1';
-                                toast.error(`Accesorio no disponible en ${storeLabel}`, {
-                                  description: `El producto "${accessoryProduct.name}" configurado en el combo pertenece a otro local.`,
-                                });
-                                return;
-                            }
+            if (rule.type === 'model_start') {
+              const startNumber = parseModelNumber(start || "");
+              return (
+                productModelNumber !== null &&
+                startNumber !== null &&
+                productModelNumber >= startNumber
+              );
+            }
 
-                            if (accessoryProduct.stock > 0 && !newCart.find(item => item.id === accessoryProduct.id)) {
-                                accessoriesToAdd.push({ ...accessoryProduct, quantity: 1, price: 0 });
-                            } else if (accessoryProduct.stock <= 0) {
-                                toast.warning(`Sin stock`, { description: `"${accessoryProduct.name}" no tiene stock.` });
-                            }
-                        } else {
-                            toast.error(`Accesorio no encontrado`, {
-                              description: `No se encontró el producto "${acc.name}" configurado en el combo.`,
-                            });
-                        }
+            return false;
+          });
+
+          if (matchedRules.length > 0) {
+            const targetStore = productToAdd.store ?? saleStore ?? null;
+            const appliedRuleNames = new Set<string>();
+
+            matchedRules.forEach(rule => {
+              let ruleApplied = false;
+
+              rule.accessories.forEach(acc => {
+                const accessoryProduct = allProducts.find(p => p.id === acc.id);
+
+                if (accessoryProduct) {
+                  const belongsToStore = !targetStore || !accessoryProduct.store || accessoryProduct.store === targetStore;
+
+                  if (!belongsToStore) {
+                    const storeLabel = targetStore === 'local2' ? 'Local 2' : 'Local 1';
+                    toast.error(`Accesorio no disponible en ${storeLabel}`, {
+                      description: `El producto "${accessoryProduct.name}" configurado en el combo pertenece a otro local.`,
                     });
+                    return;
+                  }
 
-                    if (accessoriesToAdd.length > 0) {
-                        toast.info(`Combo "${matchedRule.name}" aplicado`, { description: `Se agregaron ${accessoriesToAdd.length} accesorios de regalo.` });
-                    }
+                  const alreadyInCart = newCart.find(item => item.id === accessoryProduct.id);
+                  const alreadyQueued = accessoriesToAdd.find(item => item.id === accessoryProduct.id);
+
+                  if (accessoryProduct.stock > 0 && !alreadyInCart && !alreadyQueued) {
+                    accessoriesToAdd.push({ ...accessoryProduct, quantity: 1, price: 0 });
+                    ruleApplied = true;
+                  } else if (accessoryProduct.stock <= 0) {
+                    toast.warning(`Sin stock`, { description: `"${accessoryProduct.name}" no tiene stock.` });
+                  }
+                } else {
+                  toast.error(`Accesorio no encontrado`, {
+                    description: `No se encontró el producto "${acc.name}" configurado en el combo.`,
+                  });
                 }
+              });
+
+              if (ruleApplied) {
+                appliedRuleNames.add(rule.name);
+              }
+            });
+
+            if (accessoriesToAdd.length > 0 && appliedRuleNames.size > 0) {
+              const comboList = Array.from(appliedRuleNames).join(", ");
+              toast.info(
+                appliedRuleNames.size === 1 ? `Combo "${comboList}" aplicado` : `Combos aplicados`,
+                {
+                  description:
+                    appliedRuleNames.size === 1
+                      ? `Se agregaron ${accessoriesToAdd.length} accesorios de regalo.`
+                      : `Se agregaron ${accessoriesToAdd.length} accesorios de regalo de los combos ${comboList}.`,
+                }
+              );
             }
           }
           return [...newCart, ...accessoriesToAdd];
