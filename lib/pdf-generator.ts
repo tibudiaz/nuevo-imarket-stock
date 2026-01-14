@@ -394,9 +394,9 @@ const drawSaleSignature = async (
     const signerName = signature.signerName?.trim();
     const signerDni = signature.signerDni?.trim();
     if (signerName || signerDni) {
-      const textY = y + 6;
+      const textY = y + 9;
       const nameX = x + maxWidth + 5;
-      const textSize = 9;
+      const textSize = 12;
       const nameWidth = signerName
         ? font.widthOfTextAtSize(signerName, textSize)
         : 0;
@@ -411,7 +411,7 @@ const drawSaleSignature = async (
         });
       }
       if (signerDni) {
-        const dniX = signerName ? nameX + nameWidth + 5 : nameX;
+        const dniX = (signerName ? nameX + nameWidth + 5 : nameX) + 15;
         page.drawText(signerDni, {
           x: dniX,
           y: textY,

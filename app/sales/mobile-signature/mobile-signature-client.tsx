@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { database, storage } from "@/lib/firebase"
 import { ref as databaseRef, onValue, update, get } from "firebase/database"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
-import { Loader2, PencilLine, RotateCcw, Save } from "lucide-react"
+import { CheckCircle2, Loader2, PencilLine, RotateCcw, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
 function MobileSignatureFallback() {
@@ -39,6 +39,9 @@ function MobileSignatureContent() {
   const [sessionRefPath, setSessionRefPath] = useState<string | null>(null)
   const [signerName, setSignerName] = useState("")
   const [signerDni, setSignerDni] = useState("")
+  const [showThanks, setShowThanks] = useState(false)
+
+  const signatureLocked = status === "closed" || status === "signed" || Boolean(signatureUrl)
 
   useEffect(() => {
     if (!sessionId) return
@@ -108,6 +111,12 @@ function MobileSignatureContent() {
     return () => unsubscribe()
   }, [sessionRefPath])
 
+  useEffect(() => {
+    if (signatureUrl) {
+      setShowThanks(true)
+    }
+  }, [signatureUrl])
+
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas || typeof window === "undefined") return
@@ -150,7 +159,7 @@ function MobileSignatureContent() {
   }, [])
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (status === "closed") return
+    if (signatureLocked) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
     if (!canvas || !ctx) return
@@ -160,17 +169,17 @@ function MobileSignatureContent() {
     ctx.moveTo(x, y)
     setIsDrawing(true)
     setHasSignature(true)
-  }, [getCanvasPoint, status])
+  }, [getCanvasPoint, signatureLocked])
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return
+    if (!isDrawing || signatureLocked) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
     if (!canvas || !ctx) return
     const { x, y } = getCanvasPoint(event)
     ctx.lineTo(x, y)
     ctx.stroke()
-  }, [getCanvasPoint, isDrawing])
+  }, [getCanvasPoint, isDrawing, signatureLocked])
 
   const handlePointerUp = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return
@@ -180,15 +189,16 @@ function MobileSignatureContent() {
   }, [isDrawing])
 
   const handleClear = useCallback(() => {
+    if (signatureLocked) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
     if (!canvas || !ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     setHasSignature(false)
-  }, [])
+  }, [signatureLocked])
 
   const handleSave = useCallback(async () => {
-    if (!canvasRef.current || !sessionId || status === "closed") return
+    if (!canvasRef.current || !sessionId || signatureLocked) return
     if (!hasSignature) {
       toast.error("Agregá una firma antes de guardar.")
       return
@@ -213,8 +223,47 @@ function MobileSignatureContent() {
       if (!exportCtx) throw new Error("No se pudo preparar la firma.")
       exportCtx.drawImage(canvas, 0, 0)
 
+      const sourceImageData = exportCtx.getImageData(0, 0, exportCanvas.width, exportCanvas.height)
+      const { data, width, height } = sourceImageData
+      let minX = width
+      let minY = height
+      let maxX = 0
+      let maxY = 0
+      let hasPixels = false
+
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const alpha = data[(y * width + x) * 4 + 3]
+          if (alpha > 0) {
+            hasPixels = true
+            minX = Math.min(minX, x)
+            minY = Math.min(minY, y)
+            maxX = Math.max(maxX, x)
+            maxY = Math.max(maxY, y)
+          }
+        }
+      }
+
+      const croppedCanvas = document.createElement("canvas")
+      if (hasPixels) {
+        const croppedWidth = maxX - minX + 1
+        const croppedHeight = maxY - minY + 1
+        croppedCanvas.width = croppedWidth
+        croppedCanvas.height = croppedHeight
+        const croppedCtx = croppedCanvas.getContext("2d")
+        if (!croppedCtx) throw new Error("No se pudo recortar la firma.")
+        const croppedImageData = exportCtx.getImageData(minX, minY, croppedWidth, croppedHeight)
+        croppedCtx.putImageData(croppedImageData, 0, 0)
+      } else {
+        croppedCanvas.width = exportCanvas.width
+        croppedCanvas.height = exportCanvas.height
+        const croppedCtx = croppedCanvas.getContext("2d")
+        if (!croppedCtx) throw new Error("No se pudo preparar la firma.")
+        croppedCtx.drawImage(exportCanvas, 0, 0)
+      }
+
       const signatureBlob = await new Promise<Blob | null>((resolve) =>
-        exportCanvas.toBlob(resolve, "image/png")
+        croppedCanvas.toBlob(resolve, "image/png")
       )
       if (!signatureBlob) {
         throw new Error("No se pudo generar la imagen de la firma.")
@@ -254,6 +303,7 @@ function MobileSignatureContent() {
 
       toast.success("Firma guardada correctamente.")
       setSignatureUrl(url)
+      setShowThanks(true)
     } catch (error) {
       console.error("Error al guardar la firma:", error)
       toast.error("No se pudo guardar la firma", {
@@ -262,7 +312,7 @@ function MobileSignatureContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [hasSignature, saleId, sessionId, sessionRefPath, signerDni, signerName, status])
+  }, [hasSignature, saleId, sessionId, sessionRefPath, signatureLocked, signerDni, signerName])
 
   if (!sessionId) {
     return (
@@ -304,7 +354,7 @@ function MobileSignatureContent() {
             <div className="rounded-md border bg-white p-2">
               <canvas
                 ref={canvasRef}
-                className="h-44 w-full touch-none rounded-md bg-white"
+                className={`h-44 w-full touch-none rounded-md bg-white ${signatureLocked ? "cursor-not-allowed opacity-60" : ""}`}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -322,7 +372,7 @@ function MobileSignatureContent() {
                 placeholder="Ingresá el DNI"
                 value={signerDni}
                 onChange={(event) => setSignerDni(event.target.value)}
-                disabled={status === "closed"}
+                disabled={signatureLocked}
               />
             </div>
             <div className="space-y-2">
@@ -332,27 +382,39 @@ function MobileSignatureContent() {
                 placeholder="Ingresá nombre y apellido"
                 value={signerName}
                 onChange={(event) => setSignerName(event.target.value)}
-                disabled={status === "closed"}
+                disabled={signatureLocked}
               />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={handleClear} disabled={status === "closed"}>
+            <Button type="button" variant="outline" onClick={handleClear} disabled={signatureLocked}>
               <RotateCcw className="mr-2 h-4 w-4" /> Limpiar
             </Button>
-            <Button type="button" onClick={handleSave} disabled={status === "closed" || isSaving}>
+            <Button type="button" onClick={handleSave} disabled={signatureLocked || isSaving}>
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" /> Guardar firma
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Aceptar
                 </>
               )}
             </Button>
           </div>
+
+          {showThanks && (
+            <div className="flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
+              <div className="rounded-full bg-emerald-100 p-2">
+                <Sparkles className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">¡Gracias!</p>
+                <p className="text-sm">El equipo de iMarket agradece tu compra.</p>
+              </div>
+            </div>
+          )}
 
           {signatureUrl && (
             <div className="space-y-2">
