@@ -162,6 +162,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [signatureStatus, setSignatureStatus] = useState<string>("pending")
   const [signatureData, setSignatureData] = useState<Sale["signature"]>(null)
   const [signatureOrigin, setSignatureOrigin] = useState<string>("")
+  const [signatureSessionRefPath, setSignatureSessionRefPath] = useState<string>("")
   const [signatureSessionError, setSignatureSessionError] = useState<string | null>(null)
 
   const [cart, setCart] = useState<CartProduct[]>([])
@@ -283,6 +284,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setSignatureLink("")
       setSignatureStatus("pending")
       setSignatureData(null)
+      setSignatureSessionRefPath("")
       setSignatureSessionError(null)
     }
   }, [isOpen])
@@ -309,9 +311,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   }, [signatureOrigin, signatureSessionId])
 
   useEffect(() => {
-    if (!signatureSessionId) return
+    if (!signatureSessionRefPath) return
 
-    const sessionRef = ref(database, `saleSignatureSessions/${signatureSessionId}`)
+    const sessionRef = ref(database, signatureSessionRefPath)
     const unsubscribe = onValue(sessionRef, (snapshot) => {
       if (!snapshot.exists()) {
         setSignatureStatus("pending")
@@ -333,7 +335,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     })
 
     return () => unsubscribe()
-  }, [signatureSessionId])
+  }, [signatureSessionId, signatureSessionRefPath])
 
   useEffect(() => {
     if (!isOpen || !reserveToComplete) {
@@ -631,9 +633,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     setSignatureSessionId(null)
     setSignatureQrDataUrl("")
     setSignatureLink("")
-    const newSessionId = generateSignatureSessionId()
-    const sessionRef = ref(database, `saleSignatureSessions/${newSessionId}`)
-    await set(sessionRef, {
+    setSignatureSessionRefPath("")
+
+    const sessionPayload = {
       createdAt: new Date().toISOString(),
       status: "pending",
       saleId: sale.id,
@@ -641,9 +643,31 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       store: sale.store ?? null,
       createdBy: user?.username ?? null,
       pendingSignature: true,
-    })
-    setSignatureSessionId(newSessionId)
-    setIsSignatureDialogOpen(true)
+    }
+
+    const newSessionId = generateSignatureSessionId()
+    try {
+      const sessionRef = ref(database, `saleSignatureSessions/${newSessionId}`)
+      await set(sessionRef, sessionPayload)
+      setSignatureSessionId(newSessionId)
+      setSignatureSessionRefPath(`saleSignatureSessions/${newSessionId}`)
+      setIsSignatureDialogOpen(true)
+      return
+    } catch (error) {
+      console.error("Error al crear la sesión de firma:", error)
+    }
+
+    try {
+      const saleRef = ref(database, `sales/${sale.id}`)
+      await update(saleRef, { signatureSession: sessionPayload })
+      setSignatureSessionId(sale.id)
+      setSignatureSessionRefPath(`sales/${sale.id}/signatureSession`)
+      setIsSignatureDialogOpen(true)
+    } catch (error) {
+      console.error("Error al crear la sesión de firma en la venta:", error)
+      setSignatureSessionError("No se pudo iniciar la sesión de firma. Revisá la conexión e intentá nuevamente.")
+      throw error
+    }
   }, [generateSignatureSessionId, user?.username])
 
   const handleSellProduct = async () => {
@@ -1038,8 +1062,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   };
 
   const handleCloseSignatureDialog = async (goToPdf: boolean) => {
-    if (signatureSessionId) {
-      const sessionRef = ref(database, `saleSignatureSessions/${signatureSessionId}`)
+    if (signatureSessionRefPath) {
+      const sessionRef = ref(database, signatureSessionRefPath)
       await update(sessionRef, {
         status: "closed",
         closedAt: new Date().toISOString(),
