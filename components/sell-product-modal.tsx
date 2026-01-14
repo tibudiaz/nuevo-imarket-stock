@@ -330,6 +330,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           path: sessionData.signature.path as string | undefined,
           signedAt: sessionData.signature.signedAt as string | undefined,
           sessionId: signatureSessionId,
+          signerName: sessionData.signature.signerName as string | undefined,
+          signerDni: sessionData.signature.signerDni as string | undefined,
         }
         setSignatureData(signaturePayload)
         setCompletedSale((prev) => (prev ? { ...prev, signature: signaturePayload } : prev))
