@@ -379,7 +379,7 @@ const drawSaleSignature = async (
     const imageBytes = await response.arrayBuffer();
     const signatureImage = await pdfDoc.embedPng(imageBytes);
 
-    const maxWidth = 160;
+    const maxWidth = 112;
     const scale = maxWidth / signatureImage.width;
     const scaledHeight = signatureImage.height * scale;
     const x = 65;
@@ -411,7 +411,7 @@ const drawSaleSignature = async (
         });
       }
       if (signerDni) {
-        const dniX = (signerName ? nameX + nameWidth + 5 : nameX) + 15;
+        const dniX = (signerName ? nameX + nameWidth + 5 : nameX) + 45;
         page.drawText(signerDni, {
           x: dniX,
           y: textY,
