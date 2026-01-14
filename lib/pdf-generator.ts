@@ -383,15 +383,7 @@ const drawSaleSignature = async (
     const scale = maxWidth / signatureImage.width;
     const scaledHeight = signatureImage.height * scale;
     const x = 65;
-    const y = 110;
-
-    page.drawText("Firma del cliente", {
-      x,
-      y: y + scaledHeight + 6,
-      size: 9,
-      font,
-      color: rgb(0.2, 0.2, 0.2),
-    });
+    const y = 107;
     page.drawImage(signatureImage, {
       x,
       y,
@@ -402,21 +394,28 @@ const drawSaleSignature = async (
     const signerName = signature.signerName?.trim();
     const signerDni = signature.signerDni?.trim();
     if (signerName || signerDni) {
-      const metaStartY = y - 12;
+      const textY = y + 6;
+      const nameX = x + maxWidth + 5;
+      const textSize = 9;
+      const nameWidth = signerName
+        ? font.widthOfTextAtSize(signerName, textSize)
+        : 0;
+
       if (signerName) {
-        page.drawText(`Aclaración: ${signerName}`, {
-          x,
-          y: metaStartY,
-          size: 9,
+        page.drawText(signerName, {
+          x: nameX,
+          y: textY,
+          size: textSize,
           font,
           color: rgb(0.2, 0.2, 0.2),
         });
       }
       if (signerDni) {
-        page.drawText(`DNI: ${signerDni}`, {
-          x,
-          y: metaStartY - 12,
-          size: 9,
+        const dniX = signerName ? nameX + nameWidth + 5 : nameX;
+        page.drawText(signerDni, {
+          x: dniX,
+          y: textY,
+          size: textSize,
           font,
           color: rgb(0.2, 0.2, 0.2),
         });
