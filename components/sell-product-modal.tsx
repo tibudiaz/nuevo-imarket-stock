@@ -90,6 +90,8 @@ interface Sale {
       path?: string;
       signedAt?: string;
       sessionId?: string;
+      signerName?: string;
+      signerDni?: string;
     } | null;
 }
 

@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { database, storage } from "@/lib/firebase"
 import { ref as databaseRef, onValue, update, get } from "firebase/database"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -35,6 +37,8 @@ function MobileSignatureContent() {
   const [saleId, setSaleId] = useState<string | null>(null)
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
   const [sessionRefPath, setSessionRefPath] = useState<string | null>(null)
+  const [signerName, setSignerName] = useState("")
+  const [signerDni, setSignerDni] = useState("")
 
   useEffect(() => {
     if (!sessionId) return
@@ -93,6 +97,8 @@ function MobileSignatureContent() {
       setReceiptNumber(sessionData.receiptNumber ?? null)
       setSaleId(sessionData.saleId ?? null)
       setSignatureUrl(sessionData.signature?.url ?? null)
+      setSignerName((prev) => prev || sessionData.signature?.signerName || "")
+      setSignerDni((prev) => prev || sessionData.signature?.signerDni || "")
     })
 
     update(sessionRef, {
@@ -191,6 +197,10 @@ function MobileSignatureContent() {
       toast.error("La sesión de firma no está lista. Intentá nuevamente.")
       return
     }
+    if (!signerName.trim() || !signerDni.trim()) {
+      toast.error("Completá DNI y aclaración antes de guardar.")
+      return
+    }
 
     setIsSaving(true)
     try {
@@ -201,8 +211,6 @@ function MobileSignatureContent() {
 
       const exportCtx = exportCanvas.getContext("2d")
       if (!exportCtx) throw new Error("No se pudo preparar la firma.")
-      exportCtx.fillStyle = "#FFFFFF"
-      exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height)
       exportCtx.drawImage(canvas, 0, 0)
 
       const signatureBlob = await new Promise<Blob | null>((resolve) =>
@@ -222,6 +230,8 @@ function MobileSignatureContent() {
         path: storagePath,
         signedAt: new Date().toISOString(),
         uploadedBy: "mobile",
+        signerName: signerName.trim(),
+        signerDni: signerDni.trim(),
       }
 
       const sessionRef = databaseRef(database, sessionRefPath)
@@ -252,7 +262,7 @@ function MobileSignatureContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [hasSignature, saleId, sessionId, sessionRefPath, status])
+  }, [hasSignature, saleId, sessionId, sessionRefPath, signerDni, signerName, status])
 
   if (!sessionId) {
     return (
@@ -299,6 +309,30 @@ function MobileSignatureContent() {
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerLeave={handlePointerUp}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="signer-dni">DNI</Label>
+              <Input
+                id="signer-dni"
+                inputMode="numeric"
+                placeholder="Ingresá el DNI"
+                value={signerDni}
+                onChange={(event) => setSignerDni(event.target.value)}
+                disabled={status === "closed"}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signer-name">Aclaración (nombre y apellido)</Label>
+              <Input
+                id="signer-name"
+                placeholder="Ingresá nombre y apellido"
+                value={signerName}
+                onChange={(event) => setSignerName(event.target.value)}
+                disabled={status === "closed"}
               />
             </div>
           </div>
