@@ -43,6 +43,8 @@ interface Sale {
     path?: string;
     signedAt?: string;
     sessionId?: string;
+    signerName?: string;
+    signerDni?: string;
   } | null;
 }
 
@@ -194,7 +196,7 @@ export const generateSaleReceiptPdf = async (completedSale: Sale) => {
     
     drawSalePdfContent(firstPage, completedSale, { helveticaFont, helveticaBold });
     if (completedSale.signature?.url) {
-      await drawSaleSignature(firstPage, pdfDoc, completedSale.signature.url, helveticaFont);
+      await drawSaleSignature(firstPage, pdfDoc, completedSale.signature, helveticaFont);
     }
 
     if (pdfDoc.getPageCount() > 1) {
@@ -366,11 +368,11 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
 const drawSaleSignature = async (
   page: any,
   pdfDoc: PDFDocument,
-  signatureUrl: string,
+  signature: NonNullable<Sale["signature"]>,
   font: PDFFont
 ) => {
   try {
-    const response = await fetch(signatureUrl);
+    const response = await fetch(signature.url);
     if (!response.ok) {
       throw new Error(`No se pudo descargar la firma (${response.status}).`);
     }
@@ -396,6 +398,30 @@ const drawSaleSignature = async (
       width: maxWidth,
       height: scaledHeight,
     });
+
+    const signerName = signature.signerName?.trim();
+    const signerDni = signature.signerDni?.trim();
+    if (signerName || signerDni) {
+      const metaStartY = y - 12;
+      if (signerName) {
+        page.drawText(`Aclaración: ${signerName}`, {
+          x,
+          y: metaStartY,
+          size: 9,
+          font,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+      }
+      if (signerDni) {
+        page.drawText(`DNI: ${signerDni}`, {
+          x,
+          y: metaStartY - 12,
+          size: 9,
+          font,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+      }
+    }
   } catch (error) {
     console.warn("No se pudo insertar la firma en el PDF:", error);
   }
