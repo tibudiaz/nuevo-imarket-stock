@@ -6,12 +6,11 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { auth, database, storage } from "@/lib/firebase"
+import { database, storage } from "@/lib/firebase"
 import { ref as databaseRef, onValue, update, get } from "firebase/database"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
 import { Loader2, PencilLine, RotateCcw, Save } from "lucide-react"
 import { toast } from "sonner"
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
 
 function MobileSignatureFallback() {
   return (
@@ -35,80 +34,12 @@ function MobileSignatureContent() {
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null)
   const [saleId, setSaleId] = useState<string | null>(null)
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
-  const [isValidSession, setIsValidSession] = useState(true)
-  const [isCheckingSession, setIsCheckingSession] = useState(true)
-  const [isAuthReady, setIsAuthReady] = useState(false)
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [authBypassed, setAuthBypassed] = useState(false)
   const [sessionRefPath, setSessionRefPath] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!sessionId) return
+
     let isMounted = true
-
-    const enableAuthBypass = (reason?: string) => {
-      if (reason) {
-        console.warn(reason)
-      }
-      if (!isMounted) return
-      setAuthBypassed(true)
-      setIsAuthReady(true)
-      setAuthError(null)
-    }
-
-    if (!auth?.app) {
-      enableAuthBypass("Firebase Auth no se inicializó; habilitando modo sin autenticación.")
-      return () => {
-        isMounted = false
-      }
-    }
-
-    if (typeof window !== "undefined" && window.isSecureContext === false) {
-      enableAuthBypass("Se detectó un contexto inseguro; continuando sin sesión segura.")
-      return () => {
-        isMounted = false
-      }
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!isMounted) return
-      if (user) {
-        setIsAuthReady(true)
-        setAuthError(null)
-      }
-    })
-
-    const attemptAnonymousSignIn = async (attempt = 1) => {
-      if (!isMounted) return
-      if (auth.currentUser) {
-        setIsAuthReady(true)
-        setAuthError(null)
-        return
-      }
-
-      try {
-        await signInAnonymously(auth)
-      } catch (error) {
-        console.error("No se pudo autenticar la sesión anónima:", error)
-        if (attempt < 3) {
-          setTimeout(() => attemptAnonymousSignIn(attempt + 1), 500 * attempt)
-        } else if (isMounted) {
-          enableAuthBypass("Fallo repetido al autenticar; habilitando modo sin autenticación.")
-        }
-      }
-    }
-
-    attemptAnonymousSignIn()
-
-    return () => {
-      isMounted = false
-      unsubscribe()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!sessionId || !isAuthReady) return
-    let isMounted = true
-
     const primaryPath = `saleSignatureSessions/${sessionId}`
     const fallbackPath = `sales/${sessionId}/signatureSession`
 
@@ -117,8 +48,6 @@ function MobileSignatureContent() {
         const primarySnapshot = await get(databaseRef(database, primaryPath))
         if (primarySnapshot.exists()) {
           if (!isMounted) return
-          setIsValidSession(true)
-          setIsCheckingSession(false)
           setSessionRefPath(primaryPath)
           return
         }
@@ -126,21 +55,15 @@ function MobileSignatureContent() {
         const fallbackSnapshot = await get(databaseRef(database, fallbackPath))
         if (fallbackSnapshot.exists()) {
           if (!isMounted) return
-          setIsValidSession(true)
-          setIsCheckingSession(false)
           setSessionRefPath(fallbackPath)
           return
         }
-
-        if (!isMounted) return
-        setIsValidSession(false)
-        setIsCheckingSession(false)
       } catch (error) {
-        console.error("Error al verificar la sesión de firma:", error)
-        if (!isMounted) return
-        setIsValidSession(false)
-        setIsCheckingSession(false)
+        console.warn("No se pudo validar la sesión de firma, se continúa con la ruta principal.", error)
       }
+
+      if (!isMounted) return
+      setSessionRefPath(primaryPath)
     }
 
     resolveSession()
@@ -148,7 +71,12 @@ function MobileSignatureContent() {
     return () => {
       isMounted = false
     }
-  }, [sessionId, isAuthReady])
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!sessionId || sessionRefPath) return
+    setSessionRefPath(`saleSignatureSessions/${sessionId}`)
+  }, [sessionId, sessionRefPath])
 
   useEffect(() => {
     if (!sessionRefPath) return
@@ -156,7 +84,6 @@ function MobileSignatureContent() {
     const sessionRef = databaseRef(database, sessionRefPath)
     const unsubscribe = onValue(sessionRef, (snapshot) => {
       if (!snapshot.exists()) {
-        setIsValidSession(false)
         setStatus("pending")
         setSignatureUrl(null)
         return
@@ -260,10 +187,6 @@ function MobileSignatureContent() {
       toast.error("Agregá una firma antes de guardar.")
       return
     }
-    if (!isAuthReady) {
-      toast.error("La sesión segura aún no está lista. Espera unos segundos.")
-      return
-    }
     if (!sessionRefPath) {
       toast.error("La sesión de firma no está lista. Intentá nuevamente.")
       return
@@ -329,7 +252,7 @@ function MobileSignatureContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [hasSignature, isAuthReady, saleId, sessionId, sessionRefPath, status])
+  }, [hasSignature, saleId, sessionId, sessionRefPath, status])
 
   if (!sessionId) {
     return (
@@ -337,41 +260,6 @@ function MobileSignatureContent() {
         <Alert>
           <AlertTitle>Sesión inválida</AlertTitle>
           <AlertDescription>No se encontró la sesión de firma solicitada.</AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
-  if (authError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <Alert variant="destructive">
-          <AlertTitle>No se pudo iniciar la sesión segura</AlertTitle>
-          <AlertDescription>{authError}</AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
-  if (isCheckingSession) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Verificando sesión...
-        </div>
-      </div>
-    )
-  }
-
-  if (!isValidSession) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <Alert>
-          <AlertTitle>Sesión expirada o inexistente</AlertTitle>
-          <AlertDescription>
-            La sesión de firma no está disponible. Solicitá un nuevo QR desde el sistema de ventas.
-          </AlertDescription>
         </Alert>
       </div>
     )
@@ -389,15 +277,6 @@ function MobileSignatureContent() {
           )}
         </CardHeader>
         <CardContent className="space-y-4">
-          {authBypassed && (
-            <Alert>
-              <AlertTitle>Conexión sin autenticación</AlertTitle>
-              <AlertDescription>
-                Detectamos un contexto sin autenticación segura. La firma se guardará igual, pero se recomienda usar HTTPS.
-              </AlertDescription>
-            </Alert>
-          )}
-
           {status === "closed" && (
             <Alert variant="destructive">
               <AlertTitle>Sesión cerrada</AlertTitle>
