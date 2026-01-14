@@ -40,6 +40,7 @@ function MobileSignatureContent() {
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [authBypassed, setAuthBypassed] = useState(false)
+  const [sessionRefPath, setSessionRefPath] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -106,25 +107,53 @@ function MobileSignatureContent() {
 
   useEffect(() => {
     if (!sessionId || !isAuthReady) return
+    let isMounted = true
 
-    const sessionRef = databaseRef(database, `saleSignatureSessions/${sessionId}`)
+    const primaryPath = `saleSignatureSessions/${sessionId}`
+    const fallbackPath = `sales/${sessionId}/signatureSession`
 
-    get(sessionRef)
-      .then((snapshot) => {
-        if (!snapshot.exists()) {
-          setIsValidSession(false)
+    const resolveSession = async () => {
+      try {
+        const primarySnapshot = await get(databaseRef(database, primaryPath))
+        if (primarySnapshot.exists()) {
+          if (!isMounted) return
+          setIsValidSession(true)
           setIsCheckingSession(false)
+          setSessionRefPath(primaryPath)
           return
         }
-        setIsValidSession(true)
-        setIsCheckingSession(false)
-      })
-      .catch((error) => {
-        console.error("Error al verificar la sesión de firma:", error)
+
+        const fallbackSnapshot = await get(databaseRef(database, fallbackPath))
+        if (fallbackSnapshot.exists()) {
+          if (!isMounted) return
+          setIsValidSession(true)
+          setIsCheckingSession(false)
+          setSessionRefPath(fallbackPath)
+          return
+        }
+
+        if (!isMounted) return
         setIsValidSession(false)
         setIsCheckingSession(false)
-      })
+      } catch (error) {
+        console.error("Error al verificar la sesión de firma:", error)
+        if (!isMounted) return
+        setIsValidSession(false)
+        setIsCheckingSession(false)
+      }
+    }
 
+    resolveSession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [sessionId, isAuthReady])
+
+  useEffect(() => {
+    if (!sessionRefPath) return
+
+    const sessionRef = databaseRef(database, sessionRefPath)
     const unsubscribe = onValue(sessionRef, (snapshot) => {
       if (!snapshot.exists()) {
         setIsValidSession(false)
@@ -144,7 +173,7 @@ function MobileSignatureContent() {
     }).catch(() => null)
 
     return () => unsubscribe()
-  }, [sessionId, isAuthReady])
+  }, [sessionRefPath])
 
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -235,6 +264,10 @@ function MobileSignatureContent() {
       toast.error("La sesión segura aún no está lista. Espera unos segundos.")
       return
     }
+    if (!sessionRefPath) {
+      toast.error("La sesión de firma no está lista. Intentá nuevamente.")
+      return
+    }
 
     setIsSaving(true)
     try {
@@ -268,7 +301,7 @@ function MobileSignatureContent() {
         uploadedBy: "mobile",
       }
 
-      const sessionRef = databaseRef(database, `saleSignatureSessions/${sessionId}`)
+      const sessionRef = databaseRef(database, sessionRefPath)
       await update(sessionRef, {
         status: "signed",
         signature: signatureData,
@@ -296,7 +329,7 @@ function MobileSignatureContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [hasSignature, isAuthReady, saleId, sessionId, status])
+  }, [hasSignature, isAuthReady, saleId, sessionId, sessionRefPath, status])
 
   if (!sessionId) {
     return (
