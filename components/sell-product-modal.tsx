@@ -162,6 +162,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [signatureStatus, setSignatureStatus] = useState<string>("pending")
   const [signatureData, setSignatureData] = useState<Sale["signature"]>(null)
   const [signatureOrigin, setSignatureOrigin] = useState<string>("")
+  const [signatureSessionError, setSignatureSessionError] = useState<string | null>(null)
 
   const [cart, setCart] = useState<CartProduct[]>([])
   const [allProducts, setAllProducts] = useState<CartProduct[]>([])
@@ -282,6 +283,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setSignatureLink("")
       setSignatureStatus("pending")
       setSignatureData(null)
+      setSignatureSessionError(null)
     }
   }, [isOpen])
 
@@ -625,8 +627,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const pointsEarned = useMemo(() => (pointsPaused ? 0 : Math.floor(finalTotal / pointEarnRate)), [finalTotal, pointEarnRate, pointsPaused]);
 
   const startSignatureSession = useCallback(async (sale: Sale) => {
+    setSignatureSessionError(null)
+    setSignatureSessionId(null)
+    setSignatureQrDataUrl("")
+    setSignatureLink("")
     const newSessionId = generateSignatureSessionId()
-    setSignatureSessionId(newSessionId)
     const sessionRef = ref(database, `saleSignatureSessions/${newSessionId}`)
     await set(sessionRef, {
       createdAt: new Date().toISOString(),
@@ -637,6 +642,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       createdBy: user?.username ?? null,
       pendingSignature: true,
     })
+    setSignatureSessionId(newSessionId)
     setIsSignatureDialogOpen(true)
   }, [generateSignatureSessionId, user?.username])
 
@@ -847,7 +853,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           toast.error("No se pudo iniciar la firma", {
             description: "Se continuará sin captura de firma.",
           });
-          setIsPdfDialogOpen(true);
+          setSignatureSessionError("No se pudo iniciar la sesión de firma. Revisá la conexión e intentá nuevamente.");
+          setIsSignatureDialogOpen(true);
         }
 
     } catch (error) {
@@ -1055,6 +1062,16 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
   }
 
+  const handleRetrySignatureSession = async () => {
+    if (!completedSale) return
+    try {
+      await startSignatureSession(completedSale)
+    } catch (error) {
+      console.error("No se pudo iniciar la sesión de firma:", error)
+      setSignatureSessionError("No se pudo iniciar la sesión de firma. Revisá la conexión e intentá nuevamente.")
+    }
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1248,6 +1265,17 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {signatureSessionError && (
+                <Alert variant="destructive">
+                  <AlertTitle>No se pudo iniciar la firma</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>{signatureSessionError}</p>
+                    <Button type="button" variant="outline" onClick={handleRetrySignatureSession}>
+                      Reintentar generar QR
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
               <Alert>
                 <Smartphone className="h-4 w-4" />
                 <AlertTitle>Conectá el dispositivo</AlertTitle>
