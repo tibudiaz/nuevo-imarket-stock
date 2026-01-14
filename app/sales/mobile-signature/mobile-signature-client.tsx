@@ -354,7 +354,7 @@ function MobileSignatureContent() {
             <div className="rounded-md border bg-white p-2">
               <canvas
                 ref={canvasRef}
-                className={`h-44 w-full touch-none rounded-md bg-white ${signatureLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                className={`h-32 w-full touch-none rounded-md bg-white ${signatureLocked ? "cursor-not-allowed opacity-60" : ""}`}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -363,7 +363,7 @@ function MobileSignatureContent() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-x-[30px]">
             <div className="space-y-2">
               <Label htmlFor="signer-dni">DNI</Label>
               <Input
