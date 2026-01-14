@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import Image from "next/image"
 import { ref, set, push, get, update, onValue, query, orderByChild, equalTo, remove, runTransaction } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -15,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone, Mail, Calendar, Gift } from "lucide-react"
+import { Loader2, Search, FileText, Trash2, Plus, Minus, DollarSign, User, Phone, Mail, Calendar, Gift, Copy, Smartphone } from "lucide-react"
 import { toast } from "sonner"
 import { generateSaleReceiptPdf, generateReserveReceiptPdf } from "@/lib/pdf-generator"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -24,6 +25,10 @@ import { shouldRemoveProductFromInventory } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import QRCode from "qrcode"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useAuth } from "@/hooks/use-auth"
+import { getAppBaseUrl } from "@/lib/base-url"
 
 // --- Interfaces para Tipado Fuerte ---
 interface CartProduct {
@@ -80,6 +85,12 @@ interface Sale {
     reserveId?: string;
     reserveReceiptNumber?: string;
     reserveDownPayment?: number;
+    signature?: {
+      url: string;
+      path?: string;
+      signedAt?: string;
+      sessionId?: string;
+    } | null;
 }
 
 // Interfaz para los datos de la reserva
@@ -144,6 +155,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [reserveExpirationDate, setReserveExpirationDate] = useState("")
   const [receiptNumber, setReceiptNumber] = useState("")
   const [reservePdfCurrency, setReservePdfCurrency] = useState<"USD" | "ARS">("USD")
+  const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false)
+  const [signatureSessionId, setSignatureSessionId] = useState<string | null>(null)
+  const [signatureQrDataUrl, setSignatureQrDataUrl] = useState<string>("")
+  const [signatureLink, setSignatureLink] = useState<string>("")
+  const [signatureStatus, setSignatureStatus] = useState<string>("pending")
+  const [signatureData, setSignatureData] = useState<Sale["signature"]>(null)
+  const [signatureOrigin, setSignatureOrigin] = useState<string>("")
 
   const [cart, setCart] = useState<CartProduct[]>([])
   const [allProducts, setAllProducts] = useState<CartProduct[]>([])
@@ -163,8 +181,21 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const reservePrefilledId = useRef<string | null>(null);
   const pdfChoiceRef = useRef(false);
   const closingPdfDialogRef = useRef(false);
+  const { user } = useAuth()
 
   const isCompletingReserve = !!reserveToComplete;
+
+  const generateSignatureSessionId = () => {
+    if (
+      typeof globalThis !== "undefined" &&
+      typeof globalThis.crypto !== "undefined" &&
+      typeof globalThis.crypto.randomUUID === "function"
+    ) {
+      return globalThis.crypto.randomUUID();
+    }
+
+    return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
 
   useEffect(() => {
     if (paymentMethod !== "multiple") {
@@ -242,6 +273,65 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       reservePrefilledId.current = null;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsSignatureDialogOpen(false)
+      setSignatureSessionId(null)
+      setSignatureQrDataUrl("")
+      setSignatureLink("")
+      setSignatureStatus("pending")
+      setSignatureData(null)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    const resolvedOrigin = getAppBaseUrl()
+    setSignatureOrigin(resolvedOrigin)
+  }, [])
+
+  useEffect(() => {
+    if (!signatureSessionId || !signatureOrigin) {
+      setSignatureQrDataUrl("")
+      setSignatureLink("")
+      return
+    }
+
+    const link = `${signatureOrigin}/sales/mobile-signature?sessionId=${signatureSessionId}`
+    setSignatureLink(link)
+    QRCode.toDataURL(link, { width: 300 })
+      .then(setSignatureQrDataUrl)
+      .catch((error) => {
+        console.error("No se pudo generar el código QR de firma", error)
+      })
+  }, [signatureOrigin, signatureSessionId])
+
+  useEffect(() => {
+    if (!signatureSessionId) return
+
+    const sessionRef = ref(database, `saleSignatureSessions/${signatureSessionId}`)
+    const unsubscribe = onValue(sessionRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setSignatureStatus("pending")
+        setSignatureData(null)
+        return
+      }
+      const sessionData = snapshot.val()
+      setSignatureStatus(sessionData.status || "pending")
+      if (sessionData.signature?.url) {
+        const signaturePayload = {
+          url: sessionData.signature.url as string,
+          path: sessionData.signature.path as string | undefined,
+          signedAt: sessionData.signature.signedAt as string | undefined,
+          sessionId: signatureSessionId,
+        }
+        setSignatureData(signaturePayload)
+        setCompletedSale((prev) => (prev ? { ...prev, signature: signaturePayload } : prev))
+      }
+    })
+
+    return () => unsubscribe()
+  }, [signatureSessionId])
 
   useEffect(() => {
     if (!isOpen || !reserveToComplete) {
@@ -534,6 +624,22 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const finalTotal = useMemo(() => totalAmountInARS - discount, [totalAmountInARS, discount]);
   const pointsEarned = useMemo(() => (pointsPaused ? 0 : Math.floor(finalTotal / pointEarnRate)), [finalTotal, pointEarnRate, pointsPaused]);
 
+  const startSignatureSession = useCallback(async (sale: Sale) => {
+    const newSessionId = generateSignatureSessionId()
+    setSignatureSessionId(newSessionId)
+    const sessionRef = ref(database, `saleSignatureSessions/${newSessionId}`)
+    await set(sessionRef, {
+      createdAt: new Date().toISOString(),
+      status: "pending",
+      saleId: sale.id,
+      receiptNumber: sale.receiptNumber,
+      store: sale.store ?? null,
+      createdBy: user?.username ?? null,
+      pendingSignature: true,
+    })
+    setIsSignatureDialogOpen(true)
+  }, [generateSignatureSessionId, user?.username])
+
   const handleSellProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
         toast.error("Faltan datos del cliente", { description: "Por favor, complete nombre, DNI y teléfono." });
@@ -731,8 +837,18 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
 
         setCompletedSale(saleData);
+        setSignatureData(null);
+        setSignatureStatus("pending");
         toast.success("Venta completada con éxito.");
-        setIsPdfDialogOpen(true);
+        try {
+          await startSignatureSession(saleData);
+        } catch (error) {
+          console.error("No se pudo iniciar la sesión de firma:", error);
+          toast.error("No se pudo iniciar la firma", {
+            description: "Se continuará sin captura de firma.",
+          });
+          setIsPdfDialogOpen(true);
+        }
 
     } catch (error) {
         toast.error("Error al completar la venta", { description: (error as Error).message });
@@ -914,6 +1030,31 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     onClose();
   };
 
+  const handleCloseSignatureDialog = async (goToPdf: boolean) => {
+    if (signatureSessionId) {
+      const sessionRef = ref(database, `saleSignatureSessions/${signatureSessionId}`)
+      await update(sessionRef, {
+        status: "closed",
+        closedAt: new Date().toISOString(),
+      }).catch(() => null)
+    }
+    setIsSignatureDialogOpen(false)
+    if (goToPdf) {
+      setIsPdfDialogOpen(true)
+    }
+  }
+
+  const handleCopySignatureLink = async () => {
+    if (!signatureLink) return
+    try {
+      await navigator.clipboard.writeText(signatureLink)
+      toast.success("Enlace copiado")
+    } catch (error) {
+      console.error("No se pudo copiar el enlace", error)
+      toast.error("No se pudo copiar el enlace")
+    }
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1090,6 +1231,101 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {completedSale && (
+        <Dialog
+          open={isSignatureDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) return;
+            setIsSignatureDialogOpen(true);
+          }}
+        >
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Firma del cliente</DialogTitle>
+              <DialogDescription>
+                Antes de generar el PDF podés solicitar la firma desde otra tablet o celular.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Alert>
+                <Smartphone className="h-4 w-4" />
+                <AlertTitle>Conectá el dispositivo</AlertTitle>
+                <AlertDescription>
+                  Escaneá el QR o abrí el enlace para dibujar la firma del cliente.
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex h-40 w-40 items-center justify-center rounded-md border bg-muted">
+                  {signatureQrDataUrl ? (
+                    <Image
+                      src={signatureQrDataUrl}
+                      alt="Código QR para firma"
+                      width={160}
+                      height={160}
+                      className="h-36 w-36"
+                    />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Generando QR...</span>
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>Enlace para firmar</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={signatureLink || "Generando enlace..."} />
+                    <Button type="button" variant="outline" size="icon" onClick={handleCopySignatureLink} disabled={!signatureLink}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Compartí este enlace con la tablet o celular del cliente.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Estado de la firma</Label>
+                <div className="rounded-md border p-3">
+                  {signatureData?.url ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-green-600">Firma recibida.</p>
+                      <div className="rounded-md border bg-white p-2">
+                        <Image
+                          src={signatureData.url}
+                          alt="Firma del cliente"
+                          width={320}
+                          height={160}
+                          className="h-28 w-full object-contain"
+                        />
+                      </div>
+                      {signatureData.signedAt && (
+                        <p className="text-xs text-muted-foreground">
+                          Firmado el {new Date(signatureData.signedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {signatureStatus === "closed"
+                        ? "La sesión de firma fue cerrada."
+                        : "Esperando la firma del cliente..."}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => handleCloseSignatureDialog(true)}>
+                Omitir firma
+              </Button>
+              <Button onClick={() => handleCloseSignatureDialog(true)} disabled={!signatureData?.url}>
+                Continuar al PDF
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       
       {completedSale && (
         <Dialog

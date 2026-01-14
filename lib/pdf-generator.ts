@@ -38,6 +38,12 @@ interface Sale {
   store?: 'local1' | 'local2';
   paymentMethod?: string;
   usdtAmount?: number;
+  signature?: {
+    url: string;
+    path?: string;
+    signedAt?: string;
+    sessionId?: string;
+  } | null;
 }
 
 interface Repair {
@@ -187,6 +193,9 @@ export const generateSaleReceiptPdf = async (completedSale: Sale) => {
     const firstPage = pdfDoc.getPages()[0];
     
     drawSalePdfContent(firstPage, completedSale, { helveticaFont, helveticaBold });
+    if (completedSale.signature?.url) {
+      await drawSaleSignature(firstPage, pdfDoc, completedSale.signature.url, helveticaFont);
+    }
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
@@ -353,6 +362,44 @@ const drawSalePdfContent = (page: any, saleData: Sale, fonts: Fonts) => {
 
     page.drawText(`${formatCurrencyForPdf(finalAmount)}`, { ...positions.precioFinal, size: 12, font: helveticaBold });
 }
+
+const drawSaleSignature = async (
+  page: any,
+  pdfDoc: PDFDocument,
+  signatureUrl: string,
+  font: PDFFont
+) => {
+  try {
+    const response = await fetch(signatureUrl);
+    if (!response.ok) {
+      throw new Error(`No se pudo descargar la firma (${response.status}).`);
+    }
+    const imageBytes = await response.arrayBuffer();
+    const signatureImage = await pdfDoc.embedPng(imageBytes);
+
+    const maxWidth = 160;
+    const scale = maxWidth / signatureImage.width;
+    const scaledHeight = signatureImage.height * scale;
+    const x = 65;
+    const y = 110;
+
+    page.drawText("Firma del cliente", {
+      x,
+      y: y + scaledHeight + 6,
+      size: 9,
+      font,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+    page.drawImage(signatureImage, {
+      x,
+      y,
+      width: maxWidth,
+      height: scaledHeight,
+    });
+  } catch (error) {
+    console.warn("No se pudo insertar la firma en el PDF:", error);
+  }
+};
 
 
 // --- Generador de PDF para Reparaciones (Presupuesto) ---
