@@ -177,7 +177,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [signatureSessionRefPath, setSignatureSessionRefPath] = useState<string>("")
   const [signatureSessionError, setSignatureSessionError] = useState<string | null>(null)
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
-  const [cancelCountdown, setCancelCountdown] = useState(10)
   const [hasCancelRequest, setHasCancelRequest] = useState(false)
 
   const [cart, setCart] = useState<CartProduct[]>([])
@@ -198,7 +197,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const reservePrefilledId = useRef<string | null>(null);
   const pdfChoiceRef = useRef(false);
   const closingPdfDialogRef = useRef(false);
-  const cancelCountdownRef = useRef<NodeJS.Timeout | null>(null)
   const { user } = useAuth()
 
   const isCompletingReserve = !!reserveToComplete;
@@ -351,7 +349,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setSignatureStatus(nextStatus)
       if (nextStatus === "cancel_requested" && !hasCancelRequest) {
         setHasCancelRequest(true)
-        setCancelCountdown(10)
         setIsCancelDialogOpen(true)
       }
       if (sessionData.signature?.url) {
@@ -370,37 +367,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
     return () => unsubscribe()
   }, [hasCancelRequest, signatureSessionId, signatureSessionRefPath])
-
-  useEffect(() => {
-    if (!isCancelDialogOpen) {
-      if (cancelCountdownRef.current) {
-        clearInterval(cancelCountdownRef.current)
-        cancelCountdownRef.current = null
-      }
-      return
-    }
-
-    setCancelCountdown(10)
-    cancelCountdownRef.current = setInterval(() => {
-      setCancelCountdown((prev) => {
-        if (prev <= 1) {
-          if (cancelCountdownRef.current) {
-            clearInterval(cancelCountdownRef.current)
-            cancelCountdownRef.current = null
-          }
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => {
-      if (cancelCountdownRef.current) {
-        clearInterval(cancelCountdownRef.current)
-        cancelCountdownRef.current = null
-      }
-    }
-  }, [isCancelDialogOpen])
 
   useEffect(() => {
     if (!isOpen || !reserveToComplete) {
@@ -1548,9 +1514,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           <AlertDialogHeader>
             <AlertDialogTitle>Solicitud de cancelación</AlertDialogTitle>
             <AlertDialogDescription>
-              El cliente solicitó cancelar la operación. La venta se cancelará en{" "}
-              <span className="font-semibold text-slate-900">{cancelCountdown}</span>{" "}
-              segundos si confirmás la cancelación.
+              El cliente solicitó cancelar la operación. Confirmá si querés cancelar la venta o
+              continuar con la operación.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
