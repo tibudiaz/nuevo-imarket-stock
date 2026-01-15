@@ -45,6 +45,13 @@ function MobileSignatureContent() {
   const [disclaimerType, setDisclaimerType] = useState<"new" | "used" | null>(null)
   const [isCanceling, setIsCanceling] = useState(false)
 
+  const normalizeCategory = useCallback((value: string) => {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+  }, [])
+
   const signatureLocked = status === "closed" || status === "signed" || Boolean(signatureUrl)
 
   useEffect(() => {
@@ -129,14 +136,20 @@ function MobileSignatureContent() {
         const saleData = saleSnapshot.val()
         const items = Array.isArray(saleData.items) ? saleData.items : []
         const normalizedCategories = items
-          .map((item: { category?: string }) => (item.category || "").toLowerCase())
+          .map((item: { category?: string }) => normalizeCategory(item.category || ""))
           .filter(Boolean)
 
-        if (normalizedCategories.some((category: string) => category.includes("celulares usados"))) {
+        const hasUsed = normalizedCategories.some(
+          (category: string) => category.includes("celular") && category.includes("usad"),
+        )
+        if (hasUsed) {
           setDisclaimerType("used")
           return
         }
-        if (normalizedCategories.some((category: string) => category.includes("celulares nuevos"))) {
+        const hasNew = normalizedCategories.some(
+          (category: string) => category.includes("celular") && category.includes("nuevo"),
+        )
+        if (hasNew) {
           setDisclaimerType("new")
           return
         }
@@ -151,7 +164,7 @@ function MobileSignatureContent() {
     return () => {
       isMounted = false
     }
-  }, [saleId])
+  }, [normalizeCategory, saleId])
 
   useEffect(() => {
     if (signatureUrl) {
@@ -430,8 +443,8 @@ function MobileSignatureContent() {
 
   const disclaimerContent =
     disclaimerType === "used"
-      ? "iPhone Market le recuerda que los equipos usados cuentan con garantia válida por un período de 30 días de corridos a partir de la fecha del presente recibo. La cobertura de la garantía se extiende a posibles fallas que sucedan en el equipo dentro del periodo de tiempo establecido, se excluye terminantemente aquellos daños o fallas resultantes del mal uso del dispositivo, aquellos que sean consecuencias de golpes o por exposición al agua.- *Accesorios que se entreguen con el equipo cuentan con 15 dias de garantia a partir de la fecha del presente recibo.-"
-      : "Por la presente, el cliente declara haber adquirido un teléfono nuevo, en caja sellada, sin uso previo, en perfectas condiciones estéticas y funcionales. El equipo cuenta con garantía oficial de fábrica por el término de 1 (un) año, la cual deberá ser gestionada exclusivamente ante los canales oficiales de Apple, conforme a las políticas del fabricante. El cliente entiende y acepta que iMarket no brinda garantía propia ni se responsabiliza por fallas de fabricación, quedando exento de cualquier reclamo vinculado a defectos cubiertos por la garantía oficial."
+      ? "iPhone Market le recuerda que los equipos usados cuentan con garantia válida por un período de\n30 días de corridos a partir de la fecha del presente recibo. La cobertura de la garantía se extiende\na posibles fallas que sucedan en el equipo dentro del periodo de tiempo establecido, se excluye\nterminantemente aquellos daños o fallas resultantes del mal uso del dispositivo, aquellos que sean\nconsecuencias de golpes o por exposición al agua.- *Accesorios que se entreguen con el equipo\ncuentan con 15 dias de garantia a partir de la fecha del presente recibo.-"
+      : "Por la presente, el cliente declara haber adquirido un teléfono nuevo, en caja sellada, sin uso\nprevio, en perfectas condiciones estéticas y funcionales.\nEl equipo cuenta con garantía oficial de fábrica por el término de 1 (un) año, la cual deberá ser\ngestionada exclusivamente ante los canales oficiales de Apple, conforme a las políticas del\nfabricante.\nEl cliente entiende y acepta que iMarket no brinda garantía propia ni se responsabiliza por fallas de\nfabricación, quedando exento de cualquier reclamo vinculado a defectos cubiertos por la garantía\noficial."
 
   return (
     <div className="min-h-screen bg-muted/40 p-4">
@@ -481,7 +494,9 @@ function MobileSignatureContent() {
                     Condiciones de la compra
                   </h2>
                 </div>
-                <p className="text-sm leading-relaxed text-slate-700">{disclaimerContent}</p>
+                <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
+                  {disclaimerContent}
+                </p>
               </div>
               <div className="mt-6 flex items-center justify-between">
                 <Button type="button" variant="outline" onClick={handleCancelDisclaimer} disabled={isCanceling}>
