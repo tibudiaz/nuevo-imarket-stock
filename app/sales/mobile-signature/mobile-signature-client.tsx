@@ -41,6 +41,9 @@ function MobileSignatureContent() {
   const [signerName, setSignerName] = useState("")
   const [signerDni, setSignerDni] = useState("")
   const [showThanks, setShowThanks] = useState(false)
+  const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = useState(false)
+  const [disclaimerType, setDisclaimerType] = useState<"new" | "used" | null>(null)
+  const [isCanceling, setIsCanceling] = useState(false)
 
   const signatureLocked = status === "closed" || status === "signed" || Boolean(signatureUrl)
 
@@ -103,6 +106,9 @@ function MobileSignatureContent() {
       setSignatureUrl(sessionData.signature?.url ?? null)
       setSignerName((prev) => prev || sessionData.signature?.signerName || "")
       setSignerDni((prev) => prev || sessionData.signature?.signerDni || "")
+      if (sessionData.disclaimerAcceptedAt) {
+        setHasAcceptedDisclaimer(true)
+      }
     })
 
     update(sessionRef, {
@@ -111,6 +117,41 @@ function MobileSignatureContent() {
 
     return () => unsubscribe()
   }, [sessionRefPath])
+
+  useEffect(() => {
+    if (!saleId) return
+    let isMounted = true
+
+    const loadSaleCondition = async () => {
+      try {
+        const saleSnapshot = await get(databaseRef(database, `sales/${saleId}`))
+        if (!saleSnapshot.exists() || !isMounted) return
+        const saleData = saleSnapshot.val()
+        const items = Array.isArray(saleData.items) ? saleData.items : []
+        const normalizedCategories = items
+          .map((item: { category?: string }) => (item.category || "").toLowerCase())
+          .filter(Boolean)
+
+        if (normalizedCategories.some((category: string) => category.includes("celulares usados"))) {
+          setDisclaimerType("used")
+          return
+        }
+        if (normalizedCategories.some((category: string) => category.includes("celulares nuevos"))) {
+          setDisclaimerType("new")
+          return
+        }
+        setDisclaimerType(null)
+      } catch (error) {
+        console.warn("No se pudo cargar la condición del equipo:", error)
+      }
+    }
+
+    loadSaleCondition()
+
+    return () => {
+      isMounted = false
+    }
+  }, [saleId])
 
   useEffect(() => {
     if (signatureUrl) {
@@ -322,6 +363,44 @@ function MobileSignatureContent() {
     }
   }, [hasSignature, saleId, sessionId, sessionRefPath, signatureLocked, signerDni, signerName])
 
+  const handleAcceptDisclaimer = useCallback(async () => {
+    if (!sessionRefPath) {
+      setHasAcceptedDisclaimer(true)
+      return
+    }
+
+    try {
+      const sessionRef = databaseRef(database, sessionRefPath)
+      await update(sessionRef, {
+        disclaimerAcceptedAt: new Date().toISOString(),
+        disclaimerType: disclaimerType ?? null,
+      })
+      setHasAcceptedDisclaimer(true)
+    } catch (error) {
+      console.error("No se pudo registrar la aceptación del aviso:", error)
+      toast.error("No se pudo registrar la aceptación. Intentá nuevamente.")
+    }
+  }, [disclaimerType, sessionRefPath])
+
+  const handleCancelDisclaimer = useCallback(async () => {
+    if (!sessionRefPath || isCanceling) return
+    setIsCanceling(true)
+    try {
+      const sessionRef = databaseRef(database, sessionRefPath)
+      await update(sessionRef, {
+        status: "cancel_requested",
+        cancelRequestedAt: new Date().toISOString(),
+        cancelRequestedBy: "customer",
+      })
+      toast.message("Se avisó al vendedor para cancelar la operación.")
+    } catch (error) {
+      console.error("No se pudo solicitar la cancelación:", error)
+      toast.error("No se pudo solicitar la cancelación. Intentá nuevamente.")
+    } finally {
+      setIsCanceling(false)
+    }
+  }, [isCanceling, sessionRefPath])
+
   if (!sessionId) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -340,6 +419,19 @@ function MobileSignatureContent() {
     { left: "70%", top: "68%", delay: "0.9s" },
     { left: "50%", top: "38%", delay: "1.2s" },
   ]
+
+  const shouldShowDisclaimer =
+    !signatureLocked &&
+    !showThanks &&
+    !hasAcceptedDisclaimer &&
+    status !== "closed" &&
+    status !== "cancelled" &&
+    status !== "cancel_requested"
+
+  const disclaimerContent =
+    disclaimerType === "used"
+      ? "iPhone Market le recuerda que los equipos usados cuentan con garantia válida por un período de 30 días de corridos a partir de la fecha del presente recibo. La cobertura de la garantía se extiende a posibles fallas que sucedan en el equipo dentro del periodo de tiempo establecido, se excluye terminantemente aquellos daños o fallas resultantes del mal uso del dispositivo, aquellos que sean consecuencias de golpes o por exposición al agua.- *Accesorios que se entreguen con el equipo cuentan con 15 dias de garantia a partir de la fecha del presente recibo.-"
+      : "Por la presente, el cliente declara haber adquirido un teléfono nuevo, en caja sellada, sin uso previo, en perfectas condiciones estéticas y funcionales. El equipo cuenta con garantía oficial de fábrica por el término de 1 (un) año, la cual deberá ser gestionada exclusivamente ante los canales oficiales de Apple, conforme a las políticas del fabricante. El cliente entiende y acepta que iMarket no brinda garantía propia ni se responsabiliza por fallas de fabricación, quedando exento de cualquier reclamo vinculado a defectos cubiertos por la garantía oficial."
 
   return (
     <div className="min-h-screen bg-muted/40 p-4">
@@ -361,64 +453,108 @@ function MobileSignatureContent() {
               </AlertDescription>
             </Alert>
           )}
+          {status === "cancelled" && (
+            <Alert variant="destructive">
+              <AlertTitle>Operación cancelada</AlertTitle>
+              <AlertDescription>
+                La venta fue cancelada desde el sistema de ventas. Consultá con el vendedor.
+              </AlertDescription>
+            </Alert>
+          )}
+          {status === "cancel_requested" && (
+            <Alert>
+              <AlertTitle>Solicitud enviada</AlertTitle>
+              <AlertDescription>
+                Se avisó al vendedor para cancelar la operación. Esperá la confirmación.
+              </AlertDescription>
+            </Alert>
+          )}
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Firmá dentro del recuadro</span>
-              {signatureUrl && <span className="text-green-600">Firma registrada</span>}
+          {shouldShowDisclaimer && (
+            <div className="rounded-lg border bg-white p-4 shadow-sm">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Declaración del cliente
+                  </p>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Condiciones de la compra
+                  </h2>
+                </div>
+                <p className="text-sm leading-relaxed text-slate-700">{disclaimerContent}</p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <Button type="button" variant="outline" onClick={handleCancelDisclaimer} disabled={isCanceling}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleAcceptDisclaimer}>
+                  Aceptar
+                </Button>
+              </div>
             </div>
-            <div className="rounded-md border bg-white p-2">
-              <canvas
-                ref={canvasRef}
-                className={`h-32 w-full touch-none rounded-md bg-white ${signatureLocked ? "cursor-not-allowed opacity-60" : ""}`}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-x-[30px]">
-            <div className="space-y-2">
-              <Label htmlFor="signer-dni">DNI</Label>
-              <Input
-                id="signer-dni"
-                inputMode="numeric"
-                placeholder="Ingresá el DNI"
-                value={signerDni}
-                onChange={(event) => setSignerDni(event.target.value)}
-                disabled={signatureLocked}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="signer-name">Aclaración (nombre y apellido)</Label>
-              <Input
-                id="signer-name"
-                placeholder="Ingresá nombre y apellido"
-                value={signerName}
-                onChange={(event) => setSignerName(event.target.value)}
-                disabled={signatureLocked}
-              />
-            </div>
-          </div>
+          {!shouldShowDisclaimer && (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Firmá dentro del recuadro</span>
+                  {signatureUrl && <span className="text-green-600">Firma registrada</span>}
+                </div>
+                <div className="rounded-md border bg-white p-2">
+                  <canvas
+                    ref={canvasRef}
+                    className={`h-32 w-full touch-none rounded-md bg-white ${signatureLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                  />
+                </div>
+              </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={handleClear} disabled={signatureLocked}>
-              <RotateCcw className="mr-2 h-4 w-4" /> Limpiar
-            </Button>
-            <Button type="button" onClick={handleSave} disabled={signatureLocked || isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> Aceptar
-                </>
-              )}
-            </Button>
-          </div>
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-x-[30px]">
+                <div className="space-y-2">
+                  <Label htmlFor="signer-dni">DNI</Label>
+                  <Input
+                    id="signer-dni"
+                    inputMode="numeric"
+                    placeholder="Ingresá el DNI"
+                    value={signerDni}
+                    onChange={(event) => setSignerDni(event.target.value)}
+                    disabled={signatureLocked}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signer-name">Aclaración (nombre y apellido)</Label>
+                  <Input
+                    id="signer-name"
+                    placeholder="Ingresá nombre y apellido"
+                    value={signerName}
+                    onChange={(event) => setSignerName(event.target.value)}
+                    disabled={signatureLocked}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={handleClear} disabled={signatureLocked}>
+                  <RotateCcw className="mr-2 h-4 w-4" /> Limpiar
+                </Button>
+                <Button type="button" onClick={handleSave} disabled={signatureLocked || isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> Aceptar
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
 
           {signatureUrl && (
             <div className="space-y-2">
