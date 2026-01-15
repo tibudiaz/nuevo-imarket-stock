@@ -26,6 +26,7 @@ import type { RepairPhoto } from "@/types/repair";
 import { getAppBaseUrl } from "@/lib/base-url";
 import QRCode from "qrcode";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 
 // --- INTERFAZ UNIFICADA Y DEFINITIVA ---
 // Usando la misma estructura que la página principal para consistencia.
@@ -78,6 +79,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
   const [signatureSessionRefPath, setSignatureSessionRefPath] = useState<string>("");
   const [signatureSessionError, setSignatureSessionError] = useState<string | null>(null);
   const { selectedStore } = useStore();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (repair) {
@@ -179,7 +181,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
       repairId: repairData.id,
       receiptNumber: repairData.deliveryReceiptNumber || repairData.receiptNumber,
       store: repairData.store ?? null,
-      createdBy: null,
+      createdBy: user?.username ?? null,
       pendingSignature: true,
     };
 
@@ -189,7 +191,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
     setSignatureSessionId(newSessionId);
     setSignatureSessionRefPath(`repairSignatureSessions/${newSessionId}`);
     setIsSignatureDialogOpen(true);
-  }, []);
+  }, [user?.username]);
 
   const handleCloseSignatureDialog = async () => {
     if (signatureSessionRefPath) {
