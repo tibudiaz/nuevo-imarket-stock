@@ -122,8 +122,9 @@ function MobileSignatureContent() {
     if (!canvas || typeof window === "undefined") return
 
     const parent = canvas.parentElement
-    const width = parent?.clientWidth ?? 320
-    const height = 180
+    const rect = canvas.getBoundingClientRect()
+    const width = rect.width || parent?.clientWidth || 320
+    const height = rect.height || 180
     const ratio = window.devicePixelRatio || 1
 
     canvas.width = width * ratio
