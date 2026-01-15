@@ -382,8 +382,8 @@ const drawSaleSignature = async (
     const maxWidth = 112;
     const scale = maxWidth / signatureImage.width;
     const scaledHeight = signatureImage.height * scale;
-    const x = 65;
-    const y = 107;
+    const x = 80;
+    const y = 148;
     page.drawImage(signatureImage, {
       x,
       y,
@@ -394,27 +394,25 @@ const drawSaleSignature = async (
     const signerName = signature.signerName?.trim();
     const signerDni = signature.signerDni?.trim();
     if (signerName || signerDni) {
-      const textY = y + 9;
-      const nameX = x + maxWidth + 5;
+      const nameX = 232;
+      const dniX = 426;
+      const nameY = 148;
+      const dniY = 147;
       const textSize = 12;
-      const nameWidth = signerName
-        ? font.widthOfTextAtSize(signerName, textSize)
-        : 0;
 
       if (signerName) {
         page.drawText(signerName, {
           x: nameX,
-          y: textY,
+          y: nameY,
           size: textSize,
           font,
           color: rgb(0.2, 0.2, 0.2),
         });
       }
       if (signerDni) {
-        const dniX = (signerName ? nameX + nameWidth + 5 : nameX) + 45;
         page.drawText(signerDni, {
           x: dniX,
-          y: textY,
+          y: dniY,
           size: textSize,
           font,
           color: rgb(0.2, 0.2, 0.2),
