@@ -13,7 +13,6 @@ import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import AddRepairForm from "@/components/add-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
-import { generateRepairReceiptPdf } from "@/lib/pdf-generator"
 import { useStore } from "@/hooks/use-store"
 import type { RepairPhoto } from "@/types/repair"
 
@@ -41,6 +40,14 @@ interface Repair {
   store?: string;
   photos?: RepairPhoto[];
   uploadSessionId?: string;
+  signature?: {
+    url: string;
+    path?: string;
+    signedAt?: string;
+    sessionId?: string;
+    signerName?: string;
+    signerDni?: string;
+  } | null;
   [key: string]: any;
 }
 
@@ -103,7 +110,7 @@ export default function RepairsPage() {
     repairData: RepairFormData,
     customerData: CustomerData,
     options?: { photos?: RepairPhoto[]; sessionId?: string }
-  ) => {
+  ): Promise<Repair> => {
     try {
       const customersRef = ref(database, "customers");
       const q = query(customersRef, orderByChild('dni'), equalTo(customerData.dni));
@@ -182,14 +189,12 @@ export default function RepairsPage() {
         })
       }
 
-      await generateRepairReceiptPdf(finalRepairData, customerData, selectedStore === 'local2' ? 'local2' : 'local1');
-
       toast.success("Reparación agregada correctamente.", { description: `Recibo N°: ${newReceiptNumber}` });
-      setIsAddModalOpen(false);
-
+      return finalRepairData;
     } catch (error) {
       console.error("Error detallado al agregar reparación:", error);
       toast.error("Error al agregar la reparación.", { description: (error as Error).message });
+      throw error;
     }
   }, [selectedStore]);
 
