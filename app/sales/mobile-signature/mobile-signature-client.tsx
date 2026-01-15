@@ -337,7 +337,7 @@ function MobileSignatureContent() {
             <p className="text-sm text-muted-foreground">Venta #{receiptNumber}</p>
           )}
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-10">
           {status === "closed" && (
             <Alert variant="destructive">
               <AlertTitle>Sesión cerrada</AlertTitle>
