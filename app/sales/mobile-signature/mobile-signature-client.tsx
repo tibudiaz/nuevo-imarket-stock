@@ -135,21 +135,16 @@ function MobileSignatureContent() {
         if (!saleSnapshot.exists() || !isMounted) return
         const saleData = saleSnapshot.val()
         const items = Array.isArray(saleData.items) ? saleData.items : []
-        const normalizedLabels = items
-          .flatMap((item: { category?: string; productName?: string; model?: string }) => [
-            item.category || "",
-            item.productName || "",
-            item.model || "",
-          ])
-          .map((value) => normalizeCategory(value))
+        const normalizedCategories = items
+          .map((item: { category?: string }) => normalizeCategory(item.category || ""))
           .filter(Boolean)
 
-        const hasUsed = normalizedLabels.some((label: string) => label.includes("usad"))
+        const hasUsed = normalizedCategories.some((label: string) => label.includes("usad"))
         if (hasUsed) {
           setDisclaimerType("used")
           return
         }
-        const hasNew = normalizedLabels.some((label: string) => label.includes("nuevo"))
+        const hasNew = normalizedCategories.some((label: string) => label.includes("nuevo"))
         if (hasNew) {
           setDisclaimerType("new")
           return
