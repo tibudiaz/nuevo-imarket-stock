@@ -472,14 +472,14 @@ export const generateRepairReceiptPdf = async (repairData: Repair, customerData:
     
     drawRepairPdfContent(firstPage, repairData, customerData, { helveticaFont, helveticaBold });
     if (repairData.signature?.url) {
-      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont);
+      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont, 25);
     }
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
         drawRepairPdfContent(secondPage, repairData, customerData, { helveticaFont, helveticaBold });
         if (repairData.signature?.url) {
-          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont);
+          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont, 25);
         }
     }
 
@@ -581,14 +581,14 @@ export const generateDeliveryReceiptPdf = async (repairData: Repair, store: 'loc
 
     drawDeliveryPdfContent(firstPage, repairData, { helveticaFont, helveticaBold });
     if (repairData.signature?.url) {
-      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont);
+      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont, 25);
     }
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
         drawDeliveryPdfContent(secondPage, repairData, { helveticaFont, helveticaBold });
         if (repairData.signature?.url) {
-          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont);
+          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont, 25);
         }
     }
 
@@ -661,6 +661,7 @@ const drawRepairSignature = async (
   pdfDoc: PDFDocument,
   signature: NonNullable<Repair["signature"]>,
   font: PDFFont,
+  offsetY = 0,
 ) => {
   try {
     const response = await fetch(signature.url);
@@ -674,7 +675,7 @@ const drawRepairSignature = async (
     const scale = maxWidth / signatureImage.width;
     const scaledHeight = signatureImage.height * scale;
     const x = 80;
-    const y = 110;
+    const y = 110 + offsetY;
     page.drawImage(signatureImage, {
       x,
       y,
@@ -687,8 +688,8 @@ const drawRepairSignature = async (
     if (signerName || signerDni) {
       const nameX = 232;
       const dniX = 436;
-      const nameY = 119;
-      const dniY = 119;
+      const nameY = 119 + offsetY;
+      const dniY = 119 + offsetY;
       const textSize = 12;
 
       if (signerName) {
