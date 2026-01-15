@@ -114,12 +114,21 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
   }, []);
 
   useEffect(() => {
-    if (!signatureSessionId || !origin) {
+    if (!signatureSessionId) {
       setSignatureQrDataUrl("");
       setSignatureLink("");
       return;
     }
-    const link = `${origin}/repairs/mobile-signature?sessionId=${signatureSessionId}`;
+    const resolvedOrigin =
+      origin ||
+      getAppBaseUrl() ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    if (!resolvedOrigin) {
+      setSignatureQrDataUrl("");
+      setSignatureLink("");
+      return;
+    }
+    const link = `${resolvedOrigin}/repairs/mobile-signature?sessionId=${signatureSessionId}`;
     setSignatureLink(link);
     QRCode.toDataURL(link, { width: 300 })
       .then(setSignatureQrDataUrl)
