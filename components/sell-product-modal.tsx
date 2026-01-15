@@ -29,6 +29,16 @@ import QRCode from "qrcode"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useAuth } from "@/hooks/use-auth"
 import { getAppBaseUrl } from "@/lib/base-url"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // --- Interfaces para Tipado Fuerte ---
 interface CartProduct {
@@ -166,6 +176,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [signatureOrigin, setSignatureOrigin] = useState<string>("")
   const [signatureSessionRefPath, setSignatureSessionRefPath] = useState<string>("")
   const [signatureSessionError, setSignatureSessionError] = useState<string | null>(null)
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
+  const [cancelCountdown, setCancelCountdown] = useState(10)
+  const [hasCancelRequest, setHasCancelRequest] = useState(false)
 
   const [cart, setCart] = useState<CartProduct[]>([])
   const [allProducts, setAllProducts] = useState<CartProduct[]>([])
@@ -185,6 +198,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const reservePrefilledId = useRef<string | null>(null);
   const pdfChoiceRef = useRef(false);
   const closingPdfDialogRef = useRef(false);
+  const cancelCountdownRef = useRef<NodeJS.Timeout | null>(null)
   const { user } = useAuth()
 
   const isCompletingReserve = !!reserveToComplete;
@@ -333,7 +347,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         return
       }
       const sessionData = snapshot.val()
-      setSignatureStatus(sessionData.status || "pending")
+      const nextStatus = sessionData.status || "pending"
+      setSignatureStatus(nextStatus)
+      if (nextStatus === "cancel_requested" && !hasCancelRequest) {
+        setHasCancelRequest(true)
+        setCancelCountdown(10)
+        setIsCancelDialogOpen(true)
+      }
       if (sessionData.signature?.url) {
         const signaturePayload = {
           url: sessionData.signature.url as string,
@@ -349,7 +369,38 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     })
 
     return () => unsubscribe()
-  }, [signatureSessionId, signatureSessionRefPath])
+  }, [hasCancelRequest, signatureSessionId, signatureSessionRefPath])
+
+  useEffect(() => {
+    if (!isCancelDialogOpen) {
+      if (cancelCountdownRef.current) {
+        clearInterval(cancelCountdownRef.current)
+        cancelCountdownRef.current = null
+      }
+      return
+    }
+
+    setCancelCountdown(10)
+    cancelCountdownRef.current = setInterval(() => {
+      setCancelCountdown((prev) => {
+        if (prev <= 1) {
+          if (cancelCountdownRef.current) {
+            clearInterval(cancelCountdownRef.current)
+            cancelCountdownRef.current = null
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      if (cancelCountdownRef.current) {
+        clearInterval(cancelCountdownRef.current)
+        cancelCountdownRef.current = null
+      }
+    }
+  }, [isCancelDialogOpen])
 
   useEffect(() => {
     if (!isOpen || !reserveToComplete) {
@@ -648,6 +699,8 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     setSignatureQrDataUrl("")
     setSignatureLink("")
     setSignatureSessionRefPath("")
+    setHasCancelRequest(false)
+    setIsCancelDialogOpen(false)
 
     const sessionPayload = {
       createdAt: new Date().toISOString(),
@@ -823,6 +876,9 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 provider: item.provider || null,
                 category: item.category || null,
                 cost: item.cost ?? 0,
+                brand: item.brand || null,
+                model: item.model || null,
+                store: item.store || saleStore,
             })),
             paymentMethod,
             ...(paymentMethod === "multiple"
@@ -1110,6 +1166,96 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     }
   }
 
+  const resolveCancelRequest = async (resolution: "continue" | "cancel") => {
+    if (!signatureSessionRefPath) return
+    const sessionRef = ref(database, signatureSessionRefPath)
+    await update(sessionRef, {
+      status: resolution === "cancel" ? "cancelled" : "closed",
+      cancelResolvedAt: new Date().toISOString(),
+      cancelResolution: resolution,
+    }).catch(() => null)
+  }
+
+  const restoreInventoryForSale = async (sale: Sale) => {
+    const reserveProductId = reserveToComplete?.productId
+    const reservedQuantity = reserveToComplete?.quantity || 0
+
+    for (const item of sale.items || []) {
+      const quantityToRestore =
+        reserveToComplete && item.productId === reserveProductId
+          ? Math.max(item.quantity - reservedQuantity, 0)
+          : item.quantity
+
+      if (quantityToRestore <= 0) continue
+
+      const productRef = ref(database, `products/${item.productId}`)
+      const productSnapshot = await get(productRef)
+      if (productSnapshot.exists()) {
+        const productData = productSnapshot.val()
+        const currentStock = Number(productData.stock || 0)
+        await update(productRef, { stock: currentStock + quantityToRestore })
+      } else {
+        await set(productRef, {
+          id: item.productId,
+          name: item.productName,
+          price: item.price,
+          stock: quantityToRestore,
+          imei: item.imei || null,
+          barcode: item.barcode || null,
+          provider: item.provider || null,
+          category: item.category || null,
+          cost: item.cost ?? 0,
+          brand: item.brand || null,
+          model: item.model || null,
+          store: item.store || sale.store || null,
+          createdAt: new Date().toISOString(),
+          restoredFromSale: sale.id,
+        })
+      }
+    }
+  }
+
+  const handleContinueAfterCancelRequest = async () => {
+    if (!completedSale) return
+    setIsCancelDialogOpen(false)
+    setHasCancelRequest(false)
+    await resolveCancelRequest("continue")
+    await startSignatureSession(completedSale)
+  }
+
+  const handleConfirmCancelSale = async () => {
+    if (!completedSale) return
+    setIsLoading(true)
+    try {
+      await resolveCancelRequest("cancel")
+      await restoreInventoryForSale(completedSale)
+      if (completedSale.customerId && !completedSale.pointsPaused) {
+        const previousPoints =
+          (completedSale.pointsAccumulated ?? 0) +
+          (completedSale.pointsUsed ?? 0) -
+          (completedSale.pointsEarned ?? 0)
+        const customerRef = ref(database, `customers/${completedSale.customerId}`)
+        await update(customerRef, { points: previousPoints })
+      }
+      const saleRef = ref(database, `sales/${completedSale.id}`)
+      await update(saleRef, {
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+      })
+      setIsCancelDialogOpen(false)
+      setHasCancelRequest(false)
+      setIsSignatureDialogOpen(false)
+      toast.success("La venta fue cancelada correctamente.")
+    } catch (error) {
+      console.error("No se pudo cancelar la venta:", error)
+      toast.error("No se pudo cancelar la venta", {
+        description: (error as Error).message,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1373,9 +1519,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {signatureStatus === "closed"
-                        ? "La sesión de firma fue cerrada."
-                        : "Esperando la firma del cliente..."}
+                      {signatureStatus === "cancel_requested"
+                        ? "El cliente solicitó cancelar la operación."
+                        : signatureStatus === "closed"
+                          ? "La sesión de firma fue cerrada."
+                          : signatureStatus === "cancelled"
+                            ? "La venta fue cancelada."
+                            : "Esperando la firma del cliente..."}
                     </p>
                   )}
                 </div>
@@ -1392,6 +1542,27 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           </DialogContent>
         </Dialog>
       )}
+
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={(open) => setIsCancelDialogOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Solicitud de cancelación</AlertDialogTitle>
+            <AlertDialogDescription>
+              El cliente solicitó cancelar la operación. La venta se cancelará en{" "}
+              <span className="font-semibold text-slate-900">{cancelCountdown}</span>{" "}
+              segundos si confirmás la cancelación.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleContinueAfterCancelRequest} disabled={isLoading}>
+              Seguir con la venta
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCancelSale} disabled={isLoading}>
+              Cancelar venta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {completedSale && (
         <Dialog
