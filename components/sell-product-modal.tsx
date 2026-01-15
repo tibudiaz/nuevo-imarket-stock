@@ -658,16 +658,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const pointsToUse = useMemo(() => (pointsPaused ? 0 : discount / pointValue), [discount, pointValue, pointsPaused]);
   const finalTotal = useMemo(() => totalAmountInARS - discount, [totalAmountInARS, discount]);
   const pointsEarned = useMemo(() => (pointsPaused ? 0 : Math.floor(finalTotal / pointEarnRate)), [finalTotal, pointEarnRate, pointsPaused]);
-  const cellphoneCategoriesInSale = useMemo(() => {
-    const items = completedSale?.items ?? cart;
-    return new Set(
-      items
-        .map((item) => item.category)
-        .filter((category): category is string => Boolean(category))
-    );
-  }, [cart, completedSale?.items]);
-  const hasUsedCellphones = cellphoneCategoriesInSale.has("Celulares Usados");
-  const hasNewCellphones = cellphoneCategoriesInSale.has("Celulares Nuevos");
 
   const startSignatureSession = useCallback(async (sale: Sale) => {
     setSignatureSessionError(null)
@@ -1425,33 +1415,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              {(hasUsedCellphones || hasNewCellphones) && (
-                <Alert>
-                  <AlertTitle>Aviso de garantía</AlertTitle>
-                  <AlertDescription className="space-y-3 text-sm">
-                    {hasUsedCellphones && (
-                      <p>
-                        iPhone Market le recuerda que los equipos usados cuentan con garantia válida por un período de 30
-                        días de corridos a partir de la fecha del presente recibo. La cobertura de la garantía se extiende
-                        a posibles fallas que sucedan en el equipo dentro del periodo de tiempo establecido, se excluye
-                        terminantemente aquellos daños o fallas resultantes del mal uso del dispositivo, aquellos que sean
-                        consecuencias de golpes o por exposición al agua.- *Accesorios que se entreguen con el equipo
-                        cuentan con 15 dias de garantia a partir de la fecha del presente recibo.-
-                      </p>
-                    )}
-                    {hasNewCellphones && (
-                      <p>
-                        Por la presente, el cliente declara haber adquirido un teléfono nuevo, en caja sellada, sin uso
-                        previo, en perfectas condiciones estéticas y funcionales. El equipo cuenta con garantía oficial de
-                        fábrica por el término de 1 (un) año, la cual deberá ser gestionada exclusivamente ante los canales
-                        oficiales de Apple, conforme a las políticas del fabricante. El cliente entiende y acepta que
-                        iMarket no brinda garantía propia ni se responsabiliza por fallas de fabricación, quedando exento
-                        de cualquier reclamo vinculado a defectos cubiertos por la garantía oficial.
-                      </p>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              )}
               {signatureSessionError && (
                 <Alert variant="destructive">
                   <AlertTitle>No se pudo iniciar la firma</AlertTitle>
