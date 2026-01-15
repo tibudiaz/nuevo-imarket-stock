@@ -97,7 +97,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
   }, [repair]);
 
   useEffect(() => {
-    if (!isOpen && signatureSessionRefPath) {
+    if (!isOpen && signatureSessionRefPath && !isSignatureDialogOpen) {
       const sessionRef = ref(database, signatureSessionRefPath);
       update(sessionRef, {
         status: "closed",
@@ -106,7 +106,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
       setSignatureSessionRefPath("");
       setSignatureSessionId(null);
     }
-  }, [isOpen, signatureSessionRefPath]);
+  }, [isOpen, signatureSessionRefPath, isSignatureDialogOpen]);
 
   useEffect(() => {
     const resolvedOrigin = getAppBaseUrl();
