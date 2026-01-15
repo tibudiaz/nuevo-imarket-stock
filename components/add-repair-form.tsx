@@ -187,11 +187,19 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
   }, [isOpen, uploadSessionId, user?.username]);
 
   useEffect(() => {
-    if (!uploadSessionId || !origin) {
+    if (!uploadSessionId) {
       setQrDataUrl("");
       return;
     }
-    const url = `${origin}/repairs/mobile-upload?sessionId=${uploadSessionId}`;
+    const resolvedOrigin =
+      origin ||
+      getAppBaseUrl() ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    if (!resolvedOrigin) {
+      setQrDataUrl("");
+      return;
+    }
+    const url = `${resolvedOrigin}/repairs/mobile-upload?sessionId=${uploadSessionId}`;
     QRCode.toDataURL(url, { width: 300 })
       .then(setQrDataUrl)
       .catch((error) => {
@@ -200,12 +208,21 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
   }, [origin, uploadSessionId]);
 
   useEffect(() => {
-    if (!signatureSessionId || !origin) {
+    if (!signatureSessionId) {
       setSignatureQrDataUrl("");
       setSignatureLink("");
       return;
     }
-    const link = `${origin}/repairs/mobile-signature?sessionId=${signatureSessionId}`;
+    const resolvedOrigin =
+      origin ||
+      getAppBaseUrl() ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    if (!resolvedOrigin) {
+      setSignatureQrDataUrl("");
+      setSignatureLink("");
+      return;
+    }
+    const link = `${resolvedOrigin}/repairs/mobile-signature?sessionId=${signatureSessionId}`;
     setSignatureLink(link);
     QRCode.toDataURL(link, { width: 300 })
       .then(setSignatureQrDataUrl)

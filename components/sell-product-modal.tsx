@@ -297,13 +297,23 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   }, [])
 
   useEffect(() => {
-    if (!signatureSessionId || !signatureOrigin) {
+    if (!signatureSessionId) {
       setSignatureQrDataUrl("")
       setSignatureLink("")
       return
     }
 
-    const link = `${signatureOrigin}/sales/mobile-signature?sessionId=${signatureSessionId}`
+    const resolvedOrigin =
+      signatureOrigin ||
+      getAppBaseUrl() ||
+      (typeof window !== "undefined" ? window.location.origin : "")
+    if (!resolvedOrigin) {
+      setSignatureQrDataUrl("")
+      setSignatureLink("")
+      return
+    }
+
+    const link = `${resolvedOrigin}/sales/mobile-signature?sessionId=${signatureSessionId}`
     setSignatureLink(link)
     QRCode.toDataURL(link, { width: 300 })
       .then(setSignatureQrDataUrl)
