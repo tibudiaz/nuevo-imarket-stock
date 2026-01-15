@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { database, storage } from "@/lib/firebase"
 import { ref as databaseRef, onValue, update, get } from "firebase/database"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
-import { CheckCircle2, Loader2, PencilLine, RotateCcw, Sparkles } from "lucide-react"
+import { CheckCircle2, Loader2, PencilLine, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
 function MobileSignatureFallback() {
@@ -27,6 +27,7 @@ function MobileSignatureFallback() {
 function MobileSignatureContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("sessionId") || undefined
+  const previewThanks = searchParams.get("previewThanks") === "1"
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -116,6 +117,12 @@ function MobileSignatureContent() {
       setShowThanks(true)
     }
   }, [signatureUrl])
+
+  useEffect(() => {
+    if (previewThanks) {
+      setShowThanks(true)
+    }
+  }, [previewThanks])
 
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -326,6 +333,14 @@ function MobileSignatureContent() {
     )
   }
 
+  const fireworks = [
+    { left: "18%", top: "22%", delay: "0s" },
+    { left: "74%", top: "18%", delay: "0.3s" },
+    { left: "30%", top: "62%", delay: "0.6s" },
+    { left: "70%", top: "68%", delay: "0.9s" },
+    { left: "50%", top: "38%", delay: "1.2s" },
+  ]
+
   return (
     <div className="min-h-screen bg-muted/40 p-4">
       <Card className="mx-auto max-w-xl">
@@ -405,18 +420,6 @@ function MobileSignatureContent() {
             </Button>
           </div>
 
-          {showThanks && (
-            <div className="flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
-              <div className="rounded-full bg-emerald-100 p-2">
-                <Sparkles className="h-5 w-5 animate-pulse" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">¡Gracias!</p>
-                <p className="text-sm">El equipo de iMarket agradece tu compra.</p>
-              </div>
-            </div>
-          )}
-
           {signatureUrl && (
             <div className="space-y-2">
               <p className="text-sm font-medium">Firma guardada</p>
@@ -433,6 +436,78 @@ function MobileSignatureContent() {
           )}
         </CardContent>
       </Card>
+      {showThanks && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/90 px-6 text-center text-white">
+          <div className="absolute inset-0">
+            {fireworks.map((firework) => (
+              <div
+                key={`${firework.left}-${firework.top}`}
+                className="firework"
+                style={{
+                  left: firework.left,
+                  top: firework.top,
+                  animationDelay: firework.delay,
+                }}
+              />
+            ))}
+          </div>
+          <div className="relative z-10 space-y-3">
+            <p className="text-2xl font-semibold sm:text-3xl">¡Gracias por elegir iMarket!</p>
+            <p className="text-sm text-slate-200">
+              Tu firma fue registrada correctamente.
+            </p>
+          </div>
+          <style jsx>{`
+            .firework {
+              position: absolute;
+              width: 8px;
+              height: 8px;
+              border-radius: 9999px;
+              background: transparent;
+              transform: translate(-50%, -50%);
+              animation: firework 1.8s ease-out infinite;
+              box-shadow:
+                0 -34px #f87171,
+                24px -24px #fb923c,
+                34px 0 #facc15,
+                24px 24px #4ade80,
+                0 34px #38bdf8,
+                -24px 24px #a78bfa,
+                -34px 0 #f472b6,
+                -24px -24px #fda4af;
+            }
+
+            .firework::after {
+              content: "";
+              position: absolute;
+              inset: 0;
+              border-radius: 9999px;
+              animation: firework 1.8s ease-out infinite;
+              animation-delay: 0.2s;
+              box-shadow:
+                0 -22px #22d3ee,
+                16px -16px #60a5fa,
+                22px 0 #34d399,
+                16px 16px #f59e0b,
+                0 22px #f87171,
+                -16px 16px #c084fc,
+                -22px 0 #818cf8,
+                -16px -16px #f472b6;
+            }
+
+            @keyframes firework {
+              0% {
+                transform: translate(-50%, -50%) scale(0.2);
+                opacity: 1;
+              }
+              100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0;
+              }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   )
 }
