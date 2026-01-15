@@ -379,11 +379,12 @@ const drawSaleSignature = async (
     const imageBytes = await response.arrayBuffer();
     const signatureImage = await pdfDoc.embedPng(imageBytes);
 
-    const maxWidth = 112;
+    const sizeReductionFactor = 0.8;
+    const maxWidth = 112 * sizeReductionFactor;
     const scale = maxWidth / signatureImage.width;
     const scaledHeight = signatureImage.height * scale;
     const x = 80;
-    const y = 148;
+    const y = 110;
     page.drawImage(signatureImage, {
       x,
       y,
@@ -396,8 +397,8 @@ const drawSaleSignature = async (
     if (signerName || signerDni) {
       const nameX = 232;
       const dniX = 426;
-      const nameY = 148;
-      const dniY = 147;
+      const nameY = 110;
+      const dniY = 110;
       const textSize = 12;
 
       if (signerName) {
