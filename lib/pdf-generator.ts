@@ -64,6 +64,14 @@ interface Repair {
     customerDni?: string;
     customerPhone?: string;
     store?: 'local1' | 'local2';
+    signature?: {
+      url: string;
+      path?: string;
+      signedAt?: string;
+      sessionId?: string;
+      signerName?: string;
+      signerDni?: string;
+    } | null;
 }
 
 interface Reserve {
@@ -463,10 +471,16 @@ export const generateRepairReceiptPdf = async (repairData: Repair, customerData:
     const firstPage = pdfDoc.getPages()[0];
     
     drawRepairPdfContent(firstPage, repairData, customerData, { helveticaFont, helveticaBold });
+    if (repairData.signature?.url) {
+      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont);
+    }
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
         drawRepairPdfContent(secondPage, repairData, customerData, { helveticaFont, helveticaBold });
+        if (repairData.signature?.url) {
+          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont);
+        }
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -566,10 +580,16 @@ export const generateDeliveryReceiptPdf = async (repairData: Repair, store: 'loc
     const firstPage = pdfDoc.getPages()[0];
 
     drawDeliveryPdfContent(firstPage, repairData, { helveticaFont, helveticaBold });
+    if (repairData.signature?.url) {
+      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont);
+    }
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
         drawDeliveryPdfContent(secondPage, repairData, { helveticaFont, helveticaBold });
+        if (repairData.signature?.url) {
+          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont);
+        }
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -634,6 +654,65 @@ const drawDeliveryPdfContent = (page: any, repair: Repair, fonts: Fonts) => {
 
     const priceText = formatCurrencyForPdf(repair.finalPrice || repair.estimatedPrice);
     page.drawText(priceText, { ...positions.total, size: 12, font: helveticaBold });
+};
+
+const drawRepairSignature = async (
+  page: any,
+  pdfDoc: PDFDocument,
+  signature: NonNullable<Repair["signature"]>,
+  font: PDFFont,
+) => {
+  try {
+    const response = await fetch(signature.url);
+    if (!response.ok) {
+      throw new Error(`No se pudo descargar la firma (${response.status}).`);
+    }
+    const imageBytes = await response.arrayBuffer();
+    const signatureImage = await pdfDoc.embedPng(imageBytes);
+
+    const maxWidth = 70;
+    const scale = maxWidth / signatureImage.width;
+    const scaledHeight = signatureImage.height * scale;
+    const x = 80;
+    const y = 110;
+    page.drawImage(signatureImage, {
+      x,
+      y,
+      width: maxWidth,
+      height: scaledHeight,
+    });
+
+    const signerName = signature.signerName?.trim();
+    const signerDni = signature.signerDni?.trim();
+    if (signerName || signerDni) {
+      const nameX = 232;
+      const dniX = 436;
+      const nameY = 114;
+      const dniY = 114;
+      const textSize = 12;
+
+      if (signerName) {
+        page.drawText(signerName, {
+          x: nameX,
+          y: nameY,
+          size: textSize,
+          font,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+      }
+      if (signerDni) {
+        page.drawText(signerDni, {
+          x: dniX,
+          y: dniY,
+          size: textSize,
+          font,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+      }
+    }
+  } catch (error) {
+    console.warn("No se pudo insertar la firma en el PDF de reparación:", error);
+  }
 };
 
 // --- Generador de PDF para Reservas (Señas) ---
