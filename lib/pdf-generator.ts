@@ -687,8 +687,8 @@ const drawRepairSignature = async (
     if (signerName || signerDni) {
       const nameX = 232;
       const dniX = 436;
-      const nameY = 114;
-      const dniY = 114;
+      const nameY = 119;
+      const dniY = 119;
       const textSize = 12;
 
       if (signerName) {
