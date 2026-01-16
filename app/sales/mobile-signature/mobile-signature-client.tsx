@@ -43,6 +43,7 @@ function MobileSignatureContent() {
   const [showThanks, setShowThanks] = useState(false)
   const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = useState(false)
   const [disclaimerType, setDisclaimerType] = useState<"new" | "used" | null>(null)
+  const [disclaimerResolved, setDisclaimerResolved] = useState(false)
   const [isCanceling, setIsCanceling] = useState(false)
 
   const normalizeCategory = useCallback((value: string) => {
@@ -116,6 +117,10 @@ function MobileSignatureContent() {
       if (sessionData.disclaimerAcceptedAt) {
         setHasAcceptedDisclaimer(true)
       }
+      if (sessionData.disclaimerType && !disclaimerResolved) {
+        setDisclaimerType(sessionData.disclaimerType === "used" ? "used" : "new")
+        setDisclaimerResolved(true)
+      }
     })
 
     update(sessionRef, {
@@ -130,6 +135,10 @@ function MobileSignatureContent() {
     let isMounted = true
 
     const loadSaleCondition = async () => {
+      if (disclaimerType) {
+        setDisclaimerResolved(true)
+        return
+      }
       try {
         const saleSnapshot = await get(databaseRef(database, `sales/${saleId}`))
         if (!saleSnapshot.exists() || !isMounted) return
@@ -152,6 +161,10 @@ function MobileSignatureContent() {
         setDisclaimerType(null)
       } catch (error) {
         console.warn("No se pudo cargar la condición del equipo:", error)
+      } finally {
+        if (isMounted) {
+          setDisclaimerResolved(true)
+        }
       }
     }
 
@@ -160,7 +173,7 @@ function MobileSignatureContent() {
     return () => {
       isMounted = false
     }
-  }, [normalizeCategory, saleId])
+  }, [disclaimerType, normalizeCategory, saleId])
 
   useEffect(() => {
     if (signatureUrl) {
@@ -437,6 +450,10 @@ function MobileSignatureContent() {
     status !== "cancelled" &&
     status !== "cancel_requested"
 
+  const shouldShowDisclaimerLoading = shouldShowDisclaimer && !disclaimerResolved
+  const shouldShowDisclaimerUnavailable = shouldShowDisclaimer && disclaimerResolved && disclaimerType === null
+  const shouldShowDisclaimerContent = shouldShowDisclaimer && disclaimerResolved && disclaimerType !== null
+
   const disclaimerContent =
     disclaimerType === "used"
       ? "iPhone Market le recuerda que los equipos usados cuentan con garantia válida por un período de\n30 días de corridos a partir de la fecha del presente recibo. La cobertura de la garantía se extiende\na posibles fallas que sucedan en el equipo dentro del periodo de tiempo establecido, se excluye\nterminantemente aquellos daños o fallas resultantes del mal uso del dispositivo, aquellos que sean\nconsecuencias de golpes o por exposición al agua.- *Accesorios que se entreguen con el equipo\ncuentan con 15 dias de garantia a partir de la fecha del presente recibo.-"
@@ -479,7 +496,27 @@ function MobileSignatureContent() {
             </Alert>
           )}
 
-          {shouldShowDisclaimer && (
+          {shouldShowDisclaimerLoading && (
+            <Alert>
+              <AlertTitle>Preparando condiciones</AlertTitle>
+              <AlertDescription className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Cargando el aviso correspondiente. Esperá un momento.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {shouldShowDisclaimerUnavailable && (
+            <Alert variant="destructive">
+              <AlertTitle>No se pudo determinar el aviso</AlertTitle>
+              <AlertDescription>
+                No pudimos identificar si el equipo es nuevo o usado. Avisá al vendedor para que
+                revise la operación.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {shouldShowDisclaimerContent && (
             <div className="rounded-lg border bg-white p-4 shadow-sm">
               <div className="space-y-3">
                 <div>
@@ -505,7 +542,7 @@ function MobileSignatureContent() {
             </div>
           )}
 
-          {!shouldShowDisclaimer && (
+          {!shouldShowDisclaimerContent && !shouldShowDisclaimerLoading && !shouldShowDisclaimerUnavailable && (
             <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
