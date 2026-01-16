@@ -218,6 +218,28 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   };
 
+  const normalizeCategory = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ")
+
+  const resolveDisclaimerType = (items: Array<{ category?: string | null }> = []) => {
+    const normalizedCategories = items
+      .map((item) => normalizeCategory(item.category || ""))
+      .filter(Boolean)
+
+    const hasUsedCellphones = normalizedCategories.some((label) => label.includes("usad"))
+    if (hasUsedCellphones) {
+      return "used" as const
+    }
+
+    const hasNewCellphones = normalizedCategories.some((label) => label.includes("nuevo"))
+    return hasNewCellphones ? ("new" as const) : ("used" as const)
+  }
+
   useEffect(() => {
     if (paymentMethod !== "multiple") {
       setCashAmount(0)
@@ -681,6 +703,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       store: sale.store ?? null,
       createdBy: user?.username ?? null,
       pendingSignature: true,
+      disclaimerType: resolveDisclaimerType(sale.items),
     }
 
     const newSessionId = generateSignatureSessionId()

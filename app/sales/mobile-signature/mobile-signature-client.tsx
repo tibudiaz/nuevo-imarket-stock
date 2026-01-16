@@ -100,6 +100,22 @@ function MobileSignatureContent() {
   }, [sessionId, sessionRefPath])
 
   useEffect(() => {
+    if (!sessionId) return
+
+    setStatus("pending")
+    setReceiptNumber(null)
+    setSaleId(null)
+    setSignatureUrl(null)
+    setSignerName("")
+    setSignerDni("")
+    setShowThanks(false)
+    setHasAcceptedDisclaimer(false)
+    setDisclaimerType(null)
+    setDisclaimerResolved(false)
+    setIsCanceling(false)
+  }, [sessionId])
+
+  useEffect(() => {
     if (!sessionRefPath) return
 
     const sessionRef = databaseRef(database, sessionRefPath)
