@@ -137,15 +137,11 @@ function MobileSignatureContent() {
     let isMounted = true
 
     const loadSaleCondition = async () => {
-      if (disclaimerType) {
-        setDisclaimerResolved(true)
-        return
-      }
       try {
         const saleSnapshot = await get(databaseRef(database, `sales/${saleId}`))
         if (!isMounted) return
         if (!saleSnapshot.exists()) {
-          setDisclaimerType("used")
+          setDisclaimerType((prev) => prev ?? "used")
           return
         }
         const saleData = saleSnapshot.val()
@@ -157,11 +153,18 @@ function MobileSignatureContent() {
         const hasNewCellphones = normalizedCategories.some(
           (label: string) => label === "celulares nuevos"
         )
-        setDisclaimerType(hasNewCellphones ? "new" : "used")
+        const resolvedType = hasNewCellphones ? "new" : "used"
+        setDisclaimerType(resolvedType)
+
+        if (sessionRefPath) {
+          update(databaseRef(database, sessionRefPath), {
+            disclaimerType: resolvedType,
+          }).catch(() => null)
+        }
       } catch (error) {
         console.warn("No se pudo cargar la condición del equipo:", error)
         if (isMounted) {
-          setDisclaimerType("used")
+          setDisclaimerType((prev) => prev ?? "used")
         }
       } finally {
         if (isMounted) {
@@ -175,7 +178,7 @@ function MobileSignatureContent() {
     return () => {
       isMounted = false
     }
-  }, [disclaimerType, normalizeCategory, saleId])
+  }, [normalizeCategory, saleId, sessionRefPath])
 
   useEffect(() => {
     if (signatureUrl) {
