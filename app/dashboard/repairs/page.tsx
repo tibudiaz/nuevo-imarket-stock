@@ -203,7 +203,6 @@ export default function RepairsPage() {
       const repairRef = ref(database, `repairs/${repairId}`)
       await update(repairRef, updatedData)
       toast.success("Reparación actualizada.")
-      setIsDetailModalOpen(false)
     } catch (error) {
       console.error(error)
       toast.error("Error al actualizar la reparación.")
