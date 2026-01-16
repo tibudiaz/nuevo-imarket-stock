@@ -189,6 +189,7 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
       status: "pending",
       repairId: repairData.id,
       receiptNumber: repairData.deliveryReceiptNumber || repairData.receiptNumber,
+      signatureType: "delivery",
       store: repairData.store ?? null,
       createdBy: user?.username ?? null,
       pendingSignature: true,
