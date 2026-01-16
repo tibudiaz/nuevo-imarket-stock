@@ -1253,10 +1253,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         }
       }
       const saleRef = ref(database, `sales/${completedSale.id}`)
-      await update(saleRef, {
-        status: "cancelled",
-        cancelledAt: new Date().toISOString(),
-      })
+      await remove(saleRef)
       setIsCancelDialogOpen(false)
       setHasCancelRequest(false)
       setIsSignatureDialogOpen(false)
