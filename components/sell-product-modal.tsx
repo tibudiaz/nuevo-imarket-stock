@@ -95,6 +95,9 @@ interface Sale {
     reserveId?: string;
     reserveReceiptNumber?: string;
     reserveDownPayment?: number;
+    reserveProductId?: string;
+    reserveQuantity?: number;
+    status?: "pending_signature" | "completed" | "cancelled";
     signature?: {
       url: string;
       path?: string;
@@ -176,6 +179,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [signatureOrigin, setSignatureOrigin] = useState<string>("")
   const [signatureSessionRefPath, setSignatureSessionRefPath] = useState<string>("")
   const [signatureSessionError, setSignatureSessionError] = useState<string | null>(null)
+  const [isFinalizingSale, setIsFinalizingSale] = useState(false)
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [hasCancelRequest, setHasCancelRequest] = useState(false)
 
@@ -197,6 +201,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const reservePrefilledId = useRef<string | null>(null);
   const pdfChoiceRef = useRef(false);
   const closingPdfDialogRef = useRef(false);
+  const isFinalizingSaleRef = useRef(false)
   const { user } = useAuth()
 
   const isCompletingReserve = !!reserveToComplete;
@@ -745,64 +750,6 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             await set(newCustomerRef, { ...customer, createdAt: new Date().toISOString(), id: customerId, points: 0 });
         }
 
-        const reservedProductId = reserveToComplete?.productId;
-        const reservedQuantity = reserveToComplete?.quantity || 0;
-
-        for (const item of cart) {
-            let quantityToDeduct = item.quantity;
-            if (reserveToComplete && item.id === reservedProductId) {
-                quantityToDeduct = Math.max(item.quantity - reservedQuantity, 0);
-            }
-
-            if (quantityToDeduct <= 0) {
-                continue;
-            }
-
-            const productRef = ref(database, `products/${item.id}`);
-            const productSnapshot = await get(productRef);
-            if (productSnapshot.exists()) {
-                const productData = productSnapshot.val();
-                const currentStock = productData.stock || 0;
-                const newStock = currentStock - quantityToDeduct;
-
-                if (newStock < 0) {
-                    throw new Error(`Stock insuficiente para ${item.name}.`);
-                }
-
-                if (newStock <= 0) {
-                    const category = productData.category as string | undefined;
-                    if (shouldRemoveProductFromInventory(category)) {
-                        await remove(productRef);
-                    } else {
-                        await update(productRef, { stock: 0 });
-                    }
-                } else {
-                    await update(productRef, { stock: newStock });
-                }
-            }
-        }
-        
-        if (isTradeIn && tradeInProduct.name && tradeInProduct.price > 0) {
-            const newProductRef = push(ref(database, 'products'));
-            const newProductData = {
-                id: newProductRef.key,
-                name: tradeInProduct.name,
-                imei: tradeInProduct.imei,
-                barcode: tradeInProduct.serialNumber,
-                brand: "Apple",
-                model: "Celular",
-                category: "Celulares Usados",
-                cost: tradeInProduct.price,
-                price: tradeInProduct.price + 50,
-                stock: 1,
-                provider: customer.name,
-                createdAt: new Date().toISOString(),
-                store: saleStore,
-            };
-            await set(newProductRef, newProductData);
-            toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${tradeInProduct.name} al inventario.` });
-        }
-
         const counterRef = ref(database, 'counters/receiptNumber');
         const transactionResult = await runTransaction(counterRef, (currentData) => {
             if (currentData === null) {
@@ -857,6 +804,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             usdRate,
             pointsPaused,
             store: saleStore,
+            status: "pending_signature",
             ...(pointsPaused
                 ? {}
                 : {
@@ -869,43 +817,17 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     reserveId: reserveToComplete.id,
                     reserveReceiptNumber: reserveToComplete.receiptNumber,
                     reserveDownPayment: reserveToComplete.downPayment,
+                    reserveProductId: reserveToComplete.productId,
+                    reserveQuantity: reserveToComplete.quantity ?? 0,
                 }
                 : {}),
         };
         await set(newSaleRef, saleData);
 
-        if (customerId && !pointsPaused) {
-            const customerRef = ref(database, `customers/${customerId}`);
-            await update(customerRef, { points: updatedPoints, lastPurchase: new Date().toISOString() });
-            setAvailablePoints(updatedPoints);
-        }
-
-        if (reserveToComplete) {
-            try {
-                const reserveRef = ref(database, `reserves/${reserveToComplete.id}`);
-                await update(reserveRef, {
-                    status: "completed",
-                    completedAt: new Date().toISOString(),
-                    saleId: saleData.id,
-                    saleReceiptNumber: saleData.receiptNumber,
-                    remainingAmount: 0,
-                });
-
-                if (reserveToComplete.productId) {
-                    const productRef = ref(database, `products/${reserveToComplete.productId}`);
-                    await update(productRef, { reserved: false });
-                }
-
-                onReserveCompletion?.(reserveToComplete, saleData);
-            } catch (error) {
-                console.error("Error al actualizar la reserva después de la venta:", error);
-            }
-        }
-
         setCompletedSale(saleData);
         setSignatureData(null);
         setSignatureStatus("pending");
-        toast.success("Venta completada con éxito.");
+        toast.info("Venta pendiente de firma.");
         try {
           await startSignatureSession(saleData);
         } catch (error) {
@@ -923,6 +845,124 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         setIsLoading(false);
     }
   };
+
+  const finalizeSale = useCallback(async (sale: Sale) => {
+    if (isFinalizingSaleRef.current || !sale) return;
+    if (sale.status === "completed") return;
+    isFinalizingSaleRef.current = true;
+    setIsFinalizingSale(true);
+
+    try {
+      const reservedProductId = sale.reserveProductId || reserveToComplete?.productId;
+      const reservedQuantity = sale.reserveQuantity ?? reserveToComplete?.quantity ?? 0;
+
+      for (const item of sale.items || []) {
+        let quantityToDeduct = item.quantity;
+        if (reservedProductId && item.productId === reservedProductId) {
+          quantityToDeduct = Math.max(item.quantity - reservedQuantity, 0);
+        }
+
+        if (quantityToDeduct <= 0) {
+          continue;
+        }
+
+        const productRef = ref(database, `products/${item.productId}`);
+        const productSnapshot = await get(productRef);
+        if (productSnapshot.exists()) {
+          const productData = productSnapshot.val();
+          const currentStock = productData.stock || 0;
+          const newStock = currentStock - quantityToDeduct;
+
+          if (newStock < 0) {
+            throw new Error(`Stock insuficiente para ${item.productName}.`);
+          }
+
+          if (newStock <= 0) {
+            const category = productData.category as string | undefined;
+            if (shouldRemoveProductFromInventory(category)) {
+              await remove(productRef);
+            } else {
+              await update(productRef, { stock: 0 });
+            }
+          } else {
+            await update(productRef, { stock: newStock });
+          }
+        }
+      }
+
+      if (sale.tradeIn?.name && sale.tradeIn?.price > 0) {
+        const newProductRef = push(ref(database, 'products'));
+        const newProductData = {
+          id: newProductRef.key,
+          name: sale.tradeIn.name,
+          imei: sale.tradeIn.imei,
+          barcode: sale.tradeIn.serialNumber,
+          brand: "Apple",
+          model: "Celular",
+          category: "Celulares Usados",
+          cost: sale.tradeIn.price,
+          price: sale.tradeIn.price + 50,
+          stock: 1,
+          provider: sale.customerName,
+          createdAt: new Date().toISOString(),
+          store: sale.store,
+        };
+        await set(newProductRef, newProductData);
+        toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${sale.tradeIn.name} al inventario.` });
+      }
+
+      if (sale.customerId && !sale.pointsPaused) {
+        const customerRef = ref(database, `customers/${sale.customerId}`);
+        const nextPoints = sale.pointsAccumulated ?? 0;
+        await update(customerRef, { points: nextPoints, lastPurchase: new Date().toISOString() });
+        setAvailablePoints(nextPoints);
+      }
+
+      if (sale.reserveId) {
+        try {
+          const reserveRef = ref(database, `reserves/${sale.reserveId}`);
+          await update(reserveRef, {
+            status: "completed",
+            completedAt: new Date().toISOString(),
+            saleId: sale.id,
+            saleReceiptNumber: sale.receiptNumber,
+            remainingAmount: 0,
+          });
+
+          if (reservedProductId) {
+            const productRef = ref(database, `products/${reservedProductId}`);
+            await update(productRef, { reserved: false });
+          }
+
+          if (reserveToComplete) {
+            onReserveCompletion?.(reserveToComplete, sale);
+          }
+        } catch (error) {
+          console.error("Error al actualizar la reserva después de la venta:", error);
+        }
+      }
+
+      const saleRef = ref(database, `sales/${sale.id}`);
+      const signaturePayload = signatureData?.url ? signatureData : sale.signature ?? null;
+      await update(saleRef, {
+        status: "completed",
+        completedAt: new Date().toISOString(),
+        signature: signaturePayload,
+      });
+
+      setCompletedSale((prev) => (prev ? { ...prev, status: "completed", signature: signaturePayload ?? prev.signature } : prev));
+      toast.success("Venta completada con éxito.");
+    } catch (error) {
+      console.error("Error al finalizar la venta:", error);
+      toast.error("No se pudo finalizar la venta", {
+        description: (error as Error).message,
+      });
+      throw error;
+    } finally {
+      setIsFinalizingSale(false);
+      isFinalizingSaleRef.current = false;
+    }
+  }, [onReserveCompletion, reserveToComplete, signatureData]);
 
   const handleReserveProduct = async () => {
     if (!customer.name || !customer.dni || !customer.phone) {
@@ -1105,6 +1145,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         closedAt: new Date().toISOString(),
       }).catch(() => null)
     }
+    if (completedSale) {
+      try {
+        await finalizeSale(completedSale)
+      } catch (error) {
+        return
+      }
+    }
     setIsSignatureDialogOpen(false)
     if (goToPdf) {
       setIsPdfDialogOpen(true)
@@ -1194,14 +1241,16 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     setIsLoading(true)
     try {
       await resolveCancelRequest("cancel")
-      await restoreInventoryForSale(completedSale)
-      if (completedSale.customerId && !completedSale.pointsPaused) {
-        const previousPoints =
-          (completedSale.pointsAccumulated ?? 0) +
-          (completedSale.pointsUsed ?? 0) -
-          (completedSale.pointsEarned ?? 0)
-        const customerRef = ref(database, `customers/${completedSale.customerId}`)
-        await update(customerRef, { points: previousPoints })
+      if (completedSale.status === "completed") {
+        await restoreInventoryForSale(completedSale)
+        if (completedSale.customerId && !completedSale.pointsPaused) {
+          const previousPoints =
+            (completedSale.pointsAccumulated ?? 0) +
+            (completedSale.pointsUsed ?? 0) -
+            (completedSale.pointsEarned ?? 0)
+          const customerRef = ref(database, `customers/${completedSale.customerId}`)
+          await update(customerRef, { points: previousPoints })
+        }
       }
       const saleRef = ref(database, `sales/${completedSale.id}`)
       await update(saleRef, {
@@ -1498,10 +1547,10 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => handleCloseSignatureDialog(true)}>
+              <Button variant="outline" onClick={() => handleCloseSignatureDialog(true)} disabled={isFinalizingSale}>
                 Omitir firma
               </Button>
-              <Button onClick={() => handleCloseSignatureDialog(true)} disabled={!signatureData?.url}>
+              <Button onClick={() => handleCloseSignatureDialog(true)} disabled={!signatureData?.url || isFinalizingSale}>
                 Continuar al PDF
               </Button>
             </DialogFooter>
