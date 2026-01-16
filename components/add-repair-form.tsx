@@ -354,6 +354,7 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       status: "pending",
       repairId: repair.id,
       receiptNumber: repair.receiptNumber,
+      signatureType: "estimate",
       store: repair.store ?? null,
       createdBy: user?.username ?? null,
       pendingSignature: true,
