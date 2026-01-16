@@ -141,26 +141,26 @@ function MobileSignatureContent() {
       }
       try {
         const saleSnapshot = await get(databaseRef(database, `sales/${saleId}`))
-        if (!saleSnapshot.exists() || !isMounted) return
+        if (!isMounted) return
+        if (!saleSnapshot.exists()) {
+          setDisclaimerType("used")
+          return
+        }
         const saleData = saleSnapshot.val()
         const items = Array.isArray(saleData.items) ? saleData.items : []
         const normalizedCategories = items
           .map((item: { category?: string }) => normalizeCategory(item.category || ""))
           .filter(Boolean)
 
-        const hasUsed = normalizedCategories.some((label: string) => label.includes("usad"))
-        if (hasUsed) {
-          setDisclaimerType("used")
-          return
-        }
-        const hasNew = normalizedCategories.some((label: string) => label.includes("nuevo"))
-        if (hasNew) {
-          setDisclaimerType("new")
-          return
-        }
-        setDisclaimerType(null)
+        const hasNewCellphones = normalizedCategories.some(
+          (label: string) => label === "celulares nuevos"
+        )
+        setDisclaimerType(hasNewCellphones ? "new" : "used")
       } catch (error) {
         console.warn("No se pudo cargar la condición del equipo:", error)
+        if (isMounted) {
+          setDisclaimerType("used")
+        }
       } finally {
         if (isMounted) {
           setDisclaimerResolved(true)
@@ -451,7 +451,6 @@ function MobileSignatureContent() {
     status !== "cancel_requested"
 
   const shouldShowDisclaimerLoading = shouldShowDisclaimer && !disclaimerResolved
-  const shouldShowDisclaimerUnavailable = shouldShowDisclaimer && disclaimerResolved && disclaimerType === null
   const shouldShowDisclaimerContent = shouldShowDisclaimer && disclaimerResolved && disclaimerType !== null
 
   const disclaimerContent =
@@ -506,16 +505,6 @@ function MobileSignatureContent() {
             </Alert>
           )}
 
-          {shouldShowDisclaimerUnavailable && (
-            <Alert variant="destructive">
-              <AlertTitle>No se pudo determinar el aviso</AlertTitle>
-              <AlertDescription>
-                No pudimos identificar si el equipo es nuevo o usado. Avisá al vendedor para que
-                revise la operación.
-              </AlertDescription>
-            </Alert>
-          )}
-
           {shouldShowDisclaimerContent && (
             <div className="rounded-lg border bg-white p-4 shadow-sm">
               <div className="space-y-3">
@@ -542,7 +531,7 @@ function MobileSignatureContent() {
             </div>
           )}
 
-          {!shouldShowDisclaimerContent && !shouldShowDisclaimerLoading && !shouldShowDisclaimerUnavailable && (
+          {!shouldShowDisclaimerContent && !shouldShowDisclaimerLoading && (
             <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
