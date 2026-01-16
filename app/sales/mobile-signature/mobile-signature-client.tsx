@@ -51,6 +51,8 @@ function MobileSignatureContent() {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ")
   }, [])
 
   const signatureLocked = status === "closed" || status === "signed" || Boolean(signatureUrl)
