@@ -110,11 +110,13 @@ function MobileSignatureContent() {
       setSignatureUrl(sessionData.signature?.url ?? null)
       setSignerName((prev) => prev || sessionData.signature?.signerName || "")
       setSignerDni((prev) => prev || sessionData.signature?.signerDni || "")
-      if (sessionData.disclaimerAcceptedAt) {
-        setHasAcceptedDisclaimer(true)
-      }
       const resolvedType =
         sessionData.signatureType === "delivery" ? "delivery" : "estimate"
+      const acceptedType = sessionData.disclaimerType ?? null
+      const hasValidAcceptance = Boolean(
+        sessionData.disclaimerAcceptedAt && acceptedType === resolvedType
+      )
+      setHasAcceptedDisclaimer(hasValidAcceptance)
       setDisclaimerType(resolvedType)
       setDisclaimerResolved(true)
     })
