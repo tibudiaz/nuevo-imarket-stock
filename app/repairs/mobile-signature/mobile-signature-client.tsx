@@ -45,6 +45,7 @@ function MobileSignatureContent() {
   const [disclaimerType, setDisclaimerType] = useState<"estimate" | "delivery" | null>(null)
   const [disclaimerResolved, setDisclaimerResolved] = useState(false)
   const [isAcceptingDisclaimer, setIsAcceptingDisclaimer] = useState(false)
+  const [isCancelingDisclaimer, setIsCancelingDisclaimer] = useState(false)
 
   const signatureLocked = status === "closed" || status === "signed" || Boolean(signatureUrl)
 
@@ -170,11 +171,12 @@ function MobileSignatureContent() {
   }, [])
 
   useEffect(() => {
+    if (!hasAcceptedDisclaimer || showThanks || status === "closed") return
     setupCanvas()
     if (typeof window === "undefined") return
     window.addEventListener("resize", setupCanvas)
     return () => window.removeEventListener("resize", setupCanvas)
-  }, [setupCanvas])
+  }, [hasAcceptedDisclaimer, setupCanvas, showThanks, status])
 
   const getCanvasPoint = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -360,6 +362,25 @@ function MobileSignatureContent() {
     }
   }, [disclaimerType, sessionRefPath])
 
+  const handleCancelDisclaimer = useCallback(async () => {
+    if (!sessionRefPath || isCancelingDisclaimer) return
+    setIsCancelingDisclaimer(true)
+    try {
+      const sessionRef = databaseRef(database, sessionRefPath)
+      await update(sessionRef, {
+        status: "closed",
+        closedAt: new Date().toISOString(),
+        closedBy: "customer",
+      })
+      toast.message("Se canceló la solicitud de firma.")
+    } catch (error) {
+      console.error("No se pudo cancelar la firma:", error)
+      toast.error("No se pudo cancelar la firma. Intentá nuevamente.")
+    } finally {
+      setIsCancelingDisclaimer(false)
+    }
+  }, [isCancelingDisclaimer, sessionRefPath])
+
   if (!sessionId) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -388,6 +409,12 @@ function MobileSignatureContent() {
   const shouldShowDisclaimerLoading = shouldShowDisclaimer && !disclaimerResolved
   const shouldShowDisclaimerContent =
     shouldShowDisclaimer && disclaimerResolved && disclaimerType !== null
+  const shouldShowSignatureForm =
+    !showThanks &&
+    !shouldShowDisclaimerLoading &&
+    !shouldShowDisclaimerContent &&
+    hasAcceptedDisclaimer &&
+    status !== "closed"
 
   const disclaimerContent =
     disclaimerType === "delivery"
@@ -440,7 +467,15 @@ function MobileSignatureContent() {
                   {disclaimerContent}
                 </p>
               </div>
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelDisclaimer}
+                  disabled={isCancelingDisclaimer}
+                >
+                  Cancelar
+                </Button>
                 <Button type="button" onClick={handleAcceptDisclaimer} disabled={isAcceptingDisclaimer}>
                   {isAcceptingDisclaimer ? (
                     <>
@@ -454,7 +489,7 @@ function MobileSignatureContent() {
             </div>
           )}
 
-          {!shouldShowDisclaimerContent && !shouldShowDisclaimerLoading && (
+          {shouldShowSignatureForm && (
             <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
