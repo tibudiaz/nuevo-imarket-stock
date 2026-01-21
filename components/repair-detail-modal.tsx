@@ -184,11 +184,17 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
     setSignatureLink("");
     setSignatureSessionRefPath("");
 
+    const receiptNumber =
+      repairData.deliveryReceiptNumber ||
+      repairData.receiptNumber ||
+      repairData.id ||
+      "sin-recibo";
+
     const sessionPayload = {
       createdAt: new Date().toISOString(),
       status: "pending",
       repairId: repairData.id,
-      receiptNumber: repairData.deliveryReceiptNumber || repairData.receiptNumber,
+      receiptNumber,
       signatureType: "delivery",
       store: repairData.store ?? null,
       createdBy: user?.username ?? null,
@@ -208,8 +214,8 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
     }
 
     try {
-      const repairRef = ref(database, `repairs/${repairData.id}`);
-      await update(repairRef, { signatureSession: sessionPayload });
+      const signatureRef = ref(database, `repairs/${repairData.id}/signatureSession`);
+      await set(signatureRef, sessionPayload);
       setSignatureSessionId(repairData.id);
       setSignatureSessionRefPath(`repairs/${repairData.id}/signatureSession`);
       setIsSignatureDialogOpen(true);
