@@ -472,14 +472,14 @@ export const generateRepairReceiptPdf = async (repairData: Repair, customerData:
     
     drawRepairPdfContent(firstPage, repairData, customerData, { helveticaFont, helveticaBold });
     if (repairData.signature?.url) {
-      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont, 25);
+      await drawRepairSignature(firstPage, pdfDoc, repairData.signature, helveticaFont, 15);
     }
 
     if (pdfDoc.getPageCount() > 1) {
         const secondPage = pdfDoc.getPages()[1];
         drawRepairPdfContent(secondPage, repairData, customerData, { helveticaFont, helveticaBold });
         if (repairData.signature?.url) {
-          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont, 25);
+          await drawRepairSignature(secondPage, pdfDoc, repairData.signature, helveticaFont, 15);
         }
     }
 
