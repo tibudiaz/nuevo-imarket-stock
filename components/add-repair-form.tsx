@@ -361,12 +361,13 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
     };
 
     const newSessionId = generateSignatureSessionId();
+    const primarySessionPath = `repairSignatureSessions/${newSessionId}`;
+    setSignatureSessionId(newSessionId);
+    setSignatureSessionRefPath(primarySessionPath);
+    setIsSignatureDialogOpen(true);
     try {
-      const sessionRef = ref(database, `repairSignatureSessions/${newSessionId}`);
+      const sessionRef = ref(database, primarySessionPath);
       await set(sessionRef, sessionPayload);
-      setSignatureSessionId(newSessionId);
-      setSignatureSessionRefPath(`repairSignatureSessions/${newSessionId}`);
-      setIsSignatureDialogOpen(true);
       return;
     } catch (error) {
       console.error("Error al crear la sesión de firma:", error);
@@ -377,7 +378,6 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
       await update(repairRef, { signatureSession: sessionPayload });
       setSignatureSessionId(repair.id);
       setSignatureSessionRefPath(`repairs/${repair.id}/signatureSession`);
-      setIsSignatureDialogOpen(true);
     } catch (error) {
       console.error("Error al crear la sesión de firma en la reparación:", error);
       setSignatureSessionError("No se pudo iniciar la sesión de firma. Revisá la conexión e intentá nuevamente.");
