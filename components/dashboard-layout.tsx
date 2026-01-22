@@ -27,6 +27,7 @@ import {
   Banknote,
   Copy,
   X,
+  ClipboardList,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -469,6 +470,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   ))}
                 </CollapsibleContent>
               </Collapsible>
+
+              <NavItem
+                href="/dashboard/used-phones"
+                icon={ClipboardList}
+                label="Listado Usados"
+                active={pathname === "/dashboard/used-phones"}
+              />
 
               <NavItem href="/dashboard/low-stock" icon={AlertTriangle} label="Bajo Stock" active={pathname === "/dashboard/low-stock"} />
 
