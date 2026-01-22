@@ -44,6 +44,7 @@ import {
   Barcode,
   User,
   Wallet,
+  SlidersHorizontal,
 } from "lucide-react";
 import { ref, onValue, set, push, remove, update } from "firebase/database";
 import { database } from "@/lib/firebase";
@@ -60,6 +61,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMobile } from "@/hooks/use-mobile";
 import { useStore } from "@/hooks/use-store";
 import { useAuth } from "@/hooks/use-auth";
@@ -130,6 +139,32 @@ const createEmptyNewProduct = (
   store: getStoreFromSelection(store),
 });
 
+const getModelSortKey = (product: Product) => {
+  const text = `${product.model || product.name || ""}`.toLowerCase();
+  const normalized = text.replace(/[\s,]+/g, " ").trim();
+  const numberMatch = normalized.match(/\d+/);
+  const modelNumber = numberMatch
+    ? Number.parseInt(numberMatch[0], 10)
+    : Number.POSITIVE_INFINITY;
+  const variantRank = normalized.includes("pro max")
+    ? 2
+    : normalized.includes("pro")
+      ? 1
+      : 0;
+  const storageMatch = normalized.match(/(\d+)\s*(tb|gb)/);
+  let storage = storageMatch ? Number.parseInt(storageMatch[1], 10) : 0;
+  if (storageMatch?.[2] === "tb") {
+    storage *= 1024;
+  }
+
+  return {
+    modelNumber,
+    variantRank,
+    storage,
+    normalized,
+  };
+};
+
 export default function InventoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -141,6 +176,11 @@ export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleColumns, setVisibleColumns] = useState({
+    entryDate: true,
+    provider: true,
+    cost: true,
+  });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
   const [isQuickSaleOpen, setIsQuickSaleOpen] = useState(false);
@@ -185,6 +225,15 @@ export default function InventoryPage() {
   const isEditingCellphoneWithoutModelCategory =
     editingProduct?.category === "Celulares Usados" ||
     editingProduct?.category === "Celulares Nuevos";
+
+  const showEntryDate = visibleColumns.entryDate;
+  const showProvider = user?.role === "admin" && visibleColumns.provider;
+  const showCost = user?.role === "admin" && visibleColumns.cost;
+  const tableColumnsCount =
+    9 +
+    (showEntryDate ? 1 : 0) +
+    (showProvider ? 1 : 0) +
+    (showCost ? 1 : 0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -361,7 +410,7 @@ export default function InventoryPage() {
   // Se usa `useMemo` para evitar que el filtrado se ejecute en cada renderizado.
   // Esto optimiza drásticamente el rendimiento en listas grandes.
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    const filtered = products.filter((product) => {
       if (!product) return false;
 
       const storeMatch =
@@ -376,6 +425,29 @@ export default function InventoryPage() {
 
       return storeMatch && categoryMatch && searchMatch;
     });
+
+    return filtered
+      .map((product, index) => ({
+        product,
+        index,
+        sortKey: getModelSortKey(product),
+      }))
+      .sort((a, b) => {
+        if (a.sortKey.modelNumber !== b.sortKey.modelNumber) {
+          return a.sortKey.modelNumber - b.sortKey.modelNumber;
+        }
+        if (a.sortKey.variantRank !== b.sortKey.variantRank) {
+          return a.sortKey.variantRank - b.sortKey.variantRank;
+        }
+        if (a.sortKey.storage !== b.sortKey.storage) {
+          return a.sortKey.storage - b.sortKey.storage;
+        }
+        if (a.sortKey.normalized !== b.sortKey.normalized) {
+          return a.sortKey.normalized.localeCompare(b.sortKey.normalized, "es");
+        }
+        return a.index - b.index;
+      })
+      .map(({ product }) => product);
   }, [products, selectedStore, categorySearch, searchTerm]);
 
   const handleAddProduct = async () => {
@@ -616,6 +688,55 @@ export default function InventoryPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <SlidersHorizontal className="mr-2 h-4 w-4" />
+                  Columnas
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Ver columnas</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={visibleColumns.entryDate}
+                  onCheckedChange={(checked) =>
+                    setVisibleColumns((prev) => ({
+                      ...prev,
+                      entryDate: Boolean(checked),
+                    }))
+                  }
+                >
+                  Fecha de ingreso
+                </DropdownMenuCheckboxItem>
+                {user?.role === "admin" && (
+                  <>
+                    <DropdownMenuCheckboxItem
+                      checked={visibleColumns.provider}
+                      onCheckedChange={(checked) =>
+                        setVisibleColumns((prev) => ({
+                          ...prev,
+                          provider: Boolean(checked),
+                        }))
+                      }
+                    >
+                      Proveedor
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={visibleColumns.cost}
+                      onCheckedChange={(checked) =>
+                        setVisibleColumns((prev) => ({
+                          ...prev,
+                          cost: Boolean(checked),
+                        }))
+                      }
+                    >
+                      Costo
+                    </DropdownMenuCheckboxItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               onClick={() => {
                 if (selectedStore === "all") {
@@ -885,11 +1006,11 @@ export default function InventoryPage() {
                 <TableHead>Marca</TableHead>
                 <TableHead>Modelo</TableHead>
                 <TableHead>Categoría</TableHead>
-                <TableHead>Ingreso</TableHead>
-                {user?.role === "admin" && <TableHead>Proveedor</TableHead>}
+                {showEntryDate && <TableHead>Ingreso</TableHead>}
+                {showProvider && <TableHead>Proveedor</TableHead>}
                 <TableHead>Código/IMEI</TableHead>
                 <TableHead>Precio</TableHead>
-                {user?.role === "admin" && <TableHead>Costo</TableHead>}
+                {showCost && <TableHead>Costo</TableHead>}
                 <TableHead>Stock</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -898,7 +1019,7 @@ export default function InventoryPage() {
               {filteredProducts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={user?.role === "admin" ? 12 : 10}
+                    colSpan={tableColumnsCount}
                     className="text-center py-6 text-muted-foreground"
                   >
                     No se encontraron productos
@@ -926,15 +1047,17 @@ export default function InventoryPage() {
                     <TableCell>{product.brand || "N/A"}</TableCell>
                     <TableCell>{product.model || "N/A"}</TableCell>
                     <TableCell>{product.category || "N/A"}</TableCell>
-                    <TableCell>
-                      {(() => {
-                        const date = product.entryDate || product.createdAt;
-                        return date
-                          ? new Date(date).toLocaleDateString()
-                          : "N/A";
-                      })()}
-                    </TableCell>
-                    {user?.role === "admin" && (
+                    {showEntryDate && (
+                      <TableCell>
+                        {(() => {
+                          const date = product.entryDate || product.createdAt;
+                          return date
+                            ? new Date(date).toLocaleDateString()
+                            : "N/A";
+                        })()}
+                      </TableCell>
+                    )}
+                    {showProvider && (
                       <TableCell>
                         {product.provider && (
                           <div className="flex items-center gap-1">
@@ -960,7 +1083,7 @@ export default function InventoryPage() {
                     <TableCell>
                       ${Number(product.price || 0).toFixed(2)}
                     </TableCell>
-                    {user?.role === "admin" && (
+                    {showCost && (
                       <TableCell>
                         ${Number(product.cost || 0).toFixed(2)}
                       </TableCell>
