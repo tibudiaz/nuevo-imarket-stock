@@ -62,6 +62,10 @@ export default function PublicStockPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [usdRate, setUsdRate] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [catalogVisibility, setCatalogVisibility] = useState({
+    newPhones: true,
+    usedPhones: true,
+  })
 
   useEffect(() => {
     const productsRef = ref(database, "products")
@@ -98,6 +102,24 @@ export default function PublicStockPage() {
   }, [])
 
   useEffect(() => {
+    const visibilityRef = ref(database, "catalogVisibility")
+    const unsubscribeVisibility = onValue(visibilityRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setCatalogVisibility({ newPhones: true, usedPhones: true })
+        return
+      }
+
+      const data = snapshot.val() || {}
+      setCatalogVisibility({
+        newPhones: data.newPhones !== false,
+        usedPhones: data.usedPhones !== false,
+      })
+    })
+
+    return () => unsubscribeVisibility()
+  }, [])
+
+  useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
         const response = await fetch("https://dolarapi.com/v1/dolares/blue")
@@ -130,10 +152,28 @@ export default function PublicStockPage() {
     }
   }, [products])
 
-  const sections = [
-    { title: "Celulares Nuevos", data: newPhones, accent: "from-sky-500/20 to-blue-500/5" },
-    { title: "Celulares Usados", data: usedPhones, accent: "from-emerald-500/20 to-green-500/5" },
-  ]
+  const sections = useMemo(() => {
+    const baseSections = [
+      {
+        key: "newPhones",
+        title: "Celulares Nuevos",
+        data: newPhones,
+        accent: "from-sky-500/20 to-blue-500/5",
+      },
+      {
+        key: "usedPhones",
+        title: "Celulares Usados",
+        data: usedPhones,
+        accent: "from-emerald-500/20 to-green-500/5",
+      },
+    ]
+
+    return baseSections.filter((section) => {
+      if (section.key === "newPhones") return catalogVisibility.newPhones
+      if (section.key === "usedPhones") return catalogVisibility.usedPhones
+      return true
+    })
+  }, [catalogVisibility, newPhones, usedPhones])
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -194,78 +234,84 @@ export default function PublicStockPage() {
           </div>
         ) : (
           <div className="space-y-12">
-            {sections.map((section) => (
-              <section key={section.title} className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-semibold">{section.title}</h2>
-                    <p className="text-sm text-slate-400">
-                      {section.data.length} equipos disponibles
-                    </p>
+            {sections.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
+                El catálogo no tiene categorías visibles por el momento.
+              </div>
+            ) : (
+              sections.map((section) => (
+                <section key={section.title} className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold">{section.title}</h2>
+                      <p className="text-sm text-slate-400">
+                        {section.data.length} equipos disponibles
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                {section.data.length === 0 ? (
-                  <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
-                    No hay equipos disponibles por el momento.
-                  </div>
-                ) : (
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {section.data.map((product) => (
-                      <div
-                        key={product.id}
-                        className={cn(
-                          "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
-                          "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
-                          `before:${section.accent}`,
-                        )}
-                      >
-                        <div className="relative space-y-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                                {section.title}
-                              </p>
-                              <h3 className="text-lg font-semibold text-white">
-                                {resolveProductName(product)}
-                              </h3>
-                            </div>
-                            <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
-                              Stock: {product.stock ?? 0}
-                            </div>
-                          </div>
-
-                          <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                            <div className="flex items-center justify-between">
+                  {section.data.length === 0 ? (
+                    <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
+                      No hay equipos disponibles por el momento.
+                    </div>
+                  ) : (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                      {section.data.map((product) => (
+                        <div
+                          key={product.id}
+                          className={cn(
+                            "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
+                            "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
+                            `before:${section.accent}`,
+                          )}
+                        >
+                          <div className="relative space-y-4">
+                            <div className="flex items-start justify-between gap-4">
                               <div>
-                                <p className="text-xs text-slate-400">IMEI</p>
-                                <p className="text-sm font-medium text-slate-100">
-                                  {formatImeiSuffix(product.imei)}
+                                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                                  {section.title}
                                 </p>
+                                <h3 className="text-lg font-semibold text-white">
+                                  {resolveProductName(product)}
+                                </h3>
                               </div>
-                              <div className="text-right">
-                                <p className="text-xs text-slate-400">Precio USD</p>
-                                <p className="text-lg font-semibold text-sky-200">
-                                  {formatUsdPrice(product.price, usdRate)}
-                                </p>
+                              <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
+                                Stock: {product.stock ?? 0}
                               </div>
                             </div>
-                            <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
-                              <span className="text-xs text-slate-400">
-                                Precio en pesos actual
-                              </span>
-                              <span className="font-semibold text-emerald-200">
-                                {formatArsPriceBluePlus(product.price, usdRate)}
-                              </span>
+
+                            <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-xs text-slate-400">IMEI</p>
+                                  <p className="text-sm font-medium text-slate-100">
+                                    {formatImeiSuffix(product.imei)}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs text-slate-400">Precio USD</p>
+                                  <p className="text-lg font-semibold text-sky-200">
+                                    {formatUsdPrice(product.price, usdRate)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
+                                <span className="text-xs text-slate-400">
+                                  Precio en pesos actual
+                                </span>
+                                <span className="font-semibold text-emerald-200">
+                                  {formatArsPriceBluePlus(product.price, usdRate)}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            ))}
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ))
+            )}
           </div>
         )}
       </main>

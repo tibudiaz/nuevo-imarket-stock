@@ -16,12 +16,13 @@ import {
   Smartphone,
   RefreshCw,
 } from "lucide-react"
-import { ref, onValue } from "firebase/database"
+import { ref, onValue, set } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Reserve } from "@/components/sell-product-modal"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth" // Importa el hook de autenticación
 import { useStore } from "@/hooks/use-store"
@@ -146,6 +147,7 @@ export default function Dashboard() {
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
   const [reserves, setReserves] = useState<Reserve[]>([]);
   const [dailySalesSummary, setDailySalesSummary] = useState<Record<SummaryKey, StoreSummary>>(createEmptySummary);
+  const [catalogVisibility, setCatalogVisibility] = useState({ newPhones: true, usedPhones: true })
 
   // Se elimina el useEffect que manejaba la autenticación localmente
 
@@ -228,6 +230,47 @@ export default function Dashboard() {
 
     return () => unsubscribeReserves();
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return
+
+    const visibilityRef = ref(database, "catalogVisibility")
+    const unsubscribeVisibility = onValue(visibilityRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setCatalogVisibility({ newPhones: true, usedPhones: true })
+        return
+      }
+
+      const data = snapshot.val() || {}
+      setCatalogVisibility({
+        newPhones: data.newPhones !== false,
+        usedPhones: data.usedPhones !== false,
+      })
+    })
+
+    return () => unsubscribeVisibility()
+  }, [user])
+
+  const handleCatalogVisibilityChange = async (
+    key: "newPhones" | "usedPhones",
+    checked: boolean | "indeterminate",
+  ) => {
+    const nextValue = checked === true
+    const previous = catalogVisibility
+    const nextState = {
+      ...catalogVisibility,
+      [key]: nextValue,
+    }
+    setCatalogVisibility(nextState)
+
+    try {
+      await set(ref(database, "catalogVisibility"), nextState)
+    } catch (error) {
+      console.error("Error al actualizar visibilidad del catálogo:", error)
+      setCatalogVisibility(previous)
+      toast.error("No se pudo actualizar la visibilidad del catálogo.")
+    }
+  }
 
   useEffect(() => {
     if (products.length === 0) {
@@ -511,6 +554,14 @@ export default function Dashboard() {
               <Smartphone className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  id="catalog-new-phones"
+                  checked={catalogVisibility.newPhones}
+                  onCheckedChange={(checked) => handleCatalogVisibilityChange("newPhones", checked)}
+                />
+                <label htmlFor="catalog-new-phones">Mostrar en catálogo</label>
+              </div>
               <div className="text-2xl font-bold">{currencyFormatter.format(selectedStoreSummary.newPhones)}</div>
               <p className="text-xs text-muted-foreground">Resumen diario - {selectedStoreLabel}</p>
             </CardContent>
@@ -521,6 +572,14 @@ export default function Dashboard() {
               <RefreshCw className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  id="catalog-used-phones"
+                  checked={catalogVisibility.usedPhones}
+                  onCheckedChange={(checked) => handleCatalogVisibilityChange("usedPhones", checked)}
+                />
+                <label htmlFor="catalog-used-phones">Mostrar en catálogo</label>
+              </div>
               <div className="text-2xl font-bold">{currencyFormatter.format(selectedStoreSummary.usedPhones)}</div>
               <p className="text-xs text-muted-foreground">Resumen diario - {selectedStoreLabel}</p>
             </CardContent>
