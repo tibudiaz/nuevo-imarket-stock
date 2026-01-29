@@ -17,6 +17,7 @@ interface Product {
   category?: string
   imei?: string
   stock?: number
+  visibleInCatalog?: boolean
   [key: string]: any
 }
 
@@ -141,7 +142,9 @@ export default function PublicStockPage() {
   }, [])
 
   const { newPhones, usedPhones } = useMemo(() => {
-    const inStock = products.filter((product) => (product.stock ?? 0) > 0)
+    const inStock = products.filter(
+      (product) => (product.stock ?? 0) > 0 && product.visibleInCatalog !== false,
+    )
     const sortByName = (a: Product, b: Product) =>
       resolveProductName(a).localeCompare(resolveProductName(b), "es", {
         sensitivity: "base",

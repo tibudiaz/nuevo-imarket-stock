@@ -35,6 +35,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus,
   Search,
@@ -91,6 +92,7 @@ interface Product {
   imei?: string;
   provider?: string;
   store?: "local1" | "local2";
+  visibleInCatalog?: boolean;
   lastTransfer?: string;
   entryDate?: string;
   createdAt?: string;
@@ -181,6 +183,10 @@ export default function InventoryPage() {
     provider: true,
     cost: true,
   });
+  const [catalogVisibility, setCatalogVisibility] = useState({
+    newPhones: true,
+    usedPhones: true,
+  });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
   const [isQuickSaleOpen, setIsQuickSaleOpen] = useState(false);
@@ -229,11 +235,15 @@ export default function InventoryPage() {
   const showEntryDate = visibleColumns.entryDate;
   const showProvider = user?.role === "admin" && visibleColumns.provider;
   const showCost = user?.role === "admin" && visibleColumns.cost;
+  const showCatalogVisibility = categorySearch === "Celulares Nuevos";
+  const canManageVisibility =
+    user?.role === "admin" || user?.role === "moderator";
   const tableColumnsCount =
     9 +
     (showEntryDate ? 1 : 0) +
     (showProvider ? 1 : 0) +
-    (showCost ? 1 : 0);
+    (showCost ? 1 : 0) +
+    (showCatalogVisibility ? 1 : 0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -406,6 +416,26 @@ export default function InventoryPage() {
     };
   }, [authLoading, user]);
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const visibilityRef = ref(database, "catalogVisibility");
+    const unsubscribeVisibility = onValue(visibilityRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setCatalogVisibility({ newPhones: true, usedPhones: true });
+        return;
+      }
+
+      const data = snapshot.val() || {};
+      setCatalogVisibility({
+        newPhones: data.newPhones !== false,
+        usedPhones: data.usedPhones !== false,
+      });
+    });
+
+    return () => unsubscribeVisibility();
+  }, [authLoading, user]);
+
   // --- CORRECCIÓN CLAVE DE RENDIMIENTO ---
   // Se usa `useMemo` para evitar que el filtrado se ejecute en cada renderizado.
   // Esto optimiza drásticamente el rendimiento en listas grandes.
@@ -569,6 +599,53 @@ export default function InventoryPage() {
 
   const handleProductSold = () => {
     setIsSellDialogOpen(false);
+  };
+
+  const handleCatalogVisibilityChange = async (
+    checked: boolean | "indeterminate",
+  ) => {
+    const nextValue = checked === true;
+    const previous = catalogVisibility;
+    const nextState = {
+      ...catalogVisibility,
+      newPhones: nextValue,
+    };
+    setCatalogVisibility(nextState);
+
+    try {
+      await set(ref(database, "catalogVisibility"), nextState);
+    } catch (error) {
+      console.error("Error al actualizar visibilidad del catálogo:", error);
+      setCatalogVisibility(previous);
+      toast.error("No se pudo actualizar la visibilidad del catálogo.");
+    }
+  };
+
+  const handleProductVisibilityChange = async (
+    productId: string,
+    checked: boolean | "indeterminate",
+  ) => {
+    if (!canManageVisibility) return;
+    const nextValue = checked === true;
+    const previousProducts = products;
+
+    setProducts((prev) =>
+      prev.map((product) =>
+        product.id === productId
+          ? { ...product, visibleInCatalog: nextValue }
+          : product,
+      ),
+    );
+
+    try {
+      await update(ref(database, `products/${productId}`), {
+        visibleInCatalog: nextValue,
+      });
+    } catch (error) {
+      console.error("Error al actualizar visibilidad del equipo:", error);
+      setProducts(previousProducts);
+      toast.error("No se pudo actualizar la visibilidad del equipo.");
+    }
   };
 
   const handleCategoryChange = (value: string) => {
@@ -997,6 +1074,21 @@ export default function InventoryPage() {
           </div>
         </div>
 
+        {showCatalogVisibility && (
+          <div className="mb-4 flex items-center gap-3 rounded-md border bg-white px-3 py-2 text-sm">
+            <Checkbox
+              id="catalog-new-phones"
+              className="h-5 w-5 border-2"
+              checked={catalogVisibility.newPhones}
+              onCheckedChange={handleCatalogVisibilityChange}
+              disabled={!canManageVisibility}
+            />
+            <label htmlFor="catalog-new-phones" className="cursor-pointer font-medium">
+              Mostrar celulares nuevos en catálogo
+            </label>
+          </div>
+        )}
+
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -1012,6 +1104,9 @@ export default function InventoryPage() {
                 <TableHead>Precio</TableHead>
                 {showCost && <TableHead>Costo</TableHead>}
                 <TableHead>Stock</TableHead>
+                {showCatalogVisibility && (
+                  <TableHead className="text-center">Visible</TableHead>
+                )}
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -1097,6 +1192,19 @@ export default function InventoryPage() {
                         {product.stock || 0}
                       </Badge>
                     </TableCell>
+                    {showCatalogVisibility && (
+                      <TableCell className="text-center">
+                        <Checkbox
+                          id={`new-phone-visible-${product.id}`}
+                          className="h-5 w-5 border-2"
+                          checked={product.visibleInCatalog !== false}
+                          onCheckedChange={(checked) =>
+                            handleProductVisibilityChange(product.id, checked)
+                          }
+                          disabled={!canManageVisibility}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {(user?.role === "admin" ||

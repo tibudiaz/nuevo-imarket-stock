@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, set, update } from "firebase/database";
 import { Search, SlidersHorizontal, Smartphone } from "lucide-react";
 
 import { database } from "@/lib/firebase";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useStore } from "@/hooks/use-store";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -36,6 +37,7 @@ interface Product {
   price?: number;
   category?: string;
   store?: "local1" | "local2";
+  visibleInCatalog?: boolean;
   [key: string]: any;
 }
 
@@ -68,10 +70,17 @@ export default function UsedPhonesList() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [catalogVisibility, setCatalogVisibility] = useState({
+    newPhones: true,
+    usedPhones: true,
+  });
   const [visibleColumns, setVisibleColumns] = useState({
     price: true,
     store: false,
   });
+
+  const canManageVisibility =
+    user?.role === "admin" || user?.role === "moderator";
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -114,6 +123,73 @@ export default function UsedPhonesList() {
     return () => unsubscribe();
   }, [authLoading, user]);
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const visibilityRef = ref(database, "catalogVisibility");
+    const unsubscribeVisibility = onValue(visibilityRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setCatalogVisibility({ newPhones: true, usedPhones: true });
+        return;
+      }
+
+      const data = snapshot.val() || {};
+      setCatalogVisibility({
+        newPhones: data.newPhones !== false,
+        usedPhones: data.usedPhones !== false,
+      });
+    });
+
+    return () => unsubscribeVisibility();
+  }, [authLoading, user]);
+
+  const handleCatalogVisibilityChange = async (
+    checked: boolean | "indeterminate",
+  ) => {
+    const nextValue = checked === true;
+    const previous = catalogVisibility;
+    const nextState = {
+      ...catalogVisibility,
+      usedPhones: nextValue,
+    };
+    setCatalogVisibility(nextState);
+
+    try {
+      await set(ref(database, "catalogVisibility"), nextState);
+    } catch (error) {
+      console.error("Error al actualizar visibilidad del catálogo:", error);
+      setCatalogVisibility(previous);
+      toast.error("No se pudo actualizar la visibilidad del catálogo.");
+    }
+  };
+
+  const handleProductVisibilityChange = async (
+    productId: string,
+    checked: boolean | "indeterminate",
+  ) => {
+    if (!canManageVisibility) return;
+    const nextValue = checked === true;
+    const previousProducts = products;
+
+    setProducts((prev) =>
+      prev.map((product) =>
+        product.id === productId
+          ? { ...product, visibleInCatalog: nextValue }
+          : product,
+      ),
+    );
+
+    try {
+      await update(ref(database, `products/${productId}`), {
+        visibleInCatalog: nextValue,
+      });
+    } catch (error) {
+      console.error("Error al actualizar visibilidad del equipo:", error);
+      setProducts(previousProducts);
+      toast.error("No se pudo actualizar la visibilidad del equipo.");
+    }
+  };
+
   const filteredProducts = useMemo(() => {
     const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
     return products
@@ -132,7 +208,8 @@ export default function UsedPhonesList() {
       );
   }, [products, searchTerm, selectedStore]);
 
-  const colSpan = 1 + Number(visibleColumns.price) + Number(visibleColumns.store);
+  const colSpan =
+    2 + Number(visibleColumns.price) + Number(visibleColumns.store);
 
   if (authLoading || !user) {
     return (
@@ -198,6 +275,18 @@ export default function UsedPhonesList() {
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <div className="flex items-center gap-3 rounded-md border bg-white px-3 py-2 text-sm">
+          <Checkbox
+            id="catalog-used-phones"
+            className="h-5 w-5 border-2"
+            checked={catalogVisibility.usedPhones}
+            onCheckedChange={handleCatalogVisibilityChange}
+            disabled={!canManageVisibility}
+          />
+          <label htmlFor="catalog-used-phones" className="cursor-pointer font-medium">
+            Mostrar celulares usados en catálogo
+          </label>
+        </div>
       </div>
       <div className="rounded-md border bg-white">
         <Table>
@@ -208,6 +297,7 @@ export default function UsedPhonesList() {
                 <TableHead className="text-right">Precio de venta</TableHead>
               )}
               {visibleColumns.store && <TableHead>Local</TableHead>}
+              <TableHead className="text-center">Visible</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -235,6 +325,17 @@ export default function UsedPhonesList() {
                       {product.store ? storeLabels[product.store] : "Sin local"}
                     </TableCell>
                   )}
+                  <TableCell className="text-center">
+                    <Checkbox
+                      id={`used-phone-visible-${product.id}`}
+                      className="h-5 w-5 border-2"
+                      checked={product.visibleInCatalog !== false}
+                      onCheckedChange={(checked) =>
+                        handleProductVisibilityChange(product.id, checked)
+                      }
+                      disabled={!canManageVisibility}
+                    />
+                  </TableCell>
                 </TableRow>
               ))
             ) : (

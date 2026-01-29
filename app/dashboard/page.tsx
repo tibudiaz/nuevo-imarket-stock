@@ -16,13 +16,12 @@ import {
   Smartphone,
   RefreshCw,
 } from "lucide-react"
-import { ref, onValue, set } from "firebase/database"
+import { ref, onValue } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { Reserve } from "@/components/sell-product-modal"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth" // Importa el hook de autenticación
 import { useStore } from "@/hooks/use-store"
@@ -147,7 +146,6 @@ export default function Dashboard() {
   const [dailySalesData, setDailySalesData] = useState<Sale[]>([]);
   const [reserves, setReserves] = useState<Reserve[]>([]);
   const [dailySalesSummary, setDailySalesSummary] = useState<Record<SummaryKey, StoreSummary>>(createEmptySummary);
-  const [catalogVisibility, setCatalogVisibility] = useState({ newPhones: true, usedPhones: true })
 
   // Se elimina el useEffect que manejaba la autenticación localmente
 
@@ -230,47 +228,6 @@ export default function Dashboard() {
 
     return () => unsubscribeReserves();
   }, [user]);
-
-  useEffect(() => {
-    if (!user) return
-
-    const visibilityRef = ref(database, "catalogVisibility")
-    const unsubscribeVisibility = onValue(visibilityRef, (snapshot) => {
-      if (!snapshot.exists()) {
-        setCatalogVisibility({ newPhones: true, usedPhones: true })
-        return
-      }
-
-      const data = snapshot.val() || {}
-      setCatalogVisibility({
-        newPhones: data.newPhones !== false,
-        usedPhones: data.usedPhones !== false,
-      })
-    })
-
-    return () => unsubscribeVisibility()
-  }, [user])
-
-  const handleCatalogVisibilityChange = async (
-    key: "newPhones" | "usedPhones",
-    checked: boolean | "indeterminate",
-  ) => {
-    const nextValue = checked === true
-    const previous = catalogVisibility
-    const nextState = {
-      ...catalogVisibility,
-      [key]: nextValue,
-    }
-    setCatalogVisibility(nextState)
-
-    try {
-      await set(ref(database, "catalogVisibility"), nextState)
-    } catch (error) {
-      console.error("Error al actualizar visibilidad del catálogo:", error)
-      setCatalogVisibility(previous)
-      toast.error("No se pudo actualizar la visibilidad del catálogo.")
-    }
-  }
 
   useEffect(() => {
     if (products.length === 0) {
@@ -538,41 +495,6 @@ export default function Dashboard() {
         )}
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
-          <Card className="lg:col-span-3">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Visibilidad del catálogo público</CardTitle>
-              <Box className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-4">
-                Activa o desactiva qué categorías se muestran en el catálogo público.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex items-center gap-3 text-sm text-foreground">
-                  <Checkbox
-                    id="catalog-new-phones"
-                    className="h-5 w-5 border-2"
-                    checked={catalogVisibility.newPhones}
-                    onCheckedChange={(checked) => handleCatalogVisibilityChange("newPhones", checked)}
-                  />
-                  <label htmlFor="catalog-new-phones" className="cursor-pointer font-medium">
-                    Celulares nuevos visibles
-                  </label>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-foreground">
-                  <Checkbox
-                    id="catalog-used-phones"
-                    className="h-5 w-5 border-2"
-                    checked={catalogVisibility.usedPhones}
-                    onCheckedChange={(checked) => handleCatalogVisibilityChange("usedPhones", checked)}
-                  />
-                  <label htmlFor="catalog-used-phones" className="cursor-pointer font-medium">
-                    Celulares usados visibles
-                  </label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Ventas de Productos (Hoy)</CardTitle>
