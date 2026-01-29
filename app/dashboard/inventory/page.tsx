@@ -235,7 +235,11 @@ export default function InventoryPage() {
   const showEntryDate = visibleColumns.entryDate;
   const showProvider = user?.role === "admin" && visibleColumns.provider;
   const showCost = user?.role === "admin" && visibleColumns.cost;
-  const showCatalogVisibility = categorySearch === "Celulares Nuevos";
+  const isNewPhonesCategory = categorySearch === "Celulares Nuevos";
+  const isUsedPhonesCategory = categorySearch === "Celulares Usados";
+  const showCatalogVisibility = isNewPhonesCategory || isUsedPhonesCategory;
+  const catalogVisibilityKey: "newPhones" | "usedPhones" | null =
+    isNewPhonesCategory ? "newPhones" : isUsedPhonesCategory ? "usedPhones" : null;
   const canManageVisibility =
     user?.role === "admin" || user?.role === "moderator";
   const tableColumnsCount =
@@ -602,13 +606,14 @@ export default function InventoryPage() {
   };
 
   const handleCatalogVisibilityChange = async (
+    key: "newPhones" | "usedPhones",
     checked: boolean | "indeterminate",
   ) => {
     const nextValue = checked === true;
     const previous = catalogVisibility;
     const nextState = {
       ...catalogVisibility,
-      newPhones: nextValue,
+      [key]: nextValue,
     };
     setCatalogVisibility(nextState);
 
@@ -1074,17 +1079,24 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {showCatalogVisibility && (
+        {showCatalogVisibility && catalogVisibilityKey && (
           <div className="mb-4 flex items-center gap-3 rounded-md border bg-white px-3 py-2 text-sm">
             <Checkbox
-              id="catalog-new-phones"
+              id="catalog-phones-visibility"
               className="h-5 w-5 border-2"
-              checked={catalogVisibility.newPhones}
-              onCheckedChange={handleCatalogVisibilityChange}
+              checked={catalogVisibility[catalogVisibilityKey]}
+              onCheckedChange={(checked) =>
+                handleCatalogVisibilityChange(catalogVisibilityKey, checked)
+              }
               disabled={!canManageVisibility}
             />
-            <label htmlFor="catalog-new-phones" className="cursor-pointer font-medium">
-              Mostrar celulares nuevos en catálogo
+            <label
+              htmlFor="catalog-phones-visibility"
+              className="cursor-pointer font-medium"
+            >
+              {isNewPhonesCategory
+                ? "Mostrar celulares nuevos en catálogo"
+                : "Mostrar celulares usados en catálogo"}
             </label>
           </div>
         )}
