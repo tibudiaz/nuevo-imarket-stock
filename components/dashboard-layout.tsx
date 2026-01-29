@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { motion, AnimatePresence } from "framer-motion"
 import MobileMenu from "@/components/mobile-menu"
+import LoginForm from "@/components/login-form"
 import { useStore } from "@/hooks/use-store"
 import { Reserve } from "@/components/sell-product-modal"
 import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
@@ -327,12 +328,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     local2: 'Local 2'
   };
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/');
-    }
-  }, [authLoading, user, router]);
-
   if (authLoading) {
     return (
         <div className="flex h-screen items-center justify-center">
@@ -342,7 +337,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
   
   if (!user) {
-      return null;
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 p-4">
+          <div className="w-full max-w-md">
+            <div className="mb-8 text-center">
+              <h1 className="text-4xl font-bold text-slate-800">iMarket</h1>
+              <p className="mt-2 text-slate-600">Acceso exclusivo para administración</p>
+            </div>
+            <LoginForm />
+          </div>
+        </div>
+      );
   }
 
   return (
