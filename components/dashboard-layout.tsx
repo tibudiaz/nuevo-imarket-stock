@@ -446,7 +446,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         <div className="flex flex-1">
           <aside className="group sticky top-16 hidden h-[calc(100vh-4rem)] md:flex flex-col border-r bg-white w-16 hover:w-64 transition-all duration-300 ease-in-out">
-            <nav className="flex flex-col items-center gap-1 p-2 mt-2 flex-1">
+            <nav className="flex flex-col items-center gap-1 p-2 mt-2 flex-1 overflow-y-auto overflow-x-hidden">
               
               <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" active={pathname === "/dashboard"} />
               
