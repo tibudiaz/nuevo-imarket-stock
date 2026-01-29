@@ -44,6 +44,10 @@ const storeLabels: Record<NonNullable<Product["store"]>, string> = {
   local1: "Local 1",
   local2: "Local 2",
 };
+const nameCollator = new Intl.Collator("es", {
+  numeric: true,
+  sensitivity: "base",
+});
 
 const resolveProductName = (product: Product) => {
   const name = product.name?.trim();
@@ -112,15 +116,20 @@ export default function UsedPhonesList() {
 
   const filteredProducts = useMemo(() => {
     const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
-    return products.filter((product) => {
-      const storeMatch =
-        selectedStore === "all" || product.store === selectedStore;
-      const searchable = `${product.name || ""} ${product.brand || ""} ${product.model || ""}`.toLowerCase();
-      const searchMatch = terms.length
-        ? terms.every((term) => searchable.includes(term))
-        : true;
-      return storeMatch && searchMatch;
-    });
+    return products
+      .filter((product) => {
+        const storeMatch =
+          selectedStore === "all" || product.store === selectedStore;
+        const searchable =
+          `${product.name || ""} ${product.brand || ""} ${product.model || ""}`.toLowerCase();
+        const searchMatch = terms.length
+          ? terms.every((term) => searchable.includes(term))
+          : true;
+        return storeMatch && searchMatch;
+      })
+      .sort((a, b) =>
+        nameCollator.compare(resolveProductName(a), resolveProductName(b)),
+      );
   }, [products, searchTerm, selectedStore]);
 
   const colSpan = 1 + Number(visibleColumns.price) + Number(visibleColumns.store);
