@@ -554,13 +554,16 @@ export default function Dashboard() {
               <Smartphone className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3 text-sm text-foreground">
                 <Checkbox
                   id="catalog-new-phones"
+                  className="h-5 w-5 border-2"
                   checked={catalogVisibility.newPhones}
                   onCheckedChange={(checked) => handleCatalogVisibilityChange("newPhones", checked)}
                 />
-                <label htmlFor="catalog-new-phones">Mostrar en catálogo</label>
+                <label htmlFor="catalog-new-phones" className="cursor-pointer font-medium">
+                  Mostrar en catálogo
+                </label>
               </div>
               <div className="text-2xl font-bold">{currencyFormatter.format(selectedStoreSummary.newPhones)}</div>
               <p className="text-xs text-muted-foreground">Resumen diario - {selectedStoreLabel}</p>
@@ -572,13 +575,16 @@ export default function Dashboard() {
               <RefreshCw className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3 text-sm text-foreground">
                 <Checkbox
                   id="catalog-used-phones"
+                  className="h-5 w-5 border-2"
                   checked={catalogVisibility.usedPhones}
                   onCheckedChange={(checked) => handleCatalogVisibilityChange("usedPhones", checked)}
                 />
-                <label htmlFor="catalog-used-phones">Mostrar en catálogo</label>
+                <label htmlFor="catalog-used-phones" className="cursor-pointer font-medium">
+                  Mostrar en catálogo
+                </label>
               </div>
               <div className="text-2xl font-bold">{currencyFormatter.format(selectedStoreSummary.usedPhones)}</div>
               <p className="text-xs text-muted-foreground">Resumen diario - {selectedStoreLabel}</p>
