@@ -53,7 +53,7 @@ const formatUsdPrice = (price: number | undefined, usdRate: number) => {
 
 const formatArsPriceBluePlus = (price: number | undefined, usdRate: number) => {
   if (typeof price !== "number" || Number.isNaN(price)) return "Consultar"
-  if (usdRate <= 0) return "Sin cotización"
+  if (usdRate <= 0) return "Consultar"
   const usdValue = convertPriceToUSD(price, usdRate)
   return formatCurrency(usdValue * (usdRate + 20))
 }
@@ -65,7 +65,6 @@ export default function PublicStockPage() {
 
   useEffect(() => {
     const productsRef = ref(database, "products")
-    const usdRateRef = ref(database, "config/usdRate")
 
     const unsubscribeProducts = onValue(
       productsRef,
@@ -93,15 +92,30 @@ export default function PublicStockPage() {
       },
     )
 
-    const unsubscribeRate = onValue(usdRateRef, (snapshot) => {
-      const value = snapshot.val()
-      setUsdRate(typeof value === "number" ? value : 0)
-    })
-
     return () => {
       unsubscribeProducts()
-      unsubscribeRate()
     }
+  }, [])
+
+  useEffect(() => {
+    const fetchDolarBlue = async () => {
+      try {
+        const response = await fetch("https://dolarapi.com/v1/dolares/blue")
+        if (!response.ok) {
+          throw new Error("No se pudo obtener la cotización")
+        }
+        const data = await response.json()
+        setUsdRate(typeof data.venta === "number" ? data.venta : 0)
+      } catch (error) {
+        console.error("Error al obtener dólar blue:", error)
+        setUsdRate(0)
+      }
+    }
+
+    fetchDolarBlue()
+    const intervalId = setInterval(fetchDolarBlue, 180000)
+
+    return () => clearInterval(intervalId)
   }, [])
 
   const { newPhones, usedPhones } = useMemo(() => {
@@ -155,7 +169,7 @@ export default function PublicStockPage() {
           <div className="flex flex-col gap-6">
             <div className="max-w-2xl space-y-4">
               <p className="text-lg text-slate-200">
-                Consultá precios actualizados en USD y en pesos calculados con la cotización Blue + 20.
+                Consultá precios actualizados en USD y en pesos al tipo de cambio Blue + 20.
                 Solo mostramos información esencial para resguardar la privacidad de cada dispositivo.
               </p>
               <div className="flex flex-wrap gap-3 text-sm text-slate-300">
@@ -237,7 +251,9 @@ export default function PublicStockPage() {
                               </div>
                             </div>
                             <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
-                              <span className="text-xs text-slate-400">Precio ARS (Blue + 20)</span>
+                              <span className="text-xs text-slate-400">
+                                Precio en pesos actual
+                              </span>
                               <span className="font-semibold text-emerald-200">
                                 {formatArsPriceBluePlus(product.price, usdRate)}
                               </span>
