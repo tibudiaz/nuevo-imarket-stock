@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth" // Importa el hook de autenticación
 import { useStore } from "@/hooks/use-store"
+import LoginForm from "@/components/login-form"
 
 // Interfaces (sin cambios)
 interface SaleItem {
@@ -375,8 +376,21 @@ export default function Dashboard() {
     return () => unsubscribeSales();
   }, [products, selectedStore]);
 
-  if (authLoading || !user) { // Se usa el estado de carga del hook
+  if (authLoading) { // Se usa el estado de carga del hook
     return <div className="flex h-screen items-center justify-center">Cargando...</div>
+  }
+  if (!user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 p-4">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <h1 className="text-4xl font-bold text-slate-800">iMarket</h1>
+            <p className="mt-2 text-slate-600">Sistema de gestión para tu negocio de celulares</p>
+          </div>
+          <LoginForm />
+        </div>
+      </div>
+    )
   }
 
   const selectedSummaryKey: SummaryKey = selectedStore === "all" ? "all" : selectedStore
