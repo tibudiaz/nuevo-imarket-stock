@@ -5,7 +5,7 @@ import { ref, onValue } from "firebase/database"
 import { Smartphone, Sparkles, ShieldCheck, Globe } from "lucide-react"
 
 import { database } from "@/lib/firebase"
-import { convertPriceToUSD, formatUsdCurrency } from "@/lib/price-converter"
+import { convertPriceToUSD, formatCurrency, formatUsdCurrency } from "@/lib/price-converter"
 import { cn } from "@/lib/utils"
 
 interface Product {
@@ -49,6 +49,13 @@ const formatUsdPrice = (price: number | undefined, usdRate: number) => {
     return formatUsdCurrency(convertPriceToUSD(price, usdRate))
   }
   return formatUsdCurrency(price)
+}
+
+const formatArsPriceBluePlus = (price: number | undefined, usdRate: number) => {
+  if (typeof price !== "number" || Number.isNaN(price)) return "Consultar"
+  if (usdRate <= 0) return "Sin cotización"
+  const usdValue = convertPriceToUSD(price, usdRate)
+  return formatCurrency(usdValue * (usdRate + 20))
 }
 
 export default function PublicStockPage() {
@@ -99,9 +106,13 @@ export default function PublicStockPage() {
 
   const { newPhones, usedPhones } = useMemo(() => {
     const inStock = products.filter((product) => (product.stock ?? 0) > 0)
+    const sortByName = (a: Product, b: Product) =>
+      resolveProductName(a).localeCompare(resolveProductName(b), "es", {
+        sensitivity: "base",
+      })
     return {
-      newPhones: inStock.filter((product) => product.category === CATEGORY_NEW),
-      usedPhones: inStock.filter((product) => product.category === CATEGORY_USED),
+      newPhones: inStock.filter((product) => product.category === CATEGORY_NEW).sort(sortByName),
+      usedPhones: inStock.filter((product) => product.category === CATEGORY_USED).sort(sortByName),
     }
   }, [products])
 
@@ -144,13 +155,13 @@ export default function PublicStockPage() {
           <div className="flex flex-col gap-6">
             <div className="max-w-2xl space-y-4">
               <p className="text-lg text-slate-200">
-                Consultá precios actualizados en USD y disponibilidad de equipos nuevos y usados. Solo
-                mostramos información esencial para resguardar la privacidad de cada dispositivo.
+                Consultá precios actualizados en USD y en pesos calculados con la cotización Blue + 20.
+                Solo mostramos información esencial para resguardar la privacidad de cada dispositivo.
               </p>
               <div className="flex flex-wrap gap-3 text-sm text-slate-300">
                 <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
                   <Sparkles className="h-4 w-4 text-sky-300" />
-                  Precios en USD
+                  Precios en USD y ARS
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
                   Últimos 4 dígitos de IMEI
@@ -210,18 +221,26 @@ export default function PublicStockPage() {
                             </div>
                           </div>
 
-                          <div className="flex items-end justify-between">
-                            <div>
-                              <p className="text-xs text-slate-400">IMEI</p>
-                              <p className="text-sm font-medium text-slate-100">
-                                {formatImeiSuffix(product.imei)}
-                              </p>
+                          <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs text-slate-400">IMEI</p>
+                                <p className="text-sm font-medium text-slate-100">
+                                  {formatImeiSuffix(product.imei)}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-slate-400">Precio USD</p>
+                                <p className="text-lg font-semibold text-sky-200">
+                                  {formatUsdPrice(product.price, usdRate)}
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-xs text-slate-400">Precio</p>
-                              <p className="text-lg font-semibold text-sky-200">
-                                {formatUsdPrice(product.price, usdRate)}
-                              </p>
+                            <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
+                              <span className="text-xs text-slate-400">Precio ARS (Blue + 20)</span>
+                              <span className="font-semibold text-emerald-200">
+                                {formatArsPriceBluePlus(product.price, usdRate)}
+                              </span>
                             </div>
                           </div>
                         </div>
