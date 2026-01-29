@@ -538,6 +538,41 @@ export default function Dashboard() {
         )}
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
+          <Card className="lg:col-span-3">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Visibilidad del catálogo público</CardTitle>
+              <Box className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-4">
+                Activa o desactiva qué categorías se muestran en el catálogo público.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-3 text-sm text-foreground">
+                  <Checkbox
+                    id="catalog-new-phones"
+                    className="h-5 w-5 border-2"
+                    checked={catalogVisibility.newPhones}
+                    onCheckedChange={(checked) => handleCatalogVisibilityChange("newPhones", checked)}
+                  />
+                  <label htmlFor="catalog-new-phones" className="cursor-pointer font-medium">
+                    Celulares nuevos visibles
+                  </label>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-foreground">
+                  <Checkbox
+                    id="catalog-used-phones"
+                    className="h-5 w-5 border-2"
+                    checked={catalogVisibility.usedPhones}
+                    onCheckedChange={(checked) => handleCatalogVisibilityChange("usedPhones", checked)}
+                  />
+                  <label htmlFor="catalog-used-phones" className="cursor-pointer font-medium">
+                    Celulares usados visibles
+                  </label>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Ventas de Productos (Hoy)</CardTitle>
@@ -554,17 +589,6 @@ export default function Dashboard() {
               <Smartphone className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-3 text-sm text-foreground">
-                <Checkbox
-                  id="catalog-new-phones"
-                  className="h-5 w-5 border-2"
-                  checked={catalogVisibility.newPhones}
-                  onCheckedChange={(checked) => handleCatalogVisibilityChange("newPhones", checked)}
-                />
-                <label htmlFor="catalog-new-phones" className="cursor-pointer font-medium">
-                  Mostrar en catálogo
-                </label>
-              </div>
               <div className="text-2xl font-bold">{currencyFormatter.format(selectedStoreSummary.newPhones)}</div>
               <p className="text-xs text-muted-foreground">Resumen diario - {selectedStoreLabel}</p>
             </CardContent>
@@ -575,17 +599,6 @@ export default function Dashboard() {
               <RefreshCw className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-3 text-sm text-foreground">
-                <Checkbox
-                  id="catalog-used-phones"
-                  className="h-5 w-5 border-2"
-                  checked={catalogVisibility.usedPhones}
-                  onCheckedChange={(checked) => handleCatalogVisibilityChange("usedPhones", checked)}
-                />
-                <label htmlFor="catalog-used-phones" className="cursor-pointer font-medium">
-                  Mostrar en catálogo
-                </label>
-              </div>
               <div className="text-2xl font-bold">{currencyFormatter.format(selectedStoreSummary.usedPhones)}</div>
               <p className="text-xs text-muted-foreground">Resumen diario - {selectedStoreLabel}</p>
             </CardContent>
