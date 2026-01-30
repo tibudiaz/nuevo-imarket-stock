@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 
-export const dynamic = "force-dynamic"
-
 const DOLAR_API_URL = "https://dolarapi.com/v1/dolares/blue"
 const DOLAR_FALLBACK_URL = "https://api.bluelytics.com.ar/v2/latest"
 
@@ -20,7 +18,7 @@ const parseRate = (value: number | string | undefined) => {
 
 export async function GET() {
   try {
-    const apiResponse = await fetch(DOLAR_API_URL, { cache: "no-store" })
+    const apiResponse = await fetch(DOLAR_API_URL, { cache: "force-cache" })
     if (apiResponse.ok) {
       const apiData = (await apiResponse.json()) as { venta?: number | string }
       const venta = parseRate(apiData.venta)
@@ -32,7 +30,7 @@ export async function GET() {
       }
     }
 
-    const fallbackResponse = await fetch(DOLAR_FALLBACK_URL, { cache: "no-store" })
+    const fallbackResponse = await fetch(DOLAR_FALLBACK_URL, { cache: "force-cache" })
     if (!fallbackResponse.ok) {
       return NextResponse.json(
         { error: "No se pudo obtener la cotización" },
