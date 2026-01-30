@@ -3,23 +3,37 @@ import { NextResponse } from "next/server"
 const INFO_DOLAR_URL =
   "https://www.infodolar.com/cotizacion-dolar-localidad-rio-cuarto-provincia-cordoba.aspx"
 
+const normalizeCurrency = (value: string): number | null => {
+  const normalized = value.replace(/[^0-9.,]/g, "").replace(/\./g, "").replace(",", ".")
+  const parsed = Number.parseFloat(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 const parseVentaFromHtml = (html: string): number | null => {
   const tableMatch = html.match(/<table[^>]*id="BluePromedio"[^>]*>([\s\S]*?)<\/table>/i)
   if (!tableMatch) return null
 
-  const rowMatch = tableMatch[1].match(/<\/thead>\s*<tr>([\s\S]*?)<\/tr>/i)
-  if (!rowMatch) return null
-
-  const values = Array.from(rowMatch[1].matchAll(/colCompraVenta[^>]*>\s*\$?\s*([0-9.,]+)/gi))
+  const tableHtml = tableMatch[1]
+  const rowMatches = Array.from(tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi))
+  const rowHtml = rowMatches.map((match) => match[1]).find((row) => /colCompraVenta/i.test(row))
+  if (!rowHtml) return null
+  const dataOrderMatches = Array.from(
+    rowHtml.matchAll(/colCompraVenta[^>]*data-order="([^"]+)"/gi),
+  )
     .map((match) => match[1])
     .filter(Boolean)
 
+  const textMatches = Array.from(rowHtml.matchAll(/colCompraVenta[^>]*>\s*([^<]+)/gi))
+    .map((match) => match[1])
+    .filter(Boolean)
+
+  const values = [...dataOrderMatches, ...textMatches]
+    .map((value) => normalizeCurrency(value))
+    .filter((value): value is number => value !== null)
+
   if (values.length < 2) return null
 
-  const ventaRaw = values[1]
-  const normalized = ventaRaw.replace(/\./g, "").replace(",", ".")
-  const venta = Number.parseFloat(normalized)
-  return Number.isFinite(venta) ? venta : null
+  return values[1]
 }
 
 export async function GET() {
