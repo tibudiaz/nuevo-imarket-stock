@@ -23,6 +23,47 @@ interface Product {
 
 const CATEGORY_NEW = "Celulares Nuevos"
 const CATEGORY_USED = "Celulares Usados"
+const CATALOG_CACHE_KEY = "catalog-cache-v1"
+const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000
+
+type CatalogCache = {
+  products?: Product[]
+  usdRate?: number
+  catalogVisibility?: { newPhones?: boolean; usedPhones?: boolean }
+  updatedAt?: number
+}
+
+const readCatalogCache = (): CatalogCache | null => {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem(CATALOG_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as CatalogCache
+    if (!parsed?.updatedAt || Date.now() - parsed.updatedAt > CATALOG_CACHE_TTL_MS) {
+      return null
+    }
+    return parsed
+  } catch (error) {
+    console.error("Error al leer cache del catálogo:", error)
+    return null
+  }
+}
+
+const writeCatalogCache = (partial: CatalogCache) => {
+  if (typeof window === "undefined") return
+  try {
+    const raw = localStorage.getItem(CATALOG_CACHE_KEY)
+    const existing = raw ? (JSON.parse(raw) as CatalogCache) : {}
+    const next = {
+      ...existing,
+      ...partial,
+      updatedAt: Date.now(),
+    }
+    localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(next))
+  } catch (error) {
+    console.error("Error al guardar cache del catálogo:", error)
+  }
+}
 
 const resolveProductName = (product: Product) => {
   const name = product.name?.trim()
@@ -69,6 +110,25 @@ export default function PublicStockPage() {
   })
 
   useEffect(() => {
+    const cached = readCatalogCache()
+    if (!cached) return
+
+    if (Array.isArray(cached.products)) {
+      setProducts(cached.products)
+    }
+    if (typeof cached.usdRate === "number") {
+      setUsdRate(cached.usdRate)
+    }
+    if (cached.catalogVisibility) {
+      setCatalogVisibility({
+        newPhones: cached.catalogVisibility.newPhones !== false,
+        usedPhones: cached.catalogVisibility.usedPhones !== false,
+      })
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
     const productsRef = ref(database, "products")
 
     const unsubscribeProducts = onValue(
@@ -91,6 +151,7 @@ export default function PublicStockPage() {
         })
 
         setProducts(nextProducts)
+        writeCatalogCache({ products: nextProducts })
       },
       () => {
         setLoading(false)
@@ -115,6 +176,12 @@ export default function PublicStockPage() {
         newPhones: data.newPhones !== false,
         usedPhones: data.usedPhones !== false,
       })
+      writeCatalogCache({
+        catalogVisibility: {
+          newPhones: data.newPhones !== false,
+          usedPhones: data.usedPhones !== false,
+        },
+      })
     })
 
     return () => unsubscribeVisibility()
@@ -128,7 +195,9 @@ export default function PublicStockPage() {
           throw new Error("No se pudo obtener la cotización")
         }
         const data = await response.json()
-        setUsdRate(typeof data.venta === "number" ? data.venta : 0)
+        const nextRate = typeof data.venta === "number" ? data.venta : 0
+        setUsdRate(nextRate)
+        writeCatalogCache({ usdRate: nextRate })
       } catch (error) {
         console.error("Error al obtener dólar blue:", error)
         setUsdRate(0)
