@@ -84,7 +84,7 @@ interface Product {
   name?: string;
   brand?: string;
   model?: string;
-  price?: number;
+  price?: number | string;
   cost?: number;
   stock?: number;
   category?: string;
@@ -235,6 +235,7 @@ export default function InventoryPage() {
   const showEntryDate = visibleColumns.entryDate;
   const showProvider = user?.role === "admin" && visibleColumns.provider;
   const showCost = user?.role === "admin" && visibleColumns.cost;
+  const isModerator = user?.role === "moderator";
   const isNewPhonesCategory = categorySearch === "Celulares Nuevos";
   const isUsedPhonesCategory = categorySearch === "Celulares Usados";
   const showCatalogVisibility = isNewPhonesCategory || isUsedPhonesCategory;
@@ -248,6 +249,22 @@ export default function InventoryPage() {
     (showProvider ? 1 : 0) +
     (showCost ? 1 : 0) +
     (showCatalogVisibility ? 1 : 0);
+
+  const priceContainsWords = (price: string) =>
+    /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(price);
+
+  const formatPriceForUser = (price?: Product["price"]) => {
+    if (!isModerator) {
+      return `$${Number(price || 0).toFixed(2)}`;
+    }
+
+    if (typeof price === "string") {
+      const trimmed = price.trim();
+      return priceContainsWords(trimmed) ? trimmed : "—";
+    }
+
+    return "—";
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1188,7 +1205,7 @@ export default function InventoryPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      ${Number(product.price || 0).toFixed(2)}
+                      {formatPriceForUser(product.price)}
                     </TableCell>
                     {showCost && (
                       <TableCell>
