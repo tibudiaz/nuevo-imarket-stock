@@ -11,6 +11,9 @@ const parsePrice = (value: string) => {
     .replace(/[^0-9,.-]/g, "")
     .replace(/\.(?=\d{3}(\D|$))/g, "")
     .replace(/,(?=\d{2}$)/g, ".")
+  if (!cleaned || !/\d/.test(cleaned)) {
+    return null
+  }
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : null
 }
