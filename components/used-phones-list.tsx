@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ref, onValue, set, update } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import { Search, SlidersHorizontal, Smartphone } from "lucide-react";
 
 import { database } from "@/lib/firebase";
@@ -163,33 +163,6 @@ export default function UsedPhonesList() {
     }
   };
 
-  const handleProductVisibilityChange = async (
-    productId: string,
-    checked: boolean | "indeterminate",
-  ) => {
-    if (!canManageVisibility) return;
-    const nextValue = checked === true;
-    const previousProducts = products;
-
-    setProducts((prev) =>
-      prev.map((product) =>
-        product.id === productId
-          ? { ...product, visibleInCatalog: nextValue }
-          : product,
-      ),
-    );
-
-    try {
-      await update(ref(database, `products/${productId}`), {
-        visibleInCatalog: nextValue,
-      });
-    } catch (error) {
-      console.error("Error al actualizar visibilidad del equipo:", error);
-      setProducts(previousProducts);
-      toast.error("No se pudo actualizar la visibilidad del equipo.");
-    }
-  };
-
   const filteredProducts = useMemo(() => {
     const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
     return products
@@ -209,7 +182,7 @@ export default function UsedPhonesList() {
   }, [products, searchTerm, selectedStore]);
 
   const colSpan =
-    2 + Number(visibleColumns.price) + Number(visibleColumns.store);
+    1 + Number(visibleColumns.price) + Number(visibleColumns.store);
 
   if (authLoading || !user) {
     return (
@@ -297,7 +270,6 @@ export default function UsedPhonesList() {
                 <TableHead className="text-right">Precio de venta</TableHead>
               )}
               {visibleColumns.store && <TableHead>Local</TableHead>}
-              <TableHead className="text-center">Visible</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -325,17 +297,6 @@ export default function UsedPhonesList() {
                       {product.store ? storeLabels[product.store] : "Sin local"}
                     </TableCell>
                   )}
-                  <TableCell className="text-center">
-                    <Checkbox
-                      id={`used-phone-visible-${product.id}`}
-                      className="h-5 w-5 border-2"
-                      checked={product.visibleInCatalog !== false}
-                      onCheckedChange={(checked) =>
-                        handleProductVisibilityChange(product.id, checked)
-                      }
-                      disabled={!canManageVisibility}
-                    />
-                  </TableCell>
                 </TableRow>
               ))
             ) : (
