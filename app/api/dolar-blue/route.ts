@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 const DOLAR_API_URL = "https://dolarapi.com/v1/dolares/blue"
 const DOLAR_FALLBACK_URL = "https://api.bluelytics.com.ar/v2/latest"
 
@@ -23,7 +25,10 @@ export async function GET() {
       const apiData = (await apiResponse.json()) as { venta?: number | string }
       const venta = parseRate(apiData.venta)
       if (venta !== null) {
-        return NextResponse.json({ venta })
+        return NextResponse.json(
+          { venta },
+          { headers: { "Cache-Control": "no-store, max-age=0" } },
+        )
       }
     }
 
@@ -40,7 +45,10 @@ export async function GET() {
     }
     const venta = parseRate(fallbackData.blue?.value_sell)
     if (venta !== null) {
-      return NextResponse.json({ venta })
+      return NextResponse.json(
+        { venta },
+        { headers: { "Cache-Control": "no-store, max-age=0" } },
+      )
     }
 
     return NextResponse.json({ error: "No se pudo interpretar la cotización" }, { status: 502 })
