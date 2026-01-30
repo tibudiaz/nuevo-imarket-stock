@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-export const dynamic = "force-dynamic"
+export const dynamic = "force-static"
 
 const DEFAULT_RANGE = "A:B"
 
@@ -37,7 +37,7 @@ export async function GET() {
 
   try {
     const response = await fetch(endpoint.toString(), {
-      cache: "no-store",
+      cache: "force-cache",
     })
 
     if (!response.ok) {
