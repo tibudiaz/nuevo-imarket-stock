@@ -100,6 +100,16 @@ const formatArsPriceBlue = (price: number | undefined, usdRate: number) => {
   return formatCurrency(usdValue * usdRate)
 }
 
+const buildWhatsAppLink = (product: Product, usdRate: number) => {
+  const name = resolveProductName(product)
+  const usdPrice = formatUsdPrice(product.price, usdRate)
+  const arsPrice = formatArsPriceBlue(product.price, usdRate)
+  const imeiSuffix = formatImeiSuffix(product.imei)
+  const message = `Hola estoy interesado en el siguiente celular: ${name}. Precio USD: ${usdPrice}. Precio en pesos: ${arsPrice}. IMEI: ${imeiSuffix}.`
+  const encodedMessage = encodeURIComponent(message)
+  return `https://wa.me/5493584224464?text=${encodedMessage}`
+}
+
 export default function PublicStockPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [usdRate, setUsdRate] = useState(0)
@@ -377,6 +387,14 @@ export default function PublicStockPage() {
                                 </span>
                               </div>
                             </div>
+                            <a
+                              className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
+                              href={buildWhatsAppLink(product, usdRate)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Consultar por WhatsApp
+                            </a>
                           </div>
                         </div>
                       ))}
