@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 
 const INFO_DOLAR_URL =
   "https://www.infodolar.com/cotizacion-dolar-localidad-rio-cuarto-provincia-cordoba.aspx"
+const DOLAR_API_URL = "https://dolarapi.com/v1/dolares/blue"
 
 const normalizeCurrency = (value: string): number | null => {
   const normalized = value.replace(/[^0-9.,]/g, "").replace(/\./g, "").replace(",", ".")
@@ -38,6 +39,14 @@ const parseVentaFromHtml = (html: string): number | null => {
 
 export async function GET() {
   try {
+    const apiResponse = await fetch(DOLAR_API_URL, { cache: "no-store" })
+    if (apiResponse.ok) {
+      const apiData = (await apiResponse.json()) as { venta?: number }
+      if (typeof apiData.venta === "number" && Number.isFinite(apiData.venta)) {
+        return NextResponse.json({ venta: apiData.venta })
+      }
+    }
+
     const response = await fetch(INFO_DOLAR_URL, {
       cache: "no-store",
       headers: {
