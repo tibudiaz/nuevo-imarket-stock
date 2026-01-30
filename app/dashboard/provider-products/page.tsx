@@ -15,6 +15,7 @@ interface ProviderProduct {
   price: number | null
   columnE?: string
   columnF?: string
+  isSpacer?: boolean
 }
 
 interface ProviderHeaders {
@@ -130,8 +131,8 @@ export default function ProviderProductsPage() {
                 <TableRow>
                   <TableHead>PRODUCTO</TableHead>
                   <TableHead>PRECIO</TableHead>
-                  <TableHead>{headers?.columnE || "Columna E"}</TableHead>
-                  <TableHead className="text-right">{headers?.columnF || "Columna F"}</TableHead>
+                  <TableHead>{headers?.columnE || "Cantidad"}</TableHead>
+                  <TableHead className="text-right">{headers?.columnF || "Estado"}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -149,16 +150,24 @@ export default function ProviderProductsPage() {
                   </TableRow>
                 ) : (
                   filteredProducts.map((product, index) => (
-                    <TableRow key={`${product.name}-${index}`}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>
-                        {product.price !== null ? currencyFormatter.format(product.price) : product.priceRaw}
-                      </TableCell>
-                      <TableCell>{product.columnE}</TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground">
-                        {product.columnF}
-                      </TableCell>
-                    </TableRow>
+                    product.isSpacer ? (
+                      <TableRow key={`spacer-${index}`}>
+                        <TableCell colSpan={4} className="py-3">
+                          &nbsp;
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow key={`${product.name}-${index}`}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>
+                          {product.price !== null ? currencyFormatter.format(product.price) : product.priceRaw}
+                        </TableCell>
+                        <TableCell>{product.columnE}</TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {product.columnF}
+                        </TableCell>
+                      </TableRow>
+                    )
                   ))
                 )}
               </TableBody>
