@@ -28,6 +28,7 @@ import {
   Copy,
   X,
   ClipboardList,
+  Truck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -470,6 +471,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   ))}
                 </CollapsibleContent>
               </Collapsible>
+
+              <NavItem
+                href="/dashboard/provider-products"
+                icon={Truck}
+                label="Productos Proveedor"
+                active={pathname === "/dashboard/provider-products"}
+              />
 
               <NavItem
                 href="/dashboard/used-phones"
