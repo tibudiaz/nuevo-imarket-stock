@@ -76,6 +76,20 @@ interface FinancingConfig {
   cards: Record<string, FinancingCard>;
 }
 
+interface SystemChangeEntry {
+  id: string;
+  user?: string;
+  username?: string;
+  action?: string;
+  field?: string;
+  productName?: string;
+  product?: string;
+  before?: number | string;
+  after?: number | string;
+  description?: string;
+  createdAt?: string | number;
+}
+
 type StoredRepairPhoto = Omit<RepairPhoto, "id">;
 
 const getStoragePathFromUrl = (url: string): string | null => {
@@ -239,6 +253,7 @@ export default function SettingsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [bundles, setBundles] = useState<BundleRule[]>([]);
+  const [systemHistory, setSystemHistory] = useState<SystemChangeEntry[]>([]);
 
   const [pointRate, setPointRate] = useState(0);
   const [pointValue, setPointValue] = useState(0);
@@ -311,6 +326,20 @@ export default function SettingsPage() {
         : [];
       setUsers(userList);
     });
+  }, []);
+
+  useEffect(() => {
+    const historyRef = ref(database, 'systemChangeHistory');
+    const unsubscribe = onValue(historyRef, (snapshot) => {
+      const data = snapshot.val();
+      const historyList: SystemChangeEntry[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value }))
+        : [];
+      historyList.sort((a, b) => getEntryTimestamp(b) - getEntryTimestamp(a));
+      setSystemHistory(historyList);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -712,6 +741,61 @@ export default function SettingsPage() {
     ? financingConfig.cards[selectedFinancingCard]
     : undefined;
 
+  const getEntryTimestamp = (entry: SystemChangeEntry) => {
+    if (typeof entry.createdAt === "number") return entry.createdAt;
+    if (typeof entry.createdAt === "string") {
+      const parsed = Date.parse(entry.createdAt);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    return 0;
+  };
+
+  const formatEntryDate = (entry: SystemChangeEntry) => {
+    const timestamp = getEntryTimestamp(entry);
+    if (!timestamp) return "Sin fecha";
+    return new Date(timestamp).toLocaleString("es-AR");
+  };
+
+  const formatEntryValue = (value?: string | number, entry?: SystemChangeEntry) => {
+    if (typeof value === "undefined" || value === null) return "—";
+    const field = entry?.field?.toLowerCase() ?? "";
+    const action = entry?.action?.toLowerCase() ?? "";
+    const isPrice = field.includes("precio") || field.includes("price") || action.includes("precio") || action.includes("price");
+    const numericValue =
+      typeof value === "number"
+        ? value
+        : typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))
+          ? Number(value)
+          : null;
+    if (isPrice && numericValue !== null) {
+      return new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+      }).format(numericValue);
+    }
+    return String(value);
+  };
+
+  const buildHistorySummary = (entry: SystemChangeEntry) => {
+    const user = entry.user || entry.username || "Usuario";
+    if (entry.description) {
+      return `${user} ${entry.description}`;
+    }
+    const productName = entry.productName || entry.product || "producto";
+    const field = entry.field?.toLowerCase() ?? "";
+    const action = entry.action?.toLowerCase() ?? "";
+    if (field.includes("stock") || action.includes("stock")) {
+      return `${user} cambió el stock de ${productName} de ${formatEntryValue(entry.before, entry)} a ${formatEntryValue(entry.after, entry)}.`;
+    }
+    if (field.includes("precio") || field.includes("price") || action.includes("precio") || action.includes("price")) {
+      return `${user} actualizó el precio de ${productName} de ${formatEntryValue(entry.before, entry)} a ${formatEntryValue(entry.after, entry)}.`;
+    }
+    if (entry.action) {
+      return `${user} ${entry.action}${productName ? ` en ${productName}` : ""}.`;
+    }
+    return `${user} realizó una modificación en el sistema.`;
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-8">
@@ -1011,6 +1095,50 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card className="md:col-span-2 lg:col-span-3">
+            <CardHeader>
+              <CardTitle>Historial de modificaciones</CardTitle>
+              <CardDescription>
+                Registra quién realizó cambios en stock y precios para mantener el control.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {systemHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay modificaciones registradas todavía.
+                </p>
+              ) : (
+                <ScrollArea className="h-72">
+                  <div className="space-y-3">
+                    {systemHistory.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex flex-col gap-1 rounded-md border p-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-medium">{buildHistorySummary(entry)}</p>
+                          <span className="text-xs text-muted-foreground">
+                            {formatEntryDate(entry)}
+                          </span>
+                        </div>
+                        {(entry.field || entry.action) && (
+                          <div className="flex flex-wrap gap-2">
+                            {entry.field && (
+                              <Badge variant="secondary">{entry.field}</Badge>
+                            )}
+                            {entry.action && (
+                              <Badge variant="outline">{entry.action}</Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </CardContent>
           </Card>
 
