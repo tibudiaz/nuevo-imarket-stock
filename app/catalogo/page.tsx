@@ -93,11 +93,11 @@ const formatUsdPrice = (price: number | undefined, usdRate: number) => {
   return formatUsdCurrency(price)
 }
 
-const formatArsPriceBluePlus = (price: number | undefined, usdRate: number) => {
+const formatArsPriceBlue = (price: number | undefined, usdRate: number) => {
   if (typeof price !== "number" || Number.isNaN(price)) return "Consultar"
   if (usdRate <= 0) return "Consultar"
   const usdValue = convertPriceToUSD(price, usdRate)
-  return formatCurrency(usdValue * (usdRate + 20))
+  return formatCurrency(usdValue * usdRate)
 }
 
 export default function PublicStockPage() {
@@ -190,7 +190,7 @@ export default function PublicStockPage() {
   useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
-        const response = await fetch("https://dolarapi.com/v1/dolares/blue")
+        const response = await fetch("/api/dolar-blue")
         if (!response.ok) {
           throw new Error("No se pudo obtener la cotización")
         }
@@ -281,7 +281,8 @@ export default function PublicStockPage() {
           <div className="flex flex-col gap-6">
             <div className="max-w-2xl space-y-4">
               <p className="text-lg text-slate-200">
-                Consultá precios actualizados en USD y en pesos al tipo de cambio Blue + 20.
+                Consultá precios actualizados en USD y en pesos al tipo de cambio Blue Río Cuarto
+                (venta).
                 Solo mostramos información esencial para resguardar la privacidad de cada dispositivo.
               </p>
               <div className="flex flex-wrap gap-3 text-sm text-slate-300">
@@ -372,7 +373,7 @@ export default function PublicStockPage() {
                                   Precio en pesos actual
                                 </span>
                                 <span className="font-semibold text-emerald-200">
-                                  {formatArsPriceBluePlus(product.price, usdRate)}
+                                  {formatArsPriceBlue(product.price, usdRate)}
                                 </span>
                               </div>
                             </div>
