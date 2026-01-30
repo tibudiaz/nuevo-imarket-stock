@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Home, Package, ShoppingCart, Users, Wrench, ChevronDown, LayoutDashboard, AlertTriangle, Calculator, ClipboardList } from "lucide-react"
+import { Home, Package, ShoppingCart, Users, Wrench, ChevronDown, LayoutDashboard, AlertTriangle, Calculator, ClipboardList, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -49,6 +49,7 @@ export default function MobileMenu({ userRole }: MobileMenuProps) {
   const mainRoutes = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: pathname === "/dashboard", role: ["admin", "moderator"] },
     { href: "/dashboard/low-stock", label: "Bajo Stock", icon: AlertTriangle, active: pathname === "/dashboard/low-stock", role: ["admin", "moderator"] },
+    { href: "/dashboard/provider-products", label: "Productos Proveedor", icon: Truck, active: pathname === "/dashboard/provider-products", role: ["admin", "moderator"] },
     { href: "/dashboard/sales", label: "Ventas", icon: ShoppingCart, active: pathname === "/dashboard/sales", role: ["admin", "moderator"] },
     { href: "/dashboard/used-phones", label: "Listado Usados", icon: ClipboardList, active: pathname === "/dashboard/used-phones", role: ["admin", "moderator"] },
     { href: "/dashboard/repairs", label: "Reparaciones", icon: Wrench, active: pathname === "/dashboard/repairs", role: ["admin", "moderator"] },
