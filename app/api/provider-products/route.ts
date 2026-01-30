@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 export const dynamic = "force-static"
 
-const DEFAULT_RANGE = "A:B"
+const DEFAULT_RANGES = ["B:B", "C:C", "D:D", "F:F"]
 
 const normalizeText = (value: string) => value.trim().toLowerCase()
 
@@ -18,7 +18,9 @@ const parsePrice = (value: string) => {
 export async function GET() {
   const sheetId = process.env.GOOGLE_SHEETS_ID
   const apiKey = process.env.GOOGLE_SHEETS_API_KEY
-  const range = process.env.GOOGLE_SHEETS_RANGE || DEFAULT_RANGE
+  const ranges = process.env.GOOGLE_SHEETS_RANGE
+    ? process.env.GOOGLE_SHEETS_RANGE.split(",").map((value) => value.trim())
+    : DEFAULT_RANGES
 
   if (!sheetId || !apiKey) {
     return NextResponse.json(
@@ -31,8 +33,11 @@ export async function GET() {
   }
 
   const endpoint = new URL(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchGet`
   )
+  ranges.filter(Boolean).forEach((range) => {
+    endpoint.searchParams.append("ranges", range)
+  })
   endpoint.searchParams.set("key", apiKey)
 
   try {
@@ -52,7 +57,14 @@ export async function GET() {
     }
 
     const data = await response.json()
-    const values: string[][] = data.values || []
+    const valueRanges: Array<{ values?: string[][] }> = data.valueRanges || []
+    const maxRows = valueRanges.reduce(
+      (currentMax, valueRange) => Math.max(currentMax, valueRange.values?.length ?? 0),
+      0
+    )
+    const values: string[][] = Array.from({ length: maxRows }, (_, rowIndex) =>
+      valueRanges.map((valueRange) => valueRange.values?.[rowIndex]?.[0] ?? "")
+    )
 
     if (values.length === 0) {
       return NextResponse.json({ products: [], updatedAt: new Date().toISOString() })
@@ -61,20 +73,27 @@ export async function GET() {
     const [firstRow, ...rows] = values
     const isHeaderRow =
       firstRow.length >= 2 &&
-      (normalizeText(firstRow[0]).includes("nombre") ||
-        normalizeText(firstRow[0]).includes("producto") ||
-        normalizeText(firstRow[1]).includes("precio") ||
-        normalizeText(firstRow[1]).includes("price"))
+      (normalizeText(firstRow[0] || "").includes("nombre") ||
+        normalizeText(firstRow[0] || "").includes("producto") ||
+        normalizeText(firstRow[1] || "").includes("detalle") ||
+        normalizeText(firstRow[2] || "").includes("precio") ||
+        normalizeText(firstRow[2] || "").includes("price"))
 
     const dataRows = isHeaderRow ? rows : values
 
     const products = dataRows
-      .filter((row) => row[0] && row[1])
-      .map((row) => ({
-        name: row[0].trim(),
-        priceRaw: row[1].trim(),
-        price: parsePrice(row[1]),
-      }))
+      .filter((row) => row[0] && (row[1] || row[2] || row[3]))
+      .map((row) => {
+        const baseName = row[0].trim()
+        const detail = row[1]?.trim()
+        const priceRaw = (row[2] || row[1] || "").trim()
+        return {
+          name: detail ? `${baseName} ${detail}` : baseName,
+          priceRaw,
+          price: parsePrice(priceRaw),
+          reference: row[3]?.trim() || "",
+        }
+      })
 
     return NextResponse.json({
       products,

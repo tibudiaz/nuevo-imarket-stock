@@ -12,6 +12,7 @@ interface ProviderProduct {
   name: string
   priceRaw: string
   price: number | null
+  reference?: string
 }
 
 interface ProviderResponse {
@@ -142,7 +143,7 @@ export default function ProviderProductsPage() {
                       {product.price !== null ? currencyFormatter.format(product.price) : product.priceRaw}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
-                      {product.priceRaw}
+                      {product.reference || product.priceRaw}
                     </TableCell>
                   </TableRow>
                 ))
