@@ -79,22 +79,47 @@ export async function GET() {
         normalizeText(firstRow[1] || "").includes("price"))
 
     const dataRows = isHeaderRow ? rows : values
-    const columnEHeader = isHeaderRow ? firstRow[2]?.trim() || "" : ""
-    const columnFHeader = isHeaderRow ? firstRow[3]?.trim() || "" : ""
+    const columnEHeader = "Cantidad"
+    const columnFHeader = "Estado"
 
-    const products = dataRows
-      .filter((row) => row[0] && (row[1] || row[2] || row[3]))
-      .map((row) => {
-        const baseName = row[0].trim()
-        const priceRaw = (row[1] || "").trim()
-        return {
-          name: baseName,
-          priceRaw,
-          price: parsePrice(priceRaw),
-          columnE: row[2]?.trim() || "",
-          columnF: row[3]?.trim() || "",
-        }
+    const products = dataRows.reduce<
+      Array<{
+        name: string
+        priceRaw: string
+        price: number | null
+        columnE: string
+        columnF: string
+        isSpacer?: boolean
+      }>
+    >((acc, row) => {
+      const baseName = (row[0] || "").trim()
+
+      if (normalizeText(baseName) === "modelo") {
+        acc.push({
+          name: "",
+          priceRaw: "",
+          price: null,
+          columnE: "",
+          columnF: "",
+          isSpacer: true,
+        })
+        return acc
+      }
+
+      if (!baseName || !(row[1] || row[2] || row[3])) {
+        return acc
+      }
+
+      const priceRaw = (row[1] || "").trim()
+      acc.push({
+        name: baseName,
+        priceRaw,
+        price: parsePrice(priceRaw),
+        columnE: row[2]?.trim() || "",
+        columnF: row[3]?.trim() || "",
       })
+      return acc
+    }, [])
 
     return NextResponse.json({
       products,
