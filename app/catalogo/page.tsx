@@ -25,6 +25,7 @@ const CATEGORY_NEW = "Celulares Nuevos"
 const CATEGORY_USED = "Celulares Usados"
 const CATALOG_CACHE_KEY = "catalog-cache-v1"
 const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000
+const CATALOG_BLUE_SURCHARGE = 20
 
 type CatalogCache = {
   products?: Product[]
@@ -205,7 +206,8 @@ export default function PublicStockPage() {
           throw new Error("No se pudo obtener la cotización")
         }
         const data = await response.json()
-        const nextRate = typeof data.venta === "number" ? data.venta : 0
+        const nextRate =
+          typeof data.venta === "number" ? data.venta + CATALOG_BLUE_SURCHARGE : 0
         setUsdRate(nextRate)
         writeCatalogCache({ usdRate: nextRate })
       } catch (error) {
