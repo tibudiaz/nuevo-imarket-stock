@@ -163,12 +163,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
-        const response = await fetch("https://dolarapi.com/v1/dolares/blue");
+        const response = await fetch("/api/dolar-blue");
         if (!response.ok) {
-          throw new Error('No se pudo obtener la cotización');
+          throw new Error("No se pudo obtener la cotización");
         }
         const data = await response.json();
-        setDolarBlueRate(data.venta);
+        setDolarBlueRate(typeof data.venta === "number" ? data.venta : null);
       } catch (error) {
         console.error("Error al obtener dólar blue:", error);
         setDolarBlueRate(null);
