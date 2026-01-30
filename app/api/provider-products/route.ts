@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 export const dynamic = "force-static"
 
-const DEFAULT_RANGES = ["B:B", "C:C", "D:D", "F:F"]
+const DEFAULT_RANGES = ["B:B", "C:C", "E:E", "F:F"]
 
 const normalizeText = (value: string) => value.trim().toLowerCase()
 
@@ -75,28 +75,33 @@ export async function GET() {
       firstRow.length >= 2 &&
       (normalizeText(firstRow[0] || "").includes("nombre") ||
         normalizeText(firstRow[0] || "").includes("producto") ||
-        normalizeText(firstRow[1] || "").includes("detalle") ||
-        normalizeText(firstRow[2] || "").includes("precio") ||
-        normalizeText(firstRow[2] || "").includes("price"))
+        normalizeText(firstRow[1] || "").includes("precio") ||
+        normalizeText(firstRow[1] || "").includes("price"))
 
     const dataRows = isHeaderRow ? rows : values
+    const columnEHeader = isHeaderRow ? firstRow[2]?.trim() || "" : ""
+    const columnFHeader = isHeaderRow ? firstRow[3]?.trim() || "" : ""
 
     const products = dataRows
       .filter((row) => row[0] && (row[1] || row[2] || row[3]))
       .map((row) => {
         const baseName = row[0].trim()
-        const detail = row[1]?.trim()
-        const priceRaw = (row[2] || row[1] || "").trim()
+        const priceRaw = (row[1] || "").trim()
         return {
-          name: detail ? `${baseName} ${detail}` : baseName,
+          name: baseName,
           priceRaw,
           price: parsePrice(priceRaw),
-          reference: row[3]?.trim() || "",
+          columnE: row[2]?.trim() || "",
+          columnF: row[3]?.trim() || "",
         }
       })
 
     return NextResponse.json({
       products,
+      headers: {
+        columnE: columnEHeader,
+        columnF: columnFHeader,
+      },
       updatedAt: new Date().toISOString(),
     })
   } catch (error) {
