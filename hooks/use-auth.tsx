@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { get, ref } from "firebase/database";
+import { database } from "@/lib/firebase";
 import { safeLocalStorage } from "@/lib/safe-storage";
 
 interface User {
@@ -15,64 +17,50 @@ export function useAuth() {
 
   useEffect(() => {
     const auth = getAuth();
+    let isActive = true;
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser && firebaseUser.email) {
-        const role = firebaseUser.email.endsWith("@admin.com")
-          ? "admin"
-          : "moderator";
-        const currentUser = { username: firebaseUser.email, role };
-
-        setUser((previous) => {
-          if (
-            previous?.username === currentUser.username &&
-            previous?.role === currentUser.role
-          ) {
-            return previous;
-          }
-          return currentUser;
-        });
-        const stored = safeLocalStorage.getItem("user");
-        if (!stored.ok || !stored.value) {
-          safeLocalStorage.setItem("user", JSON.stringify(currentUser));
-        } else {
+      const syncUser = async () => {
+        if (!isActive) return;
+        if (firebaseUser?.uid) {
           try {
-            const parsed = JSON.parse(stored.value) as User;
-            if (
-              parsed.username !== currentUser.username ||
-              parsed.role !== currentUser.role
-            ) {
+            const snapshot = await get(ref(database, `users/${firebaseUser.uid}`));
+            const data = snapshot.exists() ? snapshot.val() : null;
+            const role = data?.role;
+            if (role === "admin" || role === "moderator") {
+              const username = data?.username || firebaseUser.email || "Usuario";
+              const currentUser = { username, role };
+              setUser((previous) => {
+                if (
+                  previous?.username === currentUser.username &&
+                  previous?.role === currentUser.role
+                ) {
+                  return previous;
+                }
+                return currentUser;
+              });
               safeLocalStorage.setItem("user", JSON.stringify(currentUser));
+            } else {
+              safeLocalStorage.removeItem("user");
+              setUser(null);
             }
-          } catch {
-            safeLocalStorage.setItem("user", JSON.stringify(currentUser));
-          }
-        }
-      } else {
-        const storedUser = safeLocalStorage.getItem("user");
-        if (storedUser.ok && storedUser.value) {
-          try {
-            const parsed = JSON.parse(storedUser.value) as User;
-            setUser((previous) => {
-              if (
-                previous?.username === parsed.username &&
-                previous?.role === parsed.role
-              ) {
-                return previous;
-              }
-              return parsed;
-            });
-          } catch {
+          } catch (error) {
+            console.error("Error al validar el usuario del dashboard:", error);
             safeLocalStorage.removeItem("user");
             setUser(null);
           }
         } else {
+          safeLocalStorage.removeItem("user");
           setUser(null);
         }
-      }
-      setLoading(false);
+        setLoading(false);
+      };
+      void syncUser();
     });
 
-    return () => unsubscribe();
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
   }, []);
 
   return { user, loading };
