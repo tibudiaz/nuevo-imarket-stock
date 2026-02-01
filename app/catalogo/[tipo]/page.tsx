@@ -1,3 +1,5 @@
+import { Suspense } from "react"
+
 import PublicStockClient from "./ClientPage"
 
 export const dynamicParams = false
@@ -7,5 +9,9 @@ export function generateStaticParams() {
 }
 
 export default function PublicStockPage({ params }: { params: { tipo: string } }) {
-  return <PublicStockClient params={params} />
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Cargando…</div>}>
+      <PublicStockClient params={params} />
+    </Suspense>
+  )
 }
