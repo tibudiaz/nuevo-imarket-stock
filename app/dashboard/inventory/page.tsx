@@ -55,6 +55,7 @@ import TransferProductDialog from "@/components/transfer-product-dialog";
 import QuickSaleDialog from "@/components/quick-sale-dialog";
 import { shouldRemoveProductFromInventory } from "@/lib/utils";
 import { safeLocalStorage, type SafeStorageResult } from "@/lib/safe-storage";
+import { convertPriceToUSD, formatCurrency } from "@/lib/price-converter";
 import {
   Select,
   SelectContent,
@@ -119,6 +120,8 @@ interface Category {
 
 const NEW_PRODUCT_STORAGE_KEY = "inventory-new-product";
 const NEW_PRODUCT_DIALOG_OPEN_KEY = "inventory-new-product-open";
+const CATALOG_BLUE_SURCHARGE = 10;
+const DOLAR_BLUE_REFRESH_MS = 10 * 60 * 1000;
 
 const getStoreFromSelection = (
   store: "all" | "local1" | "local2",
@@ -183,6 +186,7 @@ export default function InventoryPage() {
     provider: true,
     cost: true,
   });
+  const [usdRate, setUsdRate] = useState(0);
   const [catalogVisibility, setCatalogVisibility] = useState({
     newPhones: true,
     usedPhones: true,
@@ -269,6 +273,54 @@ export default function InventoryPage() {
 
     return `$${Number(price || 0).toFixed(2)}`;
   };
+
+  const formatCatalogArsPrice = (price?: Product["price"]) => {
+    if (usdRate <= 0) return "Consultar";
+
+    const parseNumeric = (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed || priceContainsWords(trimmed)) return null;
+      const numericValue = Number(trimmed);
+      return Number.isNaN(numericValue) ? null : numericValue;
+    };
+
+    const numericPrice =
+      typeof price === "number"
+        ? Number.isNaN(price)
+          ? null
+          : price
+        : typeof price === "string"
+          ? parseNumeric(price)
+          : null;
+
+    if (numericPrice === null) return "Consultar";
+
+    const usdValue = convertPriceToUSD(numericPrice, usdRate);
+    return formatCurrency(usdValue * usdRate);
+  };
+
+  useEffect(() => {
+    const fetchDolarBlue = async () => {
+      try {
+        const response = await fetch("/api/dolar-blue");
+        if (!response.ok) {
+          throw new Error("No se pudo obtener la cotización");
+        }
+        const data = await response.json();
+        const nextRate =
+          typeof data.venta === "number" ? data.venta + CATALOG_BLUE_SURCHARGE : 0;
+        setUsdRate(nextRate);
+      } catch (error) {
+        console.error("Error al obtener dólar blue:", error);
+        setUsdRate(0);
+      }
+    };
+
+    fetchDolarBlue();
+    const intervalId = setInterval(fetchDolarBlue, DOLAR_BLUE_REFRESH_MS);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1209,7 +1261,12 @@ export default function InventoryPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {formatPriceForUser(product.price)}
+                      <div className="space-y-1">
+                        <div>{formatPriceForUser(product.price)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Catálogo: {formatCatalogArsPrice(product.price)}
+                        </div>
+                      </div>
                     </TableCell>
                     {showCost && (
                       <TableCell>

@@ -161,6 +161,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { selectedStore, setSelectedStore } = useStore();
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
 
+  const DOLAR_BLUE_REFRESH_MS = 10 * 60 * 1000;
+
   useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
@@ -179,7 +181,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     };
 
     fetchDolarBlue();
-    const intervalId = setInterval(fetchDolarBlue, 180000);
+    const intervalId = setInterval(fetchDolarBlue, DOLAR_BLUE_REFRESH_MS);
 
     return () => clearInterval(intervalId);
   }, []);
