@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation"
+import PublicAccessLanding from "@/components/public-access-landing"
 
 export default function Home() {
-  redirect("/catalogo")
+  return <PublicAccessLanding />
 }
