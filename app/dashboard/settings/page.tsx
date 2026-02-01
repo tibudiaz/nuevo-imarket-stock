@@ -76,6 +76,12 @@ interface FinancingConfig {
   cards: Record<string, FinancingCard>;
 }
 
+interface OfferItem {
+  id: string;
+  text: string;
+  createdAt?: string;
+}
+
 interface SystemChangeEntry {
   id: string;
   user?: string;
@@ -276,6 +282,8 @@ export default function SettingsPage() {
 
   // Estado para la nueva categoría
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [offers, setOffers] = useState<OfferItem[]>([]);
+  const [newOfferText, setNewOfferText] = useState("");
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -316,6 +324,19 @@ export default function SettingsPage() {
         setPointValue(data.value || 0);
         setPointsPaused(data.paused || false);
       }
+    });
+
+    const offersRef = ref(database, 'config/offers');
+    onValue(offersRef, (snapshot) => {
+      const data = snapshot.val();
+      const offerList: OfferItem[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({
+            id,
+            text: value?.text ?? "",
+            createdAt: value?.createdAt,
+          }))
+        : [];
+      setOffers(offerList.filter((offer) => offer.text.trim() !== ""));
     });
 
     const usersRef = ref(database, 'users');
@@ -380,6 +401,36 @@ export default function SettingsPage() {
         setNewCategoryName(""); // Limpiar input
     } catch (error) {
         toast.error("Error al crear la categoría.");
+    }
+  };
+
+  const handleAddOffer = async () => {
+    const trimmed = newOfferText.trim();
+    if (!trimmed) {
+      toast.error("La oferta no puede estar vacía.");
+      return;
+    }
+    const offerRef = push(ref(database, "config/offers"));
+    try {
+      await set(offerRef, {
+        text: trimmed,
+        createdAt: new Date().toISOString(),
+      });
+      setNewOfferText("");
+      toast.success("Oferta agregada.");
+    } catch (error) {
+      console.error("Error al guardar la oferta:", error);
+      toast.error("No se pudo guardar la oferta.");
+    }
+  };
+
+  const handleRemoveOffer = async (offerId: string) => {
+    try {
+      await remove(ref(database, `config/offers/${offerId}`));
+      toast.success("Oferta eliminada.");
+    } catch (error) {
+      console.error("Error al eliminar la oferta:", error);
+      toast.error("No se pudo eliminar la oferta.");
     }
   };
 
@@ -1003,6 +1054,60 @@ export default function SettingsPage() {
                 <Label htmlFor="points-paused">Pausar sistema de puntos</Label>
               </div>
               <Button onClick={handleSavePoints}>Guardar</Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Promociones del catálogo</CardTitle>
+              <CardDescription>Administra el texto que se muestra en la barra superior.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="offer-text">Texto de oferta</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="offer-text"
+                    value={newOfferText}
+                    onChange={(e) => setNewOfferText(e.target.value)}
+                    placeholder="Ej. 20% OFF en accesorios seleccionados"
+                  />
+                  <Button onClick={handleAddOffer} className="sm:w-40">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Agregar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Este texto se mostrará como un aviso pasante en el catálogo público.
+                </p>
+              </div>
+              <Separator />
+              <ScrollArea className="h-48">
+                <div className="space-y-2">
+                  {offers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No hay ofertas cargadas.
+                    </p>
+                  ) : (
+                    offers.map((offer) => (
+                      <div
+                        key={offer.id}
+                        className="flex items-center justify-between gap-2 rounded-md border p-2"
+                      >
+                        <span className="text-sm">{offer.text}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleRemoveOffer(offer.id)}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
 
