@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState, type FormEvent } from "react"
-import { useSearchParams } from "next/navigation"
 import { ref, onValue, query, orderByChild, equalTo, get, push, set, update } from "firebase/database"
 import {
   ArrowLeft,
@@ -200,8 +199,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loginEmail, setLoginEmail] = useState("")
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false)
-  const searchParams = useSearchParams()
-
   useEffect(() => {
     if (!catalogType) return
     const cached = readCatalogCache(cacheKey)
@@ -221,13 +218,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     }
     setLoading(false)
   }, [cacheKey, catalogType])
-
-  useEffect(() => {
-    if (searchParams.get("auth") === "1") {
-      setIsAuthPanelOpen(true)
-      setAuthStep("choice")
-    }
-  }, [searchParams])
 
   useEffect(() => {
     const offersRef = ref(database, "config/offers")
