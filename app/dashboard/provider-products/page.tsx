@@ -46,7 +46,10 @@ export default function ProviderProductsPage() {
   const [search, setSearch] = useState("")
   const [headers, setHeaders] = useState<ProviderHeaders | null>(null)
   const showProviderPrices = user?.role !== "moderator"
-  const tableColumns = 3 + (showProviderPrices ? 1 : 0)
+  const showProviderNotes = user?.role === "moderator"
+  const tableColumns = 3 + (showProviderPrices ? 1 : 0) + (showProviderNotes ? 1 : 0)
+
+  const hasTextStatus = (value?: string) => Boolean(value && /[a-záéíóúñü]/i.test(value))
 
   const fetchProducts = useCallback(async () => {
     setIsLoading(true)
@@ -135,6 +138,7 @@ export default function ProviderProductsPage() {
                 <TableRow>
                   <TableHead>PRODUCTO</TableHead>
                   {showProviderPrices ? <TableHead>PRECIO</TableHead> : null}
+                  {showProviderNotes ? <TableHead>OBSERVACIÓN</TableHead> : null}
                   <TableHead>{headers?.columnE || "Cantidad"}</TableHead>
                   <TableHead className="text-right">{headers?.columnF || "Estado"}</TableHead>
                 </TableRow>
@@ -166,6 +170,11 @@ export default function ProviderProductsPage() {
                         {showProviderPrices ? (
                           <TableCell>
                             {product.price !== null ? currencyFormatter.format(product.price) : product.priceRaw}
+                          </TableCell>
+                        ) : null}
+                        {showProviderNotes ? (
+                          <TableCell className="text-sm text-muted-foreground">
+                            {hasTextStatus(product.priceRaw) ? product.priceRaw : "—"}
                           </TableCell>
                         ) : null}
                         <TableCell>{product.columnE}</TableCell>
