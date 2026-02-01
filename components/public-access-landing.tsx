@@ -1,5 +1,12 @@
+"use client"
+
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { ref, onValue } from "firebase/database"
 import { ArrowRight, Smartphone, Sparkles, Zap } from "lucide-react"
+
+import PublicTopBar from "@/components/public-top-bar"
+import { database } from "@/lib/firebase"
 
 const landingOptions = [
   {
@@ -19,11 +26,106 @@ const landingOptions = [
 ]
 
 export default function PublicAccessLanding() {
+  const [offers, setOffers] = useState<string[]>([])
+
+  useEffect(() => {
+    const offersRef = ref(database, "config/offers")
+    const unsubscribe = onValue(offersRef, (snapshot) => {
+      const data = snapshot.val()
+      if (!data) {
+        setOffers([])
+        return
+      }
+      const items = Object.values(data)
+        .map((value) => {
+          if (typeof value === "string") return value
+          if (value && typeof value === "object" && "text" in value) {
+            return String((value as { text?: string }).text ?? "")
+          }
+          return ""
+        })
+        .filter((text) => text.trim().length > 0)
+      setOffers(items)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const marqueeItems = offers.length
+    ? offers
+    : ["Promociones en tienda, cuotas y bonificaciones especiales."]
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.22),transparent_45%),radial-gradient(circle_at_bottom,_rgba(16,185,129,0.18),transparent_40%)]" />
       <div className="absolute inset-0 opacity-40 [background:linear-gradient(120deg,_rgba(15,23,42,0.65)_0%,_rgba(2,6,23,0.9)_100%)]" />
-      <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pb-20 pt-16">
+      <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pb-20 pt-10">
+        <PublicTopBar
+          marqueeItems={marqueeItems}
+          desktopContent={
+            <>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                  <Sparkles className="h-4 w-4 text-sky-300" />
+                  Stock actualizado
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                  Información segura y resumida
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                <Link
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+                  href="/catalogo/nuevos"
+                >
+                  Celulares nuevos
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+                  href="/catalogo/usados"
+                >
+                  Celulares usados
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </>
+          }
+          mobileContent={
+            <div className="space-y-4">
+              <div className="space-y-2 text-sm text-slate-200">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Accesos</p>
+                <div className="grid gap-2">
+                  <Link
+                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+                    href="/catalogo/nuevos"
+                  >
+                    Celulares nuevos
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+                    href="/catalogo/usados"
+                  >
+                    Celulares usados
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm text-slate-300">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Beneficios</p>
+                <div className="grid gap-2">
+                  <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                    Stock actualizado y precios en USD/ARS
+                  </span>
+                  <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                    Información segura y resumida
+                  </span>
+                </div>
+              </div>
+            </div>
+          }
+        />
         <header className="flex flex-col gap-6">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">

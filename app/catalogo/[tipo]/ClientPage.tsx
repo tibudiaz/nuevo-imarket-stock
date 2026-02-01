@@ -22,6 +22,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
 import { convertPriceToUSD, formatCurrency, formatUsdCurrency } from "@/lib/price-converter"
 import { cn } from "@/lib/utils"
@@ -586,6 +587,123 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
 
+  const topBarDesktopContent = (
+    <>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+        <Link
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+          href="/"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Elegir otra categoría
+        </Link>
+        <Link
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+          href={`/catalogo/${alternateType.key}`}
+        >
+          {alternateType.title}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+        <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+          <Globe className="h-4 w-4" />
+          Disponible en tiempo real
+        </span>
+        <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+          <ShieldCheck className="h-4 w-4" />
+          Datos protegidos
+        </span>
+        {currentCustomer ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100">
+              {currentCustomer.name || currentCustomer.email || "Cliente"}
+            </span>
+            <Button
+              type="button"
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+              onClick={() => setIsProfileOpen(true)}
+            >
+              Mi perfil
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+            onClick={toggleAuthPanel}
+            aria-expanded={isAuthPanelOpen}
+          >
+            Iniciar sesión / Registrarse
+          </Button>
+        )}
+      </div>
+    </>
+  )
+
+  const topBarMobileContent = (
+    <div className="space-y-6">
+      <div className="space-y-2 text-sm text-slate-200">
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Navegación</p>
+        <div className="grid gap-2">
+          <Link
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+            href="/"
+          >
+            Elegir otra categoría
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <Link
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+            href={`/catalogo/${alternateType.key}`}
+          >
+            {alternateType.title}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+      <div className="space-y-2 text-sm text-slate-300">
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Estado</p>
+        <div className="grid gap-2">
+          <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+            Disponible en tiempo real
+          </span>
+          <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+            Datos protegidos
+          </span>
+        </div>
+      </div>
+      <div className="space-y-2 text-sm text-slate-300">
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Cuenta</p>
+        <div className="grid gap-2">
+          {currentCustomer ? (
+            <>
+              <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-slate-100">
+                {currentCustomer.name || currentCustomer.email || "Cliente"}
+              </span>
+              <Button
+                type="button"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10"
+                onClick={() => setIsProfileOpen(true)}
+              >
+                Mi perfil
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200 hover:border-white/20 hover:bg-white/10"
+              onClick={toggleAuthPanel}
+              aria-expanded={isAuthPanelOpen}
+            >
+              Iniciar sesión / Registrarse
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+
   const formatSaleDate = (date?: string) => {
     if (!date) return "Fecha pendiente"
     const parsed = new Date(date)
@@ -843,77 +961,13 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           <div className="absolute top-40 left-10 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-[140px]" />
           <div className="absolute -top-10 right-10 h-64 w-64 rounded-full bg-emerald-400/20 blur-[130px]" />
         </div>
-        <header className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pb-16 pt-12">
+        <header className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pb-16 pt-10">
           <div className="flex flex-col gap-6">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-black/10">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                  <Link
-                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                    href="/"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Elegir otra categoría
-                  </Link>
-                  <Link
-                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                    href={`/catalogo/${alternateType.key}`}
-                  >
-                    {alternateType.title}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                  <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                    <Globe className="h-4 w-4" />
-                    Disponible en tiempo real
-                  </span>
-                  <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                    <ShieldCheck className="h-4 w-4" />
-                    Datos protegidos
-                  </span>
-                  {currentCustomer ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100">
-                        {currentCustomer.name || currentCustomer.email || "Cliente"}
-                      </span>
-                      <Button
-                        type="button"
-                        className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-                        onClick={() => setIsProfileOpen(true)}
-                      >
-                        Mi perfil
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-                      onClick={toggleAuthPanel}
-                      aria-expanded={isAuthPanelOpen}
-                    >
-                      Iniciar sesión / Registrarse
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <div className="mt-3 overflow-hidden rounded-full border border-white/10 bg-slate-950/60">
-                <div className="flex w-max animate-marquee items-center gap-6 whitespace-nowrap px-4 py-2 text-sm text-slate-200">
-                  {marqueeItems.map((item, index) => (
-                    <span key={`offer-primary-${index}`} className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                      {item}
-                    </span>
-                  ))}
-                  {marqueeItems.map((item, index) => (
-                    <span key={`offer-secondary-${index}`} className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <PublicTopBar
+              marqueeItems={marqueeItems}
+              desktopContent={topBarDesktopContent}
+              mobileContent={topBarMobileContent}
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div className="flex items-center gap-3">
