@@ -838,6 +838,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                 </Link>
               </div>
             </div>
+          </div>
         </header>
       </div>
 
