@@ -39,6 +39,29 @@ interface Product {
   [key: string]: any
 }
 
+interface CustomerProfile {
+  id: string
+  name?: string
+  email?: string
+  points?: number
+  [key: string]: any
+}
+
+interface SaleItem {
+  productName?: string
+  quantity?: number
+  [key: string]: any
+}
+
+interface Sale {
+  id: string
+  date?: string
+  items?: SaleItem[]
+  totalAmount?: number
+  customerId?: string
+  [key: string]: any
+}
+
 const CATEGORY_NEW = "Celulares Nuevos"
 const CATEGORY_USED = "Celulares Usados"
 const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000
@@ -160,6 +183,10 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const [offers, setOffers] = useState<string[]>([])
   const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false)
   const [authStep, setAuthStep] = useState<"choice" | "login" | "register">("choice")
+  const [currentCustomer, setCurrentCustomer] = useState<CustomerProfile | null>(null)
+  const [customerSales, setCustomerSales] = useState<Sale[]>([])
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [pointsPaused, setPointsPaused] = useState(false)
   const [purchaseStatus, setPurchaseStatus] = useState<"yes" | "no">("no")
   const [registration, setRegistration] = useState({
     dni: "",
@@ -214,6 +241,52 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const pointsRef = ref(database, "config/points")
+    const unsubscribe = onValue(pointsRef, (snapshot) => {
+      const data = snapshot.val()
+      setPointsPaused(Boolean(data?.paused))
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!currentCustomer?.id) {
+      setCustomerSales([])
+      return
+    }
+
+    const salesRef = ref(database, "sales")
+    const unsubscribe = onValue(salesRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setCustomerSales([])
+        return
+      }
+
+      const nextSales: Sale[] = []
+      snapshot.forEach((childSnapshot) => {
+        const data = childSnapshot.val() || {}
+        if (data.customerId === currentCustomer.id) {
+          nextSales.push({
+            id: childSnapshot.key || "",
+            ...data,
+          })
+        }
+      })
+
+      nextSales.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0
+        const dateB = b.date ? new Date(b.date).getTime() : 0
+        return dateB - dateA
+      })
+
+      setCustomerSales(nextSales)
+    })
+
+    return () => unsubscribe()
+  }, [currentCustomer?.id])
 
   useEffect(() => {
     if (!catalogType) return
@@ -457,6 +530,15 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       const emailQuery = query(customersRef, orderByChild("email"), equalTo(normalizedEmail))
       const emailSnapshot = await get(emailQuery)
       if (emailSnapshot.exists()) {
+        const entries = Object.entries(emailSnapshot.val())
+        const [customerId, customerData] = entries[0] as [string, any]
+        setCurrentCustomer({
+          id: customerId,
+          ...customerData,
+        })
+        setLoginEmail("")
+        setIsAuthPanelOpen(false)
+        setAuthStep("choice")
         toast.success("Cuenta encontrada.", {
           description: "Pronto podrás acceder a tu historial desde aquí.",
         })
@@ -503,6 +585,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const marqueeItems = offers.length
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
+
+  const formatSaleDate = (date?: string) => {
+    if (!date) return "Fecha pendiente"
+    const parsed = new Date(date)
+    if (Number.isNaN(parsed.getTime())) return "Fecha pendiente"
+    return new Intl.DateTimeFormat("es-AR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(parsed)
+  }
 
   const authPanel = (
     <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20">
@@ -756,6 +848,22 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-black/10">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                  <Link
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+                    href="/"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Elegir otra categoría
+                  </Link>
+                  <Link
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+                    href={`/catalogo/${alternateType.key}`}
+                  >
+                    {alternateType.title}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
                   <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
                     <Globe className="h-4 w-4" />
                     Disponible en tiempo real
@@ -764,15 +872,30 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                     <ShieldCheck className="h-4 w-4" />
                     Datos protegidos
                   </span>
+                  {currentCustomer ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100">
+                        {currentCustomer.name || currentCustomer.email || "Cliente"}
+                      </span>
+                      <Button
+                        type="button"
+                        className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+                        onClick={() => setIsProfileOpen(true)}
+                      >
+                        Mi perfil
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+                      onClick={toggleAuthPanel}
+                      aria-expanded={isAuthPanelOpen}
+                    >
+                      Iniciar sesión / Registrarse
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  type="button"
-                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-                  onClick={toggleAuthPanel}
-                  aria-expanded={isAuthPanelOpen}
-                >
-                  Iniciar sesión / Registrarse
-                </Button>
               </div>
               <div className="mt-3 overflow-hidden rounded-full border border-white/10 bg-slate-950/60">
                 <div className="flex w-max animate-marquee items-center gap-6 whitespace-nowrap px-4 py-2 text-sm text-slate-200">
@@ -821,142 +944,199 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                   </span>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                <Link
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                  href="/"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Elegir otra categoría
-                </Link>
-                <Link
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                  href={`/catalogo/${alternateType.key}`}
-                >
-                  {alternateType.title}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
             </div>
           </div>
         </header>
       </div>
 
       <main className="mx-auto w-full max-w-6xl px-6 pb-20">
-        <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
-          <div className="flex-1">
-            {loading ? (
-              <div className="flex items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 text-slate-300">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-400 border-t-transparent" />
-                <span className="ml-4">Cargando stock en tiempo real...</span>
+        {loading ? (
+          <div className="flex items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 text-slate-300">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-400 border-t-transparent" />
+            <span className="ml-4">Cargando stock en tiempo real...</span>
+          </div>
+        ) : !isSectionVisible ? (
+          <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
+            Esta sección no está disponible por el momento.
+          </div>
+        ) : inStock.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
+            No hay equipos disponibles por el momento.
+          </div>
+        ) : (
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold">{catalogType.title}</h2>
+                <p className="text-sm text-slate-400">{inStock.length} equipos disponibles</p>
               </div>
-            ) : !isSectionVisible ? (
-              <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
-                Esta sección no está disponible por el momento.
-              </div>
-            ) : inStock.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
-                No hay equipos disponibles por el momento.
-              </div>
-            ) : (
-              <section className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-semibold">{catalogType.title}</h2>
-                    <p className="text-sm text-slate-400">{inStock.length} equipos disponibles</p>
-                  </div>
-                </div>
+            </div>
 
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {inStock.map((product) => (
-                    <div
-                      key={product.id}
-                      className={cn(
-                        "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
-                        "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
-                        `before:${catalogType.accent}`,
-                      )}
-                    >
-                      <div className="relative space-y-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                              {catalogType.title}
-                            </p>
-                            <h3 className="text-lg font-semibold text-white">
-                              {resolveProductName(product)}
-                            </h3>
-                          </div>
-                          <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
-                            Stock: {product.stock ?? 0}
-                          </div>
-                        </div>
-
-                        <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-xs text-slate-400">IMEI</p>
-                              <p className="text-sm font-medium text-slate-100">
-                                {formatImeiSuffix(product.imei)}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-slate-400">Precio USD</p>
-                              <p className="text-lg font-semibold text-sky-200">
-                                {formatUsdPrice(product.price, usdRate)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
-                            <span className="text-xs text-slate-400">Precio en pesos actual</span>
-                            <span className="font-semibold text-emerald-200">
-                              {formatArsPriceBlue(product.price, usdRate)}
-                            </span>
-                          </div>
-                        </div>
-                        <a
-                          className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
-                          href={buildWhatsAppLink(product, usdRate)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Consultar por WhatsApp
-                        </a>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {inStock.map((product) => (
+                <div
+                  key={product.id}
+                  className={cn(
+                    "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
+                    "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
+                    `before:${catalogType.accent}`,
+                  )}
+                >
+                  <div className="relative space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                          {catalogType.title}
+                        </p>
+                        <h3 className="text-lg font-semibold text-white">
+                          {resolveProductName(product)}
+                        </h3>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
+                        Stock: {product.stock ?? 0}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
 
-          <aside className="hidden w-full max-w-sm flex-shrink-0 lg:block">
-            {isAuthPanelOpen ? authPanel : null}
-          </aside>
-        </div>
+                    <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-slate-400">IMEI</p>
+                          <p className="text-sm font-medium text-slate-100">
+                            {formatImeiSuffix(product.imei)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">Precio USD</p>
+                          <p className="text-lg font-semibold text-sky-200">
+                            {formatUsdPrice(product.price, usdRate)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
+                        <span className="text-xs text-slate-400">Precio en pesos actual</span>
+                        <span className="font-semibold text-emerald-200">
+                          {formatArsPriceBlue(product.price, usdRate)}
+                        </span>
+                      </div>
+                    </div>
+                    <a
+                      className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
+                      href={buildWhatsAppLink(product, usdRate)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Consultar por WhatsApp
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {isAuthPanelOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
           <button
             type="button"
             className="absolute inset-0 bg-slate-950/80"
             onClick={() => setIsAuthPanelOpen(false)}
             aria-label="Cerrar panel"
           />
-          <div className="relative ml-auto h-full w-full max-w-sm overflow-y-auto border-l border-white/10 bg-slate-950 px-6 py-8 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Cuenta</p>
+          <div className="relative w-full max-w-md">
+            {authPanel}
+          </div>
+        </div>
+      )}
+
+      {isProfileOpen && currentCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/80"
+            onClick={() => setIsProfileOpen(false)}
+            aria-label="Cerrar perfil"
+          />
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950/90 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Mi perfil</p>
+                <h2 className="text-xl font-semibold text-white">
+                  {currentCustomer.name || currentCustomer.email || "Cliente"}
+                </h2>
+                <p className="text-sm text-slate-300">{currentCustomer.email}</p>
+              </div>
               <button
                 type="button"
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-200 hover:border-white/20"
-                onClick={() => setIsAuthPanelOpen(false)}
-                aria-label="Cerrar panel"
+                onClick={() => setIsProfileOpen(false)}
+                aria-label="Cerrar perfil"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {authPanel}
+            <div className="max-h-[70vh] space-y-6 overflow-y-auto px-6 py-6">
+              {!pointsPaused && (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+                    Puntos disponibles
+                  </p>
+                  <p className="text-2xl font-semibold text-emerald-200">
+                    {currentCustomer.points ?? 0} puntos
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">Historial de compras</h3>
+                  <span className="text-sm text-slate-400">
+                    {customerSales.length} operaciones
+                  </span>
+                </div>
+                {customerSales.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-center text-sm text-slate-400">
+                    Todavía no registramos compras asociadas a tu cuenta.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {customerSales.map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-white">
+                            Compra #{sale.id.slice(-6)}
+                          </p>
+                          <p className="text-xs text-slate-400">{formatSaleDate(sale.date)}</p>
+                        </div>
+                        <div className="mt-3 space-y-2 text-sm text-slate-300">
+                          {(sale.items ?? []).length > 0 ? (
+                            <ul className="space-y-1">
+                              {sale.items?.map((item, index) => (
+                                <li key={`${sale.id}-${index}`} className="flex justify-between">
+                                  <span>{item.productName || "Producto"}</span>
+                                  <span className="text-slate-400">x{item.quantity ?? 1}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-slate-400">Sin detalle de productos.</p>
+                          )}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-sm">
+                          <span className="text-slate-400">Total</span>
+                          <span className="font-semibold text-emerald-200">
+                            {formatCurrency(Number(sale.totalAmount ?? 0))}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
