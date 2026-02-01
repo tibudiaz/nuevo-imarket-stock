@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
 import { ArrowRight, Smartphone, Sparkles, Zap } from "lucide-react"
 
@@ -27,6 +28,8 @@ const landingOptions = [
 
 export default function PublicAccessLanding() {
   const [offers, setOffers] = useState<string[]>([])
+  const [secretClickCount, setSecretClickCount] = useState(0)
+  const router = useRouter()
 
   useEffect(() => {
     const offersRef = ref(database, "config/offers")
@@ -54,6 +57,17 @@ export default function PublicAccessLanding() {
   const marqueeItems = offers.length
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
+
+  const handleSecretDashboardAccess = () => {
+    setSecretClickCount((previous) => {
+      const next = previous + 1
+      if (next >= 5) {
+        router.push("/dashboard")
+        return 0
+      }
+      return next
+    })
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
@@ -144,9 +158,14 @@ export default function PublicAccessLanding() {
         />
         <header className="flex flex-col gap-6">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
+            <button
+              type="button"
+              className="flex h-14 w-14 cursor-default items-center justify-center rounded-2xl bg-white/10"
+              onClick={handleSecretDashboardAccess}
+              aria-label="Acceso rápido al dashboard"
+            >
               <Smartphone className="h-7 w-7 text-sky-300" />
-            </div>
+            </button>
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">iMarket</p>
               <h1 className="text-4xl font-semibold">Catálogo de celulares</h1>
