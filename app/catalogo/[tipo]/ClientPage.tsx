@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState, type FormEvent } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { ref, onValue, query, orderByChild, equalTo, get, push, set, update } from "firebase/database"
 import {
   ArrowLeft,
@@ -200,8 +200,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loginEmail, setLoginEmail] = useState("")
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false)
-  const [secretClickCount, setSecretClickCount] = useState(0)
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -573,17 +571,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         setAuthStep("choice")
       }
       return !prev
-    })
-  }
-
-  const handleSecretDashboardAccess = () => {
-    setSecretClickCount((previous) => {
-      const next = previous + 1
-      if (next >= 5) {
-        router.push("/dashboard")
-        return 0
-      }
-      return next
     })
   }
 
@@ -993,14 +980,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10"
-                  onClick={handleSecretDashboardAccess}
-                  aria-label="Acceso rápido al dashboard"
-                >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
                   <Smartphone className="h-6 w-6 text-sky-300" />
-                </button>
+                </div>
                 <div>
                   <p className="text-sm uppercase tracking-[0.25em] text-slate-400">iMarket</p>
                   <h1 className="text-3xl font-semibold">{catalogType.title}</h1>
