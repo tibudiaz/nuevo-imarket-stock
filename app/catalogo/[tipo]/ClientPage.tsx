@@ -9,8 +9,8 @@ import {
   BadgeCheck,
   Globe,
   IdCard,
+  LogIn,
   Mail,
-  Menu,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -157,7 +157,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     newPhones: true,
     usedPhones: true,
   })
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [offers, setOffers] = useState<string[]>([])
+  const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false)
+  const [authStep, setAuthStep] = useState<"choice" | "login" | "register">("choice")
   const [purchaseStatus, setPurchaseStatus] = useState<"yes" | "no">("no")
   const [registration, setRegistration] = useState({
     dni: "",
@@ -167,6 +169,8 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const [matchedCustomer, setMatchedCustomer] = useState<{ id: string; name: string } | null>(null)
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loginEmail, setLoginEmail] = useState("")
+  const [isLoginSubmitting, setIsLoginSubmitting] = useState(false)
 
   useEffect(() => {
     if (!catalogType) return
@@ -187,6 +191,29 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     }
     setLoading(false)
   }, [cacheKey, catalogType])
+
+  useEffect(() => {
+    const offersRef = ref(database, "config/offers")
+    const unsubscribe = onValue(offersRef, (snapshot) => {
+      const data = snapshot.val()
+      if (!data) {
+        setOffers([])
+        return
+      }
+      const items = Object.values(data)
+        .map((value) => {
+          if (typeof value === "string") return value
+          if (value && typeof value === "object" && "text" in value) {
+            return String((value as { text?: string }).text ?? "")
+          }
+          return ""
+        })
+        .filter((text) => text.trim().length > 0)
+      setOffers(items)
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   useEffect(() => {
     if (!catalogType) return
@@ -417,6 +444,44 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     }
   }
 
+  const handleLoginCustomer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const normalizedEmail = loginEmail.trim().toLowerCase()
+    if (!normalizedEmail) {
+      toast.error("Ingresá tu email para continuar.")
+      return
+    }
+    setIsLoginSubmitting(true)
+    try {
+      const customersRef = ref(database, "customers")
+      const emailQuery = query(customersRef, orderByChild("email"), equalTo(normalizedEmail))
+      const emailSnapshot = await get(emailQuery)
+      if (emailSnapshot.exists()) {
+        toast.success("Cuenta encontrada.", {
+          description: "Pronto podrás acceder a tu historial desde aquí.",
+        })
+      } else {
+        toast.error("No encontramos ese email.", {
+          description: "Probá registrarte para crear tu cuenta.",
+        })
+      }
+    } catch (error) {
+      console.error("Error al iniciar sesión:", error)
+      toast.error("No pudimos validar tu cuenta. Intentá de nuevo.")
+    } finally {
+      setIsLoginSubmitting(false)
+    }
+  }
+
+  const toggleAuthPanel = () => {
+    setIsAuthPanelOpen((prev) => {
+      if (!prev) {
+        setAuthStep("choice")
+      }
+      return !prev
+    })
+  }
+
   const inStock = useMemo(() => {
     return products
       .filter((product) => (product.stock ?? 0) > 0 && product.visibleInCatalog !== false)
@@ -435,130 +500,226 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   const alternateType = catalogType?.key === "nuevos" ? CATALOG_TYPES.usados : CATALOG_TYPES.nuevos
 
-  const registrationPanel = (
+  const marqueeItems = offers.length
+    ? offers
+    : ["Promociones en tienda, cuotas y bonificaciones especiales."]
+
+  const authPanel = (
     <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20">
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Opciones</p>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10">
-            <UserPlus className="h-5 w-5 text-emerald-300" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-white">Crear usuario</h2>
-            <p className="text-sm text-slate-300">
-              Registrate para guardar tu historial y recibir novedades.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <form className="space-y-5" onSubmit={handleRegisterCustomer}>
-        <div className="space-y-3">
-          <Label className="text-sm text-slate-200">¿Ya compraste en iMarket?</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              className={cn(
-                "rounded-xl border px-3 py-2 text-sm font-medium transition",
-                purchaseStatus === "yes"
-                  ? "border-sky-400/60 bg-sky-500/20 text-sky-100"
-                  : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20",
-              )}
-              onClick={() => handlePurchaseStatusChange("yes")}
-            >
-              Sí, ya compré
-            </button>
-            <button
-              type="button"
-              className={cn(
-                "rounded-xl border px-3 py-2 text-sm font-medium transition",
-                purchaseStatus === "no"
-                  ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100"
-                  : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20",
-              )}
-              onClick={() => handlePurchaseStatusChange("no")}
-            >
-              Soy nuevo
-            </button>
-          </div>
-        </div>
-
-        {purchaseStatus === "yes" && (
-          <div className="space-y-2">
-            <Label htmlFor="public-dni" className="text-sm text-slate-200">
-              DNI
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="public-dni"
-                value={registration.dni}
-                onChange={(event) =>
-                  setRegistration((prev) => ({ ...prev, dni: event.target.value }))
-                }
-                placeholder="Ingresá tu DNI"
-                className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10"
-                onClick={handleSearchCustomer}
-                disabled={isSearchingCustomer}
-              >
-                <IdCard className="h-4 w-4" />
-                {isSearchingCustomer ? "Buscando..." : "Buscar"}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label htmlFor="public-name" className="text-sm text-slate-200">
-            Nombre y apellido
-          </Label>
-          <Input
-            id="public-name"
-            value={registration.name}
-            onChange={(event) => setRegistration((prev) => ({ ...prev, name: event.target.value }))}
-            placeholder="Ingresá tu nombre completo"
-            className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
-            readOnly={Boolean(matchedCustomer)}
-          />
-          {matchedCustomer && (
-            <p className="flex items-center gap-2 text-xs text-emerald-200">
-              <BadgeCheck className="h-4 w-4" />
-              Datos cargados desde tu historial.
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="public-email" className="text-sm text-slate-200">
-            Email
-          </Label>
-          <Input
-            id="public-email"
-            type="email"
-            value={registration.email}
-            onChange={(event) => setRegistration((prev) => ({ ...prev, email: event.target.value }))}
-            placeholder="correo@ejemplo.com"
-            className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
-            required
-          />
-          <p className="flex items-center gap-2 text-xs text-slate-400">
-            <Mail className="h-4 w-4" />
-            Usamos el email para validar tu cuenta.
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Cuenta</p>
+          <h2 className="text-lg font-semibold text-white">
+            {authStep === "choice" && "Acceso a tu cuenta"}
+            {authStep === "login" && "Iniciar sesión"}
+            {authStep === "register" && "Registrarse"}
+          </h2>
+          <p className="text-sm text-slate-300">
+            {authStep === "choice" &&
+              "Elegí cómo querés ingresar para ver tu historial o recibir novedades."}
+            {authStep === "login" && "Validá tu email para entrar a tu historial."}
+            {authStep === "register" &&
+              "Completá el formulario para crear tu usuario y recibir promociones."}
           </p>
         </div>
-
-        <Button
-          type="submit"
-          className="w-full rounded-xl bg-emerald-500 text-white hover:bg-emerald-400"
-          disabled={isSubmitting}
+        <button
+          type="button"
+          className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-200 hover:border-white/20"
+          onClick={() => setIsAuthPanelOpen(false)}
+          aria-label="Cerrar panel"
         >
-          {isSubmitting ? "Creando usuario..." : "Crear usuario"}
-        </Button>
-      </form>
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {authStep === "choice" && (
+        <div className="grid gap-3">
+          <button
+            type="button"
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-slate-200 transition hover:border-white/20"
+            onClick={() => setAuthStep("login")}
+          >
+            <span className="flex items-center gap-2">
+              <LogIn className="h-4 w-4 text-sky-300" />
+              Iniciar sesión
+            </span>
+            <span className="text-xs text-slate-400">Entrar</span>
+          </button>
+          <button
+            type="button"
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-slate-200 transition hover:border-white/20"
+            onClick={() => setAuthStep("register")}
+          >
+            <span className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-emerald-300" />
+              Registrarse
+            </span>
+            <span className="text-xs text-slate-400">Crear cuenta</span>
+          </button>
+        </div>
+      )}
+
+      {authStep === "login" && (
+        <form className="space-y-5" onSubmit={handleLoginCustomer}>
+          <div className="space-y-2">
+            <Label htmlFor="login-email" className="text-sm text-slate-200">
+              Email
+            </Label>
+            <Input
+              id="login-email"
+              type="email"
+              value={loginEmail}
+              onChange={(event) => setLoginEmail(event.target.value)}
+              placeholder="correo@ejemplo.com"
+              className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Button
+              type="submit"
+              className="w-full rounded-xl bg-sky-500 text-white hover:bg-sky-400"
+              disabled={isLoginSubmitting}
+            >
+              {isLoginSubmitting ? "Validando..." : "Ingresar"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-slate-300 hover:text-white"
+              onClick={() => setAuthStep("choice")}
+            >
+              Volver
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {authStep === "register" && (
+        <>
+          <form className="space-y-5" onSubmit={handleRegisterCustomer}>
+            <div className="space-y-3">
+              <Label className="text-sm text-slate-200">¿Ya compraste en iMarket?</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-sm font-medium transition",
+                    purchaseStatus === "yes"
+                      ? "border-sky-400/60 bg-sky-500/20 text-sky-100"
+                      : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20",
+                  )}
+                  onClick={() => handlePurchaseStatusChange("yes")}
+                >
+                  Sí, ya compré
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-sm font-medium transition",
+                    purchaseStatus === "no"
+                      ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100"
+                      : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20",
+                  )}
+                  onClick={() => handlePurchaseStatusChange("no")}
+                >
+                  Soy nuevo
+                </button>
+              </div>
+            </div>
+
+            {purchaseStatus === "yes" && (
+              <div className="space-y-2">
+                <Label htmlFor="public-dni" className="text-sm text-slate-200">
+                  DNI
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="public-dni"
+                    value={registration.dni}
+                    onChange={(event) =>
+                      setRegistration((prev) => ({ ...prev, dni: event.target.value }))
+                    }
+                    placeholder="Ingresá tu DNI"
+                    className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10"
+                    onClick={handleSearchCustomer}
+                    disabled={isSearchingCustomer}
+                  >
+                    <IdCard className="h-4 w-4" />
+                    {isSearchingCustomer ? "Buscando..." : "Buscar"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="public-name" className="text-sm text-slate-200">
+                Nombre y apellido
+              </Label>
+              <Input
+                id="public-name"
+                value={registration.name}
+                onChange={(event) =>
+                  setRegistration((prev) => ({ ...prev, name: event.target.value }))
+                }
+                placeholder="Ingresá tu nombre completo"
+                className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
+                readOnly={Boolean(matchedCustomer)}
+              />
+              {matchedCustomer && (
+                <p className="flex items-center gap-2 text-xs text-emerald-200">
+                  <BadgeCheck className="h-4 w-4" />
+                  Datos cargados desde tu historial.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="public-email" className="text-sm text-slate-200">
+                Email
+              </Label>
+              <Input
+                id="public-email"
+                type="email"
+                value={registration.email}
+                onChange={(event) =>
+                  setRegistration((prev) => ({ ...prev, email: event.target.value }))
+                }
+                placeholder="correo@ejemplo.com"
+                className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
+                required
+              />
+              <p className="flex items-center gap-2 text-xs text-slate-400">
+                <Mail className="h-4 w-4" />
+                Usamos el email para validar tu cuenta.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Button
+                type="submit"
+                className="w-full rounded-xl bg-emerald-500 text-white hover:bg-emerald-400"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Creando usuario..." : "Crear usuario"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-slate-300 hover:text-white"
+                onClick={() => setAuthStep("choice")}
+              >
+                Volver
+              </Button>
+            </div>
+          </form>
+        </>
+      )}
     </div>
   )
 
@@ -591,72 +752,92 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           <div className="absolute -top-10 right-10 h-64 w-64 rounded-full bg-emerald-400/20 blur-[130px]" />
         </div>
         <header className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pb-16 pt-12">
-          <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                <Smartphone className="h-6 w-6 text-sky-300" />
-              </div>
-              <div>
-                <p className="text-sm uppercase tracking-[0.25em] text-slate-400">iMarket</p>
-                <h1 className="text-3xl font-semibold">{catalogType.title}</h1>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-              <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                <Globe className="h-4 w-4" />
-                Disponible en tiempo real
-              </span>
-              <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                <ShieldCheck className="h-4 w-4" />
-                Datos protegidos
-              </span>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 lg:hidden"
-                onClick={() => setIsSidebarOpen(true)}
-                aria-expanded={isSidebarOpen}
-                aria-label="Abrir opciones"
-              >
-                <Menu className="h-4 w-4" />
-                Opciones
-              </button>
-            </div>
-          </div>
-
           <div className="flex flex-col gap-6">
-            <div className="max-w-2xl space-y-4">
-              <p className="text-lg text-slate-200">
-                Consultá precios actualizados en USD y en pesos al tipo de cambio Blue Río Cuarto
-                (venta).
-                Solo mostramos información esencial para resguardar la privacidad de cada dispositivo.
-              </p>
-              <div className="flex flex-wrap gap-3 text-sm text-slate-300">
-                <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  <Sparkles className="h-4 w-4 text-sky-300" />
-                  Precios en USD y ARS
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  Últimos 4 dígitos de IMEI
-                </span>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-black/10">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                  <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                    <Globe className="h-4 w-4" />
+                    Disponible en tiempo real
+                  </span>
+                  <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    Datos protegidos
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+                  onClick={toggleAuthPanel}
+                  aria-expanded={isAuthPanelOpen}
+                >
+                  Iniciar sesión / Registrarse
+                </Button>
+              </div>
+              <div className="mt-3 overflow-hidden rounded-full border border-white/10 bg-slate-950/60">
+                <div className="flex w-max animate-marquee items-center gap-6 whitespace-nowrap px-4 py-2 text-sm text-slate-200">
+                  {marqueeItems.map((item, index) => (
+                    <span key={`offer-primary-${index}`} className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                      {item}
+                    </span>
+                  ))}
+                  {marqueeItems.map((item, index) => (
+                    <span key={`offer-secondary-${index}`} className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                      {item}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-              <Link
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                href="/"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Elegir otra categoría
-              </Link>
-              <Link
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                href={`/catalogo/${alternateType.key}`}
-              >
-                {alternateType.title}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                  <Smartphone className="h-6 w-6 text-sky-300" />
+                </div>
+                <div>
+                  <p className="text-sm uppercase tracking-[0.25em] text-slate-400">iMarket</p>
+                  <h1 className="text-3xl font-semibold">{catalogType.title}</h1>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div className="flex flex-col gap-6">
+              <div className="max-w-2xl space-y-4">
+                <p className="text-lg text-slate-200">
+                  Consultá precios actualizados en USD y en pesos al tipo de cambio Blue Río Cuarto
+                  (venta).
+                  Solo mostramos información esencial para resguardar la privacidad de cada dispositivo.
+                </p>
+                <div className="flex flex-wrap gap-3 text-sm text-slate-300">
+                  <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                    <Sparkles className="h-4 w-4 text-sky-300" />
+                    Precios en USD y ARS
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                    Últimos 4 dígitos de IMEI
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                <Link
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+                  href="/"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Elegir otra categoría
+                </Link>
+                <Link
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+                  href={`/catalogo/${alternateType.key}`}
+                >
+                  {alternateType.title}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
         </header>
       </div>
 
@@ -749,32 +930,32 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           </div>
 
           <aside className="hidden w-full max-w-sm flex-shrink-0 lg:block">
-            {registrationPanel}
+            {isAuthPanelOpen ? authPanel : null}
           </aside>
         </div>
       </main>
 
-      {isSidebarOpen && (
+      {isAuthPanelOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true">
           <button
             type="button"
             className="absolute inset-0 bg-slate-950/80"
-            onClick={() => setIsSidebarOpen(false)}
-            aria-label="Cerrar opciones"
+            onClick={() => setIsAuthPanelOpen(false)}
+            aria-label="Cerrar panel"
           />
           <div className="relative ml-auto h-full w-full max-w-sm overflow-y-auto border-l border-white/10 bg-slate-950 px-6 py-8 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
-              <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Opciones</p>
+              <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Cuenta</p>
               <button
                 type="button"
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-200 hover:border-white/20"
-                onClick={() => setIsSidebarOpen(false)}
-                aria-label="Cerrar menú"
+                onClick={() => setIsAuthPanelOpen(false)}
+                aria-label="Cerrar panel"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {registrationPanel}
+            {authPanel}
           </div>
         </div>
       )}
