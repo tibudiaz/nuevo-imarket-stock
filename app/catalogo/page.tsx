@@ -24,8 +24,9 @@ interface Product {
 const CATEGORY_NEW = "Celulares Nuevos"
 const CATEGORY_USED = "Celulares Usados"
 const CATALOG_CACHE_KEY = "catalog-cache-v1"
-const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000
-const CATALOG_BLUE_SURCHARGE = 20
+const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000
+const CATALOG_BLUE_SURCHARGE = 10
+const CATALOG_RATE_REFRESH_MS = 10 * 60 * 1000
 
 type CatalogCache = {
   products?: Product[]
@@ -217,7 +218,7 @@ export default function PublicStockPage() {
     }
 
     fetchDolarBlue()
-    const intervalId = setInterval(fetchDolarBlue, 180000)
+    const intervalId = setInterval(fetchDolarBlue, CATALOG_RATE_REFRESH_MS)
 
     return () => clearInterval(intervalId)
   }, [])
