@@ -12,13 +12,14 @@ export default function PathCleaner() {
   useEffect(() => {
     const auth = getAuth()
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (
-        pathname.startsWith("/dashboard") &&
-        !firebaseUser
-      ) {
-        const storedUser = safeLocalStorage.getItem("user")
-        if (!storedUser.ok || !storedUser.value) {
-          router.replace("/")
+      if (!pathname.startsWith("/dashboard") || firebaseUser) {
+        return
+      }
+
+      const storedUser = safeLocalStorage.getItem("user")
+      if (!storedUser.ok || !storedUser.value) {
+        if (pathname !== "/dashboard") {
+          router.replace("/dashboard")
         }
       }
     })
