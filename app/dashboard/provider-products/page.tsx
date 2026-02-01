@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/hooks/use-auth"
 
 interface ProviderProduct {
   name: string
@@ -37,12 +38,15 @@ const currencyFormatter = new Intl.NumberFormat("es-AR", {
 })
 
 export default function ProviderProductsPage() {
+  const { user } = useAuth()
   const [products, setProducts] = useState<ProviderProduct[]>([])
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [headers, setHeaders] = useState<ProviderHeaders | null>(null)
+  const showProviderPrices = user?.role !== "moderator"
+  const tableColumns = 3 + (showProviderPrices ? 1 : 0)
 
   const fetchProducts = useCallback(async () => {
     setIsLoading(true)
@@ -130,7 +134,7 @@ export default function ProviderProductsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>PRODUCTO</TableHead>
-                  <TableHead>PRECIO</TableHead>
+                  {showProviderPrices ? <TableHead>PRECIO</TableHead> : null}
                   <TableHead>{headers?.columnE || "Cantidad"}</TableHead>
                   <TableHead className="text-right">{headers?.columnF || "Estado"}</TableHead>
                 </TableRow>
@@ -138,13 +142,13 @@ export default function ProviderProductsPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={tableColumns} className="py-6 text-center text-muted-foreground">
                       Cargando productos del proveedor...
                     </TableCell>
                   </TableRow>
                 ) : filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={tableColumns} className="py-6 text-center text-muted-foreground">
                       No hay productos disponibles para mostrar.
                     </TableCell>
                   </TableRow>
@@ -152,16 +156,18 @@ export default function ProviderProductsPage() {
                   filteredProducts.map((product, index) => (
                     product.isSpacer ? (
                       <TableRow key={`spacer-${index}`}>
-                        <TableCell colSpan={4} className="py-3">
+                        <TableCell colSpan={tableColumns} className="py-3">
                           &nbsp;
                         </TableCell>
                       </TableRow>
                     ) : (
                       <TableRow key={`${product.name}-${index}`}>
                         <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>
-                          {product.price !== null ? currencyFormatter.format(product.price) : product.priceRaw}
-                        </TableCell>
+                        {showProviderPrices ? (
+                          <TableCell>
+                            {product.price !== null ? currencyFormatter.format(product.price) : product.priceRaw}
+                          </TableCell>
+                        ) : null}
                         <TableCell>{product.columnE}</TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground">
                           {product.columnF}

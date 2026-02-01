@@ -235,7 +235,6 @@ export default function InventoryPage() {
   const showEntryDate = visibleColumns.entryDate;
   const showProvider = user?.role === "admin" && visibleColumns.provider;
   const showCost = user?.role === "admin" && visibleColumns.cost;
-  const isModerator = user?.role === "moderator";
   const isNewPhonesCategory = categorySearch === "Celulares Nuevos";
   const isUsedPhonesCategory = categorySearch === "Celulares Usados";
   const showCatalogVisibility = isNewPhonesCategory || isUsedPhonesCategory;
@@ -254,16 +253,21 @@ export default function InventoryPage() {
     /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(price);
 
   const formatPriceForUser = (price?: Product["price"]) => {
-    if (!isModerator) {
-      return `$${Number(price || 0).toFixed(2)}`;
-    }
-
     if (typeof price === "string") {
       const trimmed = price.trim();
-      return priceContainsWords(trimmed) ? trimmed : "—";
+      if (!trimmed) return "—";
+
+      if (priceContainsWords(trimmed)) {
+        return trimmed;
+      }
+
+      const numericValue = Number(trimmed);
+      return Number.isNaN(numericValue)
+        ? trimmed
+        : `$${numericValue.toFixed(2)}`;
     }
 
-    return "—";
+    return `$${Number(price || 0).toFixed(2)}`;
   };
 
   useEffect(() => {
