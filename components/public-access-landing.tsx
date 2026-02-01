@@ -104,9 +104,9 @@ export default function PublicAccessLanding() {
                 </Link>
                 <Link
                   className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-slate-100 transition hover:border-sky-300/60"
-                  href="/catalogo/nuevos?auth=1"
+                  href="/catalogo/nuevos"
                 >
-                  Iniciar sesión / Registrarse
+                  Entrar al catálogo
                 </Link>
               </div>
             </>
@@ -147,9 +147,9 @@ export default function PublicAccessLanding() {
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Cuenta</p>
                 <Link
                   className="flex items-center justify-between rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 py-3 text-slate-100"
-                  href="/catalogo/nuevos?auth=1"
+                  href="/catalogo/nuevos"
                 >
-                  Iniciar sesión / Registrarse
+                  Entrar al catálogo
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
