@@ -48,6 +48,7 @@ interface Repair {
   deliveryReceiptNumber?: string;
   photos?: RepairPhoto[];
   store?: string;
+  quickRepair?: boolean;
   signature?: {
     url: string;
     path?: string;
@@ -281,7 +282,8 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
 
       let deliveryReceiptNumber: string | undefined;
       const isDelivering = editableRepair.status === 'delivered' && repair.status !== 'delivered';
-      if (isDelivering) {
+      const isQuickRepair = Boolean(editableRepair.quickRepair);
+      if (isDelivering && !isQuickRepair) {
         const counterRef = ref(database, 'counters/deliveryNumber');
         const transactionResult = await runTransaction(counterRef, (currentData) => {
           if (currentData === null) {
@@ -307,12 +309,16 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
               ? new Date().toISOString()
               : repair.deliveredAt,
           ...(deliveryReceiptNumber ? { deliveryReceiptNumber } : {}),
-          ...(isDelivering ? { signature: null } : {}),
+          ...(isDelivering && !isQuickRepair ? { signature: null } : {}),
       };
 
       await onUpdate(repair.id, updatedData);
 
       if (isDelivering) {
+        if (isQuickRepair) {
+          onClose();
+          return;
+        }
         const repairForSignature = { ...repair, ...updatedData };
         setCompletedDeliveryRepair(repairForSignature);
         setSignatureData(null);

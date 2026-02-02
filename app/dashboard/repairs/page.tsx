@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Eye } from "lucide-react"
+import { Plus, Search, Eye, Zap } from "lucide-react"
 import { ref, onValue, push, set, update, get, query, orderByChild, equalTo, runTransaction } from "firebase/database"
 import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 import AddRepairForm from "@/components/add-repair-form"
+import AddQuickRepairForm from "@/components/add-quick-repair-form"
 import RepairDetailModal from "@/components/repair-detail-modal"
 import { useStore } from "@/hooks/use-store"
 import type { RepairPhoto } from "@/types/repair"
@@ -40,6 +41,7 @@ interface Repair {
   store?: string;
   photos?: RepairPhoto[];
   uploadSessionId?: string;
+  quickRepair?: boolean;
   signature?: {
     url: string;
     path?: string;
@@ -66,11 +68,17 @@ interface RepairFormData {
   estimatedPrice: number;
 }
 
+interface QuickRepairFormData {
+  productName: string;
+  imei: string;
+  customerName: string;
+}
 
 export default function RepairsPage() {
   const [repairs, setRepairs] = useState<Repair[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -198,6 +206,58 @@ export default function RepairsPage() {
     }
   }, [selectedStore]);
 
+  const handleAddQuickRepair = useCallback(async (quickRepairData: QuickRepairFormData): Promise<Repair> => {
+    try {
+      const counterRef = ref(database, 'counters/quickRepairNumber');
+      const transactionResult = await runTransaction(counterRef, (currentData) => {
+        if (currentData === null) {
+          return { value: 1, prefix: "QR-", lastUpdated: new Date().toISOString() };
+        }
+        currentData.value++;
+        currentData.lastUpdated = new Date().toISOString();
+        return currentData;
+      });
+
+      if (!transactionResult.committed || !transactionResult.snapshot.exists()) {
+        throw new Error("No se pudo confirmar la transacción del contador de reparaciones rápidas.");
+      }
+
+      const newCounterData = transactionResult.snapshot.val();
+      const newReceiptNumber = `${newCounterData.prefix}${String(newCounterData.value).padStart(5, '0')}`;
+
+      const newRepairRef = push(ref(database, "repairs"));
+      const newRepairId = newRepairRef.key;
+      if (!newRepairId) throw new Error("No se pudo generar el ID para la reparación rápida.");
+
+      const finalRepairData = {
+        id: newRepairId,
+        receiptNumber: newReceiptNumber,
+        customerId: "",
+        customerName: quickRepairData.customerName,
+        customerDni: "",
+        customerPhone: "",
+        customerEmail: "",
+        productName: quickRepairData.productName,
+        imei: quickRepairData.imei,
+        description: "",
+        estimatedPrice: 0,
+        entryDate: new Date().toISOString(),
+        createdAt: Date.now(),
+        status: 'pending' as const,
+        store: selectedStore === 'all' ? 'local1' : selectedStore,
+        quickRepair: true,
+      };
+
+      await set(newRepairRef, finalRepairData);
+      toast.success("Reparación rápida creada.", { description: `Registro N°: ${newReceiptNumber}` });
+      return finalRepairData;
+    } catch (error) {
+      console.error("Error al agregar reparación rápida:", error);
+      toast.error("Error al agregar la reparación rápida.", { description: (error as Error).message });
+      throw error;
+    }
+  }, [selectedStore]);
+
   const handleUpdateRepair = useCallback(async (repairId: string, updatedData: Partial<Repair>) => {
     try {
       const repairRef = ref(database, `repairs/${repairId}`)
@@ -253,6 +313,10 @@ export default function RepairsPage() {
               <Plus className="mr-2 h-4 w-4" />
               Nueva Reparación
             </Button>
+            <Button variant="secondary" onClick={() => setIsQuickAddModalOpen(true)} className="w-full sm:w-auto">
+              <Zap className="mr-2 h-4 w-4" />
+              Carga rápida
+            </Button>
           </div>
         </div>
 
@@ -306,6 +370,11 @@ export default function RepairsPage() {
         </div>
 
         <AddRepairForm isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddRepair={handleAddRepair} />
+        <AddQuickRepairForm
+          isOpen={isQuickAddModalOpen}
+          onClose={() => setIsQuickAddModalOpen(false)}
+          onAddQuickRepair={handleAddQuickRepair}
+        />
         {selectedRepair && (
           <RepairDetailModal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} repair={selectedRepair} onUpdate={handleUpdateRepair} />
         )}
