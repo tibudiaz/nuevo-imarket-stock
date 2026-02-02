@@ -40,6 +40,14 @@ interface Product {
   [key: string]: any
 }
 
+interface NewCatalogItem {
+  id: string
+  name: string
+  price?: number
+  status?: string
+  createdAt?: string
+}
+
 interface CustomerProfile {
   id: string
   name?: string
@@ -88,6 +96,7 @@ type CatalogTypeKey = keyof typeof CATALOG_TYPES
 
 type CatalogCache = {
   products?: Product[]
+  newCatalogItems?: NewCatalogItem[]
   usdRate?: number
   catalogVisibility?: { newPhones?: boolean; usedPhones?: boolean }
   updatedAt?: number
@@ -138,6 +147,16 @@ const resolveProductName = (product: Product) => {
   return "Equipo disponible"
 }
 
+const resolveNewCatalogName = (item: NewCatalogItem) => {
+  const name = item.name?.trim()
+  return name || "Equipo nuevo"
+}
+
+const resolveNewCatalogStatus = (item: NewCatalogItem) => {
+  const status = item.status?.trim()
+  return status || "Consultar disponibilidad"
+}
+
 const formatImeiSuffix = (imei?: string) => {
   if (!imei) return "Sin IMEI"
   const clean = imei.replace(/\s+/g, "")
@@ -170,11 +189,27 @@ const buildWhatsAppLink = (product: Product, usdRate: number) => {
   return `https://wa.me/5493584224464?text=${encodedMessage}`
 }
 
+const buildWhatsAppLinkForNewCatalog = (item: NewCatalogItem, usdRate: number) => {
+  const name = resolveNewCatalogName(item)
+  const usdPrice = formatUsdPrice(item.price, usdRate)
+  const arsPrice = formatArsPriceBlue(item.price, usdRate)
+  const status = resolveNewCatalogStatus(item)
+  const messageParts = [
+    `Hola! Estoy interesado en el siguiente celular nuevo: ${name}.`,
+    `Precio USD: ${usdPrice}.`,
+    `Precio en pesos: ${arsPrice}.`,
+    item.status?.trim() ? `Estado: ${status}.` : null,
+  ].filter(Boolean)
+  const encodedMessage = encodeURIComponent(messageParts.join(" "))
+  return `https://wa.me/5493584224464?text=${encodedMessage}`
+}
+
 export default function PublicStockClient({ params }: { params: { tipo: string } }) {
   const catalogType = CATALOG_TYPES[params.tipo as CatalogTypeKey]
   const cacheKey = catalogType ? `catalog-cache-${catalogType.key}` : "catalog-cache"
 
   const [products, setProducts] = useState<Product[]>([])
+  const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([])
   const [usdRate, setUsdRate] = useState(0)
   const [loading, setLoading] = useState(true)
   const [catalogVisibility, setCatalogVisibility] = useState({
@@ -209,6 +244,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
     if (Array.isArray(cached.products)) {
       setProducts(cached.products)
+    }
+    if (Array.isArray(cached.newCatalogItems)) {
+      setNewCatalogItems(cached.newCatalogItems)
     }
     if (typeof cached.usdRate === "number") {
       setUsdRate(cached.usdRate)
@@ -295,6 +333,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   useEffect(() => {
     if (!catalogType) return
+    if (catalogType.key === "nuevos") return
     const productsRef = ref(database, "products")
     const productsQuery = query(
       productsRef,
@@ -331,6 +370,45 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
     return () => {
       unsubscribeProducts()
+    }
+  }, [cacheKey, catalogType])
+
+  useEffect(() => {
+    if (!catalogType || catalogType.key !== "nuevos") return
+    const newCatalogRef = ref(database, "catalog/newPhones")
+    const unsubscribeNewCatalog = onValue(
+      newCatalogRef,
+      (snapshot) => {
+        setLoading(false)
+        if (!snapshot.exists()) {
+          setNewCatalogItems([])
+          return
+        }
+
+        const items: NewCatalogItem[] = []
+        snapshot.forEach((childSnapshot) => {
+          const value = childSnapshot.val()
+          if (value && typeof value === "object" && childSnapshot.key) {
+            items.push({
+              id: childSnapshot.key,
+              name: String(value.name ?? "").trim(),
+              price: typeof value.price === "number" ? value.price : undefined,
+              status: value.status ? String(value.status) : undefined,
+              createdAt: value.createdAt,
+            })
+          }
+        })
+
+        setNewCatalogItems(items)
+        writeCatalogCache(cacheKey, { newCatalogItems: items })
+      },
+      () => {
+        setLoading(false)
+      },
+    )
+
+    return () => {
+      unsubscribeNewCatalog()
     }
   }, [cacheKey, catalogType])
 
@@ -612,6 +690,14 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       )
   }, [products])
 
+  const newCatalogSorted = useMemo(() => {
+    return [...newCatalogItems].sort((a, b) =>
+      resolveNewCatalogName(a).localeCompare(resolveNewCatalogName(b), "es", {
+        sensitivity: "base",
+      }),
+    )
+  }, [newCatalogItems])
+
   const isSectionVisible = useMemo(() => {
     if (!catalogType) return false
     if (catalogType.key === "nuevos") return catalogVisibility.newPhones
@@ -623,6 +709,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const marqueeItems = offers.length
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
+
+  const isNewCatalog = catalogType?.key === "nuevos"
+  const catalogItemsCount = isNewCatalog ? newCatalogSorted.length : inStock.length
 
   const topBarDesktopContent = (
     <>
@@ -1077,9 +1166,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                     <Sparkles className="h-4 w-4 text-sky-300" />
                     Precios en USD y ARS
                   </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                    Últimos 4 dígitos de IMEI
-                  </span>
+                  {!isNewCatalog && (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                      Últimos 4 dígitos de IMEI
+                    </span>
+                  )}
+                  {isNewCatalog && (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                      Modelos seleccionados
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1091,13 +1187,15 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         {loading ? (
           <div className="flex items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 text-slate-300">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-400 border-t-transparent" />
-            <span className="ml-4">Cargando stock en tiempo real...</span>
+            <span className="ml-4">
+              {isNewCatalog ? "Cargando catálogo de equipos nuevos..." : "Cargando stock en tiempo real..."}
+            </span>
           </div>
         ) : !isSectionVisible ? (
           <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
             Esta sección no está disponible por el momento.
           </div>
-        ) : inStock.length === 0 ? (
+        ) : catalogItemsCount === 0 ? (
           <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
             No hay equipos disponibles por el momento.
           </div>
@@ -1106,68 +1204,128 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-semibold">{catalogType.title}</h2>
-                <p className="text-sm text-slate-400">{inStock.length} equipos disponibles</p>
+                <p className="text-sm text-slate-400">
+                  {catalogItemsCount} equipos disponibles
+                </p>
               </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {inStock.map((product) => (
-                <div
-                  key={product.id}
-                  className={cn(
-                    "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
-                    "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
-                    `before:${catalogType.accent}`,
-                  )}
-                >
-                  <div className="relative space-y-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                          {catalogType.title}
-                        </p>
-                        <h3 className="text-lg font-semibold text-white">
-                          {resolveProductName(product)}
-                        </h3>
-                      </div>
-                      <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
-                        Stock: {product.stock ?? 0}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-slate-400">IMEI</p>
-                          <p className="text-sm font-medium text-slate-100">
-                            {formatImeiSuffix(product.imei)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Precio USD</p>
-                          <p className="text-lg font-semibold text-sky-200">
-                            {formatUsdPrice(product.price, usdRate)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
-                        <span className="text-xs text-slate-400">Precio en pesos actual</span>
-                        <span className="font-semibold text-emerald-200">
-                          {formatArsPriceBlue(product.price, usdRate)}
-                        </span>
-                      </div>
-                    </div>
-                    <a
-                      className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
-                      href={buildWhatsAppLink(product, usdRate)}
-                      target="_blank"
-                      rel="noreferrer"
+              {isNewCatalog
+                ? newCatalogSorted.map((item) => (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
+                        "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
+                        `before:${catalogType.accent}`,
+                      )}
                     >
-                      Consultar por WhatsApp
-                    </a>
-                  </div>
-                </div>
-              ))}
+                      <div className="relative space-y-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                              {catalogType.title}
+                            </p>
+                            <h3 className="text-lg font-semibold text-white">
+                              {resolveNewCatalogName(item)}
+                            </h3>
+                          </div>
+                          <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
+                            Nuevo
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-slate-400">Disponibilidad</p>
+                              <p className="text-sm font-medium text-slate-100">
+                                {resolveNewCatalogStatus(item)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-slate-400">Precio USD</p>
+                              <p className="text-lg font-semibold text-sky-200">
+                                {formatUsdPrice(item.price, usdRate)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
+                            <span className="text-xs text-slate-400">Precio en pesos actual</span>
+                            <span className="font-semibold text-emerald-200">
+                              {formatArsPriceBlue(item.price, usdRate)}
+                            </span>
+                          </div>
+                        </div>
+                        <a
+                          className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
+                          href={buildWhatsAppLinkForNewCatalog(item, usdRate)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Consultar por WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  ))
+                : inStock.map((product) => (
+                    <div
+                      key={product.id}
+                      className={cn(
+                        "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
+                        "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
+                        `before:${catalogType.accent}`,
+                      )}
+                    >
+                      <div className="relative space-y-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                              {catalogType.title}
+                            </p>
+                            <h3 className="text-lg font-semibold text-white">
+                              {resolveProductName(product)}
+                            </h3>
+                          </div>
+                          <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
+                            Stock: {product.stock ?? 0}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-slate-400">IMEI</p>
+                              <p className="text-sm font-medium text-slate-100">
+                                {formatImeiSuffix(product.imei)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-slate-400">Precio USD</p>
+                              <p className="text-lg font-semibold text-sky-200">
+                                {formatUsdPrice(product.price, usdRate)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
+                            <span className="text-xs text-slate-400">Precio en pesos actual</span>
+                            <span className="font-semibold text-emerald-200">
+                              {formatArsPriceBlue(product.price, usdRate)}
+                            </span>
+                          </div>
+                        </div>
+                        <a
+                          className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
+                          href={buildWhatsAppLink(product, usdRate)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Consultar por WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  ))}
             </div>
           </section>
         )}
