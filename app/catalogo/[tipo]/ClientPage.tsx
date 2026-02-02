@@ -157,7 +157,70 @@ const ensureIphonePrefix = (name: string) => {
 const WARRANTY_REGEX = /\b(gtia|gar|car)\s*(\d{1,2}\/\d{2}(?:\/\d{2})?)\b/i
 
 const stripImeiSuffix = (name: string) => {
-  return name.replace(/\bimei\b[:\s-]*\d+\s*$/i, "").trim()
+  return name.replace(/\bimei\b[:\s-]*\d+\b/gi, "").replace(/\s+/g, " ").trim()
+}
+
+const COLOR_PHRASES = [
+  "azul medianoche",
+  "azul oscuro",
+  "azul marino",
+  "azul claro",
+  "azul",
+  "celeste",
+  "verde oliva",
+  "verde",
+  "rojo",
+  "amarillo",
+  "negro",
+  "blanco",
+  "gris",
+  "grafito",
+  "plata",
+  "plateado",
+  "dorado",
+  "oro",
+  "rosa",
+  "fucsia",
+  "morado",
+  "violeta",
+  "lila",
+  "coral",
+  "turquesa",
+  "cobre",
+  "chocolate",
+  "midnight",
+  "starlight",
+  "gold",
+  "silver",
+  "black",
+  "white",
+  "blue",
+  "green",
+  "red",
+  "pink",
+  "purple",
+  "yellow",
+] as const
+
+const findColorPhrase = (tokens: string[]) => {
+  const lowerTokens = tokens.map((token) => token.toLowerCase())
+  const phrases = COLOR_PHRASES.map((phrase) => phrase.split(" "))
+
+  for (let index = 0; index < lowerTokens.length; index += 1) {
+    for (const phraseTokens of phrases) {
+      if (phraseTokens.length === 0) continue
+      const slice = lowerTokens.slice(index, index + phraseTokens.length)
+      if (slice.length !== phraseTokens.length) continue
+      if (slice.every((token, sliceIndex) => token === phraseTokens[sliceIndex])) {
+        return {
+          start: index,
+          end: index + phraseTokens.length,
+          value: tokens.slice(index, index + phraseTokens.length).join(" "),
+        }
+      }
+    }
+  }
+  return null
 }
 
 const parseUsedPhoneDetails = (name: string) => {
@@ -169,6 +232,7 @@ const parseUsedPhoneDetails = (name: string) => {
   const tokens = warrantyTrimmed.split(/\s+/).filter(Boolean)
   const batteryIndex = tokens.findIndex((token) => /(\d+)%/.test(token))
   const memoryIndex = tokens.findIndex((token) => /(\d+)\s*gb/i.test(token))
+  const colorMatch = findColorPhrase(tokens)
 
   const batteryConditionMatch =
     batteryIndex >= 0 ? tokens[batteryIndex].match(/(\d+)%/) : null
@@ -177,17 +241,11 @@ const parseUsedPhoneDetails = (name: string) => {
   const memoryMatch = memoryIndex >= 0 ? tokens[memoryIndex].match(/(\d+)\s*gb/i) : null
   const memory = memoryMatch ? memoryMatch[0].replace(/\s+/g, "").toUpperCase() : null
 
-  const colorTokens =
-    batteryIndex >= 0
-      ? tokens.slice(batteryIndex + 1, memoryIndex > batteryIndex ? memoryIndex : undefined)
-      : []
-  const color = colorTokens.length > 0 ? colorTokens.join(" ") : null
+  const color = colorMatch?.value ?? null
 
   const displayTokens = tokens.filter((_, index) => {
     if (index === batteryIndex || index === memoryIndex) return false
-    if (batteryIndex >= 0 && index > batteryIndex && (memoryIndex < 0 || index < memoryIndex)) {
-      return false
-    }
+    if (colorMatch && index >= colorMatch.start && index < colorMatch.end) return false
     return true
   })
   const displayName = displayTokens.join(" ").trim() || warrantyTrimmed
