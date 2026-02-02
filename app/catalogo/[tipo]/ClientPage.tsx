@@ -147,6 +147,13 @@ const resolveProductName = (product: Product) => {
   return "Equipo disponible"
 }
 
+const ensureIphonePrefix = (name: string) => {
+  const trimmed = name.trim()
+  if (!trimmed) return "iPhone"
+  if (/^iphone\b/i.test(trimmed)) return trimmed
+  return `iPhone ${trimmed}`
+}
+
 const parseUsedPhoneDetails = (name: string) => {
   const tokens = name.split(/\s+/).filter(Boolean)
   const batteryIndex = tokens.findIndex((token) => /(\d+)%/.test(token))
@@ -215,7 +222,7 @@ const formatArsPriceBlue = (price: number | undefined, usdRate: number) => {
 }
 
 const buildWhatsAppLink = (product: Product, usdRate: number) => {
-  const name = resolveProductName(product)
+  const name = ensureIphonePrefix(resolveProductName(product))
   const usdPrice = formatUsdPrice(product.price, usdRate)
   const arsPrice = formatArsPriceBlue(product.price, usdRate)
   const imeiSuffix = formatImeiSuffix(product.imei)
@@ -1316,7 +1323,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                     </div>
                   ))
                 : inStock.map((product) => {
-                    const usedDetails = parseUsedPhoneDetails(resolveProductName(product))
+                    const usedDetails = parseUsedPhoneDetails(
+                      ensureIphonePrefix(resolveProductName(product)),
+                    )
                     return (
                       <div
                         key={product.id}
