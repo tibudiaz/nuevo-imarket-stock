@@ -315,7 +315,7 @@ export default function SettingsPage() {
   const [isCleaningRepairPhotos, setIsCleaningRepairPhotos] = useState(false);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [customerDniSearch, setCustomerDniSearch] = useState("");
   const [customerPassword, setCustomerPassword] = useState("");
   const [customerPasswordConfirm, setCustomerPasswordConfirm] = useState("");
   const [isUpdatingCustomerPassword, setIsUpdatingCustomerPassword] = useState(false);
@@ -398,9 +398,9 @@ export default function SettingsPage() {
         ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value }))
         : [];
       customerList.sort((a, b) => {
-        const nameA = (a.name || a.email || '').toString().toLowerCase();
-        const nameB = (b.name || b.email || '').toString().toLowerCase();
-        return nameA.localeCompare(nameB, 'es');
+        const dniA = (a.dni || '').toString();
+        const dniB = (b.dni || '').toString();
+        return dniA.localeCompare(dniB, 'es');
       });
       setCustomers(customerList);
     });
@@ -607,8 +607,9 @@ export default function SettingsPage() {
   };
 
   const handleUpdateCustomerPassword = async () => {
-    if (!selectedCustomerId) {
-      toast.error("Seleccioná un cliente para continuar.");
+    const normalizedDni = customerDniSearch.replace(/\D/g, "");
+    if (!normalizedDni) {
+      toast.error("Ingresá el DNI del cliente para continuar.");
       return;
     }
     const trimmedPassword = customerPassword.trim();
@@ -622,15 +623,18 @@ export default function SettingsPage() {
       return;
     }
 
-    const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
+    const selectedCustomer = customers.find((customer) => {
+      const customerDni = String(customer.dni || "").replace(/\D/g, "");
+      return customerDni === normalizedDni;
+    });
     if (!selectedCustomer) {
-      toast.error("No encontramos el cliente seleccionado.");
+      toast.error("No encontramos un cliente con ese DNI.");
       return;
     }
 
     setIsUpdatingCustomerPassword(true);
     try {
-      await update(ref(database, `customers/${selectedCustomerId}`), {
+      await update(ref(database, `customers/${selectedCustomer.id}`), {
         password: trimmedPassword,
         passwordUpdatedAt: new Date().toISOString(),
       });
@@ -648,6 +652,7 @@ export default function SettingsPage() {
       }
 
       toast.success("Contraseña de cliente actualizada.");
+      setCustomerDniSearch("");
       setCustomerPassword("");
       setCustomerPasswordConfirm("");
     } catch (error) {
@@ -1482,28 +1487,16 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Cliente</Label>
-                <Select
-                  value={selectedCustomerId}
-                  onValueChange={(value) => setSelectedCustomerId(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.length === 0 ? (
-                      <SelectItem value="no-customers" disabled>
-                        No hay clientes registrados
-                      </SelectItem>
-                    ) : (
-                      customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name || customer.email || "Cliente"}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="customer-dni-search">DNI del cliente</Label>
+                <Input
+                  id="customer-dni-search"
+                  value={customerDniSearch}
+                  onChange={(e) => setCustomerDniSearch(e.target.value)}
+                  placeholder="Ingresá el DNI para buscar al cliente"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Usá el DNI para identificar rápidamente al cliente.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customer-password">Nueva contraseña</Label>
