@@ -4,25 +4,18 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
-import { ArrowRight, Smartphone, Sparkles, Zap } from "lucide-react"
+import { ArrowRight, MapPin, Smartphone, Sparkles } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
 
 const landingOptions = [
   {
-    title: "Celulares nuevos",
-    description: "Modelos sellados con disponibilidad inmediata y precios en USD/ARS.",
-    href: "/catalogo/nuevos",
+    title: "Contacto",
+    description: "Encontrá nuestra dirección y todos los canales de comunicación disponibles.",
+    href: "/catalogo/contacto",
     accent: "from-sky-500/20 via-sky-400/5 to-transparent",
-    icon: Smartphone,
-  },
-  {
-    title: "Celulares usados",
-    description: "Equipos testeados, con detalle de estado y stock real.",
-    href: "/catalogo/usados",
-    accent: "from-emerald-500/20 via-emerald-400/5 to-transparent",
-    icon: Zap,
+    icon: MapPin,
   },
 ]
 
@@ -90,16 +83,9 @@ export default function PublicAccessLanding() {
               <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
                 <Link
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                  href="/catalogo/nuevos"
+                  href="/catalogo/contacto"
                 >
-                  Celulares nuevos
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                  href="/catalogo/usados"
-                >
-                  Celulares usados
+                  Contacto
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
@@ -118,16 +104,9 @@ export default function PublicAccessLanding() {
                 <div className="grid gap-2">
                   <Link
                     className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                    href="/catalogo/nuevos"
+                    href="/catalogo/contacto"
                   >
-                    Celulares nuevos
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                    href="/catalogo/usados"
-                  >
-                    Celulares usados
+                    Contacto
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
@@ -174,8 +153,8 @@ export default function PublicAccessLanding() {
             </div>
           </div>
           <p className="max-w-2xl text-lg text-slate-200">
-            Elegí el tipo de catálogo que querés consultar para cargar solo la información
-            necesaria y abrir la página más rápido.
+            Coordiná tu visita o escribinos por nuestros canales oficiales. Encontrá la dirección y
+            los teléfonos de contacto en un solo lugar.
           </p>
           <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
             <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
@@ -188,7 +167,7 @@ export default function PublicAccessLanding() {
           </div>
         </header>
 
-        <section className="grid gap-6 md:grid-cols-2">
+        <section className="grid gap-6 md:grid-cols-1">
           {landingOptions.map((option) => {
             const Icon = option.icon
             return (
