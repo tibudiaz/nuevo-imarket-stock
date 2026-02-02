@@ -4,18 +4,25 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
-import { ArrowRight, MapPin, Smartphone, Sparkles } from "lucide-react"
+import { ArrowRight, Smartphone, Sparkles } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
 
 const landingOptions = [
   {
-    title: "Contacto",
-    description: "Encontrá nuestra dirección y todos los canales de comunicación disponibles.",
-    href: "/catalogo/contacto",
+    title: "Celulares nuevos",
+    description: "Explorá los últimos modelos con garantía oficial y stock actualizado.",
+    href: "/catalogo/nuevos",
+    accent: "from-emerald-400/20 via-emerald-300/5 to-transparent",
+    icon: Sparkles,
+  },
+  {
+    title: "Celulares usados",
+    description: "Revisá el stock de equipos usados certificados y listos para entrega.",
+    href: "/catalogo/usados",
     accent: "from-sky-500/20 via-sky-400/5 to-transparent",
-    icon: MapPin,
+    icon: Smartphone,
   },
 ]
 
@@ -167,7 +174,7 @@ export default function PublicAccessLanding() {
           </div>
         </header>
 
-        <section className="grid gap-6 md:grid-cols-1">
+        <section className="grid gap-6 md:grid-cols-2">
           {landingOptions.map((option) => {
             const Icon = option.icon
             return (
