@@ -64,6 +64,13 @@ const resolveProductName = (product: Product) => {
   return "Sin nombre";
 };
 
+const ensureIphonePrefix = (name: string) => {
+  const trimmed = name.trim();
+  if (!trimmed) return "iPhone";
+  if (/^iphone\b/i.test(trimmed)) return trimmed;
+  return `iPhone ${trimmed}`;
+};
+
 export default function UsedPhonesList() {
   const { user, loading: authLoading } = useAuth();
   const { selectedStore } = useStore();
@@ -177,7 +184,10 @@ export default function UsedPhonesList() {
         return storeMatch && searchMatch;
       })
       .sort((a, b) =>
-        nameCollator.compare(resolveProductName(a), resolveProductName(b)),
+        nameCollator.compare(
+          ensureIphonePrefix(resolveProductName(a)),
+          ensureIphonePrefix(resolveProductName(b)),
+        ),
       );
   }, [products, searchTerm, selectedStore]);
 
@@ -283,7 +293,7 @@ export default function UsedPhonesList() {
               filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">
-                    {resolveProductName(product)}
+                    {ensureIphonePrefix(resolveProductName(product))}
                   </TableCell>
                   {visibleColumns.price && (
                     <TableCell className="text-right">
