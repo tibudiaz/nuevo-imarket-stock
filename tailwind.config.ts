@@ -89,7 +89,7 @@ const config: Config = {
   					transform: 'translateX(0%)'
   				},
   				'100%': {
-  					transform: 'translateX(-50%)'
+  					transform: 'translateX(-100%)'
   				}
   			}
   		},
