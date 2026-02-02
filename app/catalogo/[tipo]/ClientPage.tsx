@@ -147,6 +147,41 @@ const resolveProductName = (product: Product) => {
   return "Equipo disponible"
 }
 
+const parseUsedPhoneDetails = (name: string) => {
+  const tokens = name.split(/\s+/).filter(Boolean)
+  const batteryIndex = tokens.findIndex((token) => /(\d+)%/.test(token))
+  const memoryIndex = tokens.findIndex((token) => /(\d+)\s*gb/i.test(token))
+
+  const batteryConditionMatch =
+    batteryIndex >= 0 ? tokens[batteryIndex].match(/(\d+)%/) : null
+  const batteryCondition = batteryConditionMatch ? batteryConditionMatch[0] : null
+
+  const memoryMatch = memoryIndex >= 0 ? tokens[memoryIndex].match(/(\d+)\s*gb/i) : null
+  const memory = memoryMatch ? memoryMatch[0].replace(/\s+/g, "").toUpperCase() : null
+
+  const colorTokens =
+    batteryIndex >= 0
+      ? tokens.slice(batteryIndex + 1, memoryIndex > batteryIndex ? memoryIndex : undefined)
+      : []
+  const color = colorTokens.length > 0 ? colorTokens.join(" ") : null
+
+  const displayTokens = tokens.filter((_, index) => {
+    if (index === batteryIndex || index === memoryIndex) return false
+    if (batteryIndex >= 0 && index > batteryIndex && (memoryIndex < 0 || index < memoryIndex)) {
+      return false
+    }
+    return true
+  })
+  const displayName = displayTokens.join(" ").trim() || name
+
+  return {
+    displayName,
+    batteryCondition,
+    color,
+    memory,
+  }
+}
+
 const resolveNewCatalogName = (item: NewCatalogItem) => {
   const name = item.name?.trim()
   return name || "Equipo nuevo"
@@ -1280,63 +1315,98 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                       </div>
                     </div>
                   ))
-                : inStock.map((product) => (
-                    <div
-                      key={product.id}
-                      className={cn(
-                        "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
-                        "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
-                        `before:${catalogType.accent}`,
-                      )}
-                    >
-                      <div className="relative space-y-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                              {catalogType.title}
-                            </p>
-                            <h3 className="text-lg font-semibold text-white">
-                              {resolveProductName(product)}
-                            </h3>
-                          </div>
-                          <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
-                            Stock: {product.stock ?? 0}
-                          </div>
-                        </div>
-
-                        <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                          <div className="flex items-center justify-between">
+                : inStock.map((product) => {
+                    const usedDetails = parseUsedPhoneDetails(resolveProductName(product))
+                    return (
+                      <div
+                        key={product.id}
+                        className={cn(
+                          "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
+                          "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
+                          `before:${catalogType.accent}`,
+                        )}
+                      >
+                        <div className="relative space-y-4">
+                          <div className="flex items-start justify-between gap-4">
                             <div>
-                              <p className="text-xs text-slate-400">IMEI</p>
-                              <p className="text-sm font-medium text-slate-100">
-                                {formatImeiSuffix(product.imei)}
+                              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                                {catalogType.title}
                               </p>
+                              <h3 className="text-lg font-semibold text-white">
+                                {usedDetails.displayName}
+                              </h3>
+                              {(usedDetails.batteryCondition ||
+                                usedDetails.color ||
+                                usedDetails.memory) && (
+                                <div className="mt-3 grid gap-2 text-sm text-slate-300">
+                                  {usedDetails.batteryCondition && (
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span className="text-xs text-slate-400">
+                                        Condición de batería
+                                      </span>
+                                      <span className="font-medium text-slate-100">
+                                        {usedDetails.batteryCondition}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {usedDetails.color && (
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span className="text-xs text-slate-400">Color</span>
+                                      <span className="font-medium text-slate-100">
+                                        {usedDetails.color}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {usedDetails.memory && (
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span className="text-xs text-slate-400">Memoria</span>
+                                      <span className="font-medium text-slate-100">
+                                        {usedDetails.memory}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="text-right">
-                              <p className="text-xs text-slate-400">Precio USD</p>
-                              <p className="text-lg font-semibold text-sky-200">
-                                {formatUsdPrice(product.price, usdRate)}
-                              </p>
+                            <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
+                              Stock: {product.stock ?? 0}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
-                            <span className="text-xs text-slate-400">Precio en pesos actual</span>
-                            <span className="font-semibold text-emerald-200">
-                              {formatArsPriceBlue(product.price, usdRate)}
-                            </span>
+
+                          <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs text-slate-400">IMEI</p>
+                                <p className="text-sm font-medium text-slate-100">
+                                  {formatImeiSuffix(product.imei)}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-slate-400">Precio USD</p>
+                                <p className="text-lg font-semibold text-sky-200">
+                                  {formatUsdPrice(product.price, usdRate)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
+                              <span className="text-xs text-slate-400">Precio en pesos actual</span>
+                              <span className="font-semibold text-emerald-200">
+                                {formatArsPriceBlue(product.price, usdRate)}
+                              </span>
+                            </div>
                           </div>
+                          <a
+                            className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
+                            href={buildWhatsAppLink(product, usdRate)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Consultar por WhatsApp
+                          </a>
                         </div>
-                        <a
-                          className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
-                          href={buildWhatsAppLink(product, usdRate)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Consultar por WhatsApp
-                        </a>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
             </div>
           </section>
         )}
