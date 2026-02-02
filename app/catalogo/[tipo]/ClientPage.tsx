@@ -194,10 +194,13 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     name: "",
     email: "",
   })
+  const [registrationPassword, setRegistrationPassword] = useState("")
+  const [registrationPasswordConfirm, setRegistrationPasswordConfirm] = useState("")
   const [matchedCustomer, setMatchedCustomer] = useState<{ id: string; name: string } | null>(null)
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loginEmail, setLoginEmail] = useState("")
+  const [loginPassword, setLoginPassword] = useState("")
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false)
   useEffect(() => {
     if (!catalogType) return
@@ -258,8 +261,12 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       return
     }
 
-    const salesRef = ref(database, "sales")
-    const unsubscribe = onValue(salesRef, (snapshot) => {
+    const salesQuery = query(
+      ref(database, "sales"),
+      orderByChild("customerId"),
+      equalTo(currentCustomer.id),
+    )
+    const unsubscribe = onValue(salesQuery, (snapshot) => {
       if (!snapshot.exists()) {
         setCustomerSales([])
         return
@@ -268,12 +275,10 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       const nextSales: Sale[] = []
       snapshot.forEach((childSnapshot) => {
         const data = childSnapshot.val() || {}
-        if (data.customerId === currentCustomer.id) {
-          nextSales.push({
-            id: childSnapshot.key || "",
-            ...data,
-          })
-        }
+        nextSales.push({
+          id: childSnapshot.key || "",
+          ...data,
+        })
       })
 
       nextSales.sort((a, b) => {
@@ -452,6 +457,17 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       return
     }
 
+    const trimmedPassword = registrationPassword.trim()
+    const trimmedPasswordConfirm = registrationPasswordConfirm.trim()
+    if (!trimmedPassword || !trimmedPasswordConfirm) {
+      toast.error("Ingresá y confirmá tu contraseña para continuar.")
+      return
+    }
+    if (trimmedPassword !== trimmedPasswordConfirm) {
+      toast.error("Las contraseñas no coinciden. Revisalas e intentá de nuevo.")
+      return
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(normalizedEmail)) {
       toast.error("Ingresá un email válido para continuar.")
@@ -476,11 +492,13 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       if (matchedCustomer) {
         await update(ref(database, `customers/${matchedCustomer.id}`), {
           email: normalizedEmail,
+          password: trimmedPassword,
+          passwordUpdatedAt: new Date().toISOString(),
           publicAccess: true,
           publicAccessUpdatedAt: new Date().toISOString(),
         })
         toast.success("Usuario actualizado.", {
-          description: "Ya podés acceder a tu historial de compras.",
+          description: "Ya podés acceder a tu historial con tu contraseña.",
         })
       } else {
         const newCustomerRef = push(customersRef)
@@ -491,7 +509,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         const payload: Record<string, string | boolean> = {
           name: normalizedName,
           email: normalizedEmail,
+          password: trimmedPassword,
           createdAt: new Date().toISOString(),
+          passwordUpdatedAt: new Date().toISOString(),
           publicAccess: true,
           hasPurchased: purchaseStatus === "yes",
         }
@@ -502,11 +522,13 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
         await set(newCustomerRef, payload)
         toast.success("Usuario creado correctamente.", {
-          description: "Te avisaremos cuando tu cuenta esté lista para usar.",
+          description: "Tu contraseña quedó guardada. Ya podés iniciar sesión.",
         })
       }
 
       setRegistration({ dni: "", name: "", email: "" })
+      setRegistrationPassword("")
+      setRegistrationPasswordConfirm("")
       setMatchedCustomer(null)
       setPurchaseStatus("no")
     } catch (error) {
@@ -520,8 +542,13 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const handleLoginCustomer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const normalizedEmail = loginEmail.trim().toLowerCase()
+    const trimmedPassword = loginPassword.trim()
     if (!normalizedEmail) {
       toast.error("Ingresá tu email para continuar.")
+      return
+    }
+    if (!trimmedPassword) {
+      toast.error("Ingresá tu contraseña para continuar.")
       return
     }
     setIsLoginSubmitting(true)
@@ -532,15 +559,26 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       if (emailSnapshot.exists()) {
         const entries = Object.entries(emailSnapshot.val())
         const [customerId, customerData] = entries[0] as [string, any]
+        if (!customerData?.password) {
+          toast.error("Tu cuenta aún no tiene contraseña.", {
+            description: "Visitá nuestro local para restablecer o crearla.",
+          })
+          return
+        }
+        if (String(customerData.password) !== trimmedPassword) {
+          toast.error("Contraseña incorrecta.")
+          return
+        }
         setCurrentCustomer({
           id: customerId,
           ...customerData,
         })
         setLoginEmail("")
+        setLoginPassword("")
         setIsAuthPanelOpen(false)
         setAuthStep("choice")
         toast.success("Cuenta encontrada.", {
-          description: "Pronto podrás acceder a tu historial desde aquí.",
+          description: "Accediste a tu historial de compras.",
         })
       } else {
         toast.error("No encontramos ese email.", {
@@ -785,6 +823,20 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="login-password" className="text-sm text-slate-200">
+              Contraseña
+            </Label>
+            <Input
+              id="login-password"
+              type="password"
+              value={loginPassword}
+              onChange={(event) => setLoginPassword(event.target.value)}
+              placeholder="Ingresá tu contraseña"
+              className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
+              required
+            />
+          </div>
+          <div className="space-y-2">
             <Button
               type="submit"
               className="w-full rounded-xl bg-sky-500 text-white hover:bg-sky-400"
@@ -906,6 +958,39 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               <p className="flex items-center gap-2 text-xs text-slate-400">
                 <Mail className="h-4 w-4" />
                 Usamos el email para validar tu cuenta.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="public-password" className="text-sm text-slate-200">
+                Contraseña
+              </Label>
+              <Input
+                id="public-password"
+                type="password"
+                value={registrationPassword}
+                onChange={(event) => setRegistrationPassword(event.target.value)}
+                placeholder="Creá una contraseña"
+                className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="public-password-confirm" className="text-sm text-slate-200">
+                Repetir contraseña
+              </Label>
+              <Input
+                id="public-password-confirm"
+                type="password"
+                value={registrationPasswordConfirm}
+                onChange={(event) => setRegistrationPasswordConfirm(event.target.value)}
+                placeholder="Repetí tu contraseña"
+                className="border-white/10 bg-slate-950/60 text-white placeholder:text-slate-500"
+                required
+              />
+              <p className="text-xs text-amber-200">
+                Para restablecer tu contraseña debés visitarnos en nuestro local.
               </p>
             </div>
 

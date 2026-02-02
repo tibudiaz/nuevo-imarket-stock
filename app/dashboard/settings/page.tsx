@@ -10,7 +10,7 @@ import { Check, ChevronsUpDown, Loader2, PlusCircle, Trash, X } from "lucide-rea
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ref, onValue, set, push, remove, get, update } from "firebase/database"
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
+import { getAuth, createUserWithEmailAndPassword, updatePassword } from "firebase/auth"
 import { database, storage } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -80,6 +80,14 @@ interface OfferItem {
   id: string;
   text: string;
   createdAt?: string;
+}
+
+interface Customer {
+  id: string;
+  name?: string;
+  email?: string;
+  password?: string;
+  [key: string]: any;
 }
 
 interface SystemChangeEntry {
@@ -293,6 +301,12 @@ export default function SettingsPage() {
   const [photoCleanupDate, setPhotoCleanupDate] = useState("");
   const [isCleaningRepairPhotos, setIsCleaningRepairPhotos] = useState(false);
 
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [customerPassword, setCustomerPassword] = useState("");
+  const [customerPasswordConfirm, setCustomerPasswordConfirm] = useState("");
+  const [isUpdatingCustomerPassword, setIsUpdatingCustomerPassword] = useState(false);
+
   useEffect(() => {
     const productsRef = ref(database, 'products');
     onValue(productsRef, (snapshot) => {
@@ -346,6 +360,20 @@ export default function SettingsPage() {
         ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value }))
         : [];
       setUsers(userList);
+    });
+
+    const customersRef = ref(database, 'customers');
+    onValue(customersRef, (snapshot) => {
+      const data = snapshot.val();
+      const customerList: Customer[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({ id, ...value }))
+        : [];
+      customerList.sort((a, b) => {
+        const nameA = (a.name || a.email || '').toString().toLowerCase();
+        const nameB = (b.name || b.email || '').toString().toLowerCase();
+        return nameA.localeCompare(nameB, 'es');
+      });
+      setCustomers(customerList);
     });
   }, []);
 
@@ -486,6 +514,58 @@ export default function SettingsPage() {
       toast.success("Usuario eliminado.");
     } catch (error) {
       toast.error("Error al eliminar el usuario.");
+    }
+  };
+
+  const handleUpdateCustomerPassword = async () => {
+    if (!selectedCustomerId) {
+      toast.error("Seleccioná un cliente para continuar.");
+      return;
+    }
+    const trimmedPassword = customerPassword.trim();
+    const trimmedConfirm = customerPasswordConfirm.trim();
+    if (!trimmedPassword || !trimmedConfirm) {
+      toast.error("Ingresá y confirmá la nueva contraseña.");
+      return;
+    }
+    if (trimmedPassword !== trimmedConfirm) {
+      toast.error("Las contraseñas no coinciden.");
+      return;
+    }
+
+    const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
+    if (!selectedCustomer) {
+      toast.error("No encontramos el cliente seleccionado.");
+      return;
+    }
+
+    setIsUpdatingCustomerPassword(true);
+    try {
+      await update(ref(database, `customers/${selectedCustomerId}`), {
+        password: trimmedPassword,
+        passwordUpdatedAt: new Date().toISOString(),
+      });
+
+      if (selectedCustomer.email) {
+        try {
+          const auth = getAuth();
+          const authUser = auth.currentUser;
+          if (authUser && authUser.email === selectedCustomer.email) {
+            await updatePassword(authUser, trimmedPassword);
+          }
+        } catch (authError) {
+          console.error("Error al actualizar contraseña en Auth:", authError);
+        }
+      }
+
+      toast.success("Contraseña de cliente actualizada.");
+      setCustomerPassword("");
+      setCustomerPasswordConfirm("");
+    } catch (error) {
+      console.error("Error al actualizar la contraseña del cliente:", error);
+      toast.error("No se pudo actualizar la contraseña.");
+    } finally {
+      setIsUpdatingCustomerPassword(false);
     }
   };
 
@@ -1200,6 +1280,75 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Restablecer contraseña de clientes</CardTitle>
+              <CardDescription>
+                Actualiza manualmente la contraseña de un cliente desde el dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <Select
+                  value={selectedCustomerId}
+                  onValueChange={(value) => setSelectedCustomerId(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.length === 0 ? (
+                      <SelectItem value="no-customers" disabled>
+                        No hay clientes registrados
+                      </SelectItem>
+                    ) : (
+                      customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name || customer.email || "Cliente"}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customer-password">Nueva contraseña</Label>
+                <Input
+                  id="customer-password"
+                  type="password"
+                  value={customerPassword}
+                  onChange={(e) => setCustomerPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customer-password-confirm">Repetir contraseña</Label>
+                <Input
+                  id="customer-password-confirm"
+                  type="password"
+                  value={customerPasswordConfirm}
+                  onChange={(e) => setCustomerPasswordConfirm(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Indicar al cliente que el restablecimiento se realiza en el local.
+                </p>
+              </div>
+              <Button
+                onClick={handleUpdateCustomerPassword}
+                disabled={isUpdatingCustomerPassword}
+              >
+                {isUpdatingCustomerPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  "Guardar contraseña"
+                )}
+              </Button>
             </CardContent>
           </Card>
 
