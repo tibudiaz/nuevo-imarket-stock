@@ -82,6 +82,14 @@ interface OfferItem {
   createdAt?: string;
 }
 
+interface NewCatalogItem {
+  id: string;
+  name: string;
+  price?: number;
+  status?: string;
+  createdAt?: string;
+}
+
 interface Customer {
   id: string;
   name?: string;
@@ -292,6 +300,10 @@ export default function SettingsPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [offers, setOffers] = useState<OfferItem[]>([]);
   const [newOfferText, setNewOfferText] = useState("");
+  const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([]);
+  const [newCatalogName, setNewCatalogName] = useState("");
+  const [newCatalogPrice, setNewCatalogPrice] = useState("");
+  const [newCatalogStatus, setNewCatalogStatus] = useState("");
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -351,6 +363,22 @@ export default function SettingsPage() {
           }))
         : [];
       setOffers(offerList.filter((offer) => offer.text.trim() !== ""));
+    });
+
+    const newCatalogRef = ref(database, 'catalog/newPhones');
+    onValue(newCatalogRef, (snapshot) => {
+      const data = snapshot.val();
+      const catalogList: NewCatalogItem[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({
+            id,
+            name: String(value?.name ?? ""),
+            price: typeof value?.price === "number" ? value.price : undefined,
+            status: value?.status ? String(value.status) : undefined,
+            createdAt: value?.createdAt,
+          }))
+        : [];
+      catalogList.sort((a, b) => (a.name || "").localeCompare(b.name || "", "es"));
+      setNewCatalogItems(catalogList);
     });
 
     const usersRef = ref(database, 'users');
@@ -459,6 +487,60 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Error al eliminar la oferta:", error);
       toast.error("No se pudo eliminar la oferta.");
+    }
+  };
+
+  const handleAddNewCatalogItem = async () => {
+    const trimmedName = newCatalogName.trim();
+    const trimmedStatus = newCatalogStatus.trim();
+    if (!trimmedName) {
+      toast.error("El nombre del equipo es obligatorio.");
+      return;
+    }
+
+    const trimmedPrice = newCatalogPrice.trim();
+    const price =
+      trimmedPrice.length > 0 ? Number(trimmedPrice.replace(",", ".")) : undefined;
+    if (trimmedPrice.length > 0 && !Number.isFinite(price)) {
+      toast.error("Ingresá un precio válido.");
+      return;
+    }
+
+    if (!trimmedStatus && typeof price === "undefined") {
+      toast.error("Cargá un precio o una descripción para el ingreso.");
+      return;
+    }
+
+    const catalogRef = push(ref(database, "catalog/newPhones"));
+    try {
+      const payload: Record<string, string | number> = {
+        name: trimmedName,
+        createdAt: new Date().toISOString(),
+      };
+      if (typeof price === "number") {
+        payload.price = price;
+      }
+      if (trimmedStatus) {
+        payload.status = trimmedStatus;
+      }
+      await set(catalogRef, payload);
+      setNewCatalogName("");
+      setNewCatalogPrice("");
+      setNewCatalogStatus("");
+      toast.success("Equipo agregado al catálogo de nuevos.");
+    } catch (error) {
+      console.error("Error al agregar equipo nuevo:", error);
+      toast.error("No se pudo agregar el equipo.");
+    }
+  };
+
+  const handleRemoveNewCatalogItem = async (itemId: string) => {
+    try {
+      await remove(ref(database, `catalog/newPhones/${itemId}`));
+      toast.success("Equipo eliminado.");
+    } catch (error) {
+      console.error("Error al eliminar equipo nuevo:", error);
+      toast.error("No se pudo eliminar el equipo.");
     }
   };
 
@@ -1180,6 +1262,89 @@ export default function SettingsPage() {
                           size="icon"
                           className="h-7 w-7 text-destructive"
                           onClick={() => handleRemoveOffer(offer.id)}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Catálogo de equipos nuevos</CardTitle>
+              <CardDescription>
+                Cargá modelos nuevos que no se descuentan del stock. Podés incluir precio y/o una
+                nota para equipos por ingresar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2 md:col-span-1">
+                  <Label htmlFor="new-catalog-name">Nombre del equipo</Label>
+                  <Input
+                    id="new-catalog-name"
+                    value={newCatalogName}
+                    onChange={(e) => setNewCatalogName(e.target.value)}
+                    placeholder="Ej. iPhone 15 Pro"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-catalog-price">Precio</Label>
+                  <Input
+                    id="new-catalog-price"
+                    type="number"
+                    value={newCatalogPrice}
+                    onChange={(e) => setNewCatalogPrice(e.target.value)}
+                    placeholder="Ej. 1200"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-catalog-status">Estado / ingreso</Label>
+                  <Input
+                    id="new-catalog-status"
+                    value={newCatalogStatus}
+                    onChange={(e) => setNewCatalogStatus(e.target.value)}
+                    placeholder="Ej. Ingresan la semana próxima"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleAddNewCatalogItem}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Agregar equipo nuevo
+                </Button>
+              </div>
+              <Separator />
+              <ScrollArea className="h-64">
+                <div className="space-y-2">
+                  {newCatalogItems.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      No hay equipos nuevos cargados.
+                    </p>
+                  ) : (
+                    newCatalogItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          <div className="text-xs text-muted-foreground">
+                            {typeof item.price === "number"
+                              ? `Precio: ${item.price}`
+                              : "Precio: sin definir"}
+                            {item.status ? ` · ${item.status}` : ""}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleRemoveNewCatalogItem(item.id)}
                         >
                           <Trash className="h-4 w-4" />
                         </Button>
