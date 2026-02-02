@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react"
 import { ref, onValue, query, orderByChild, equalTo, get, push, set, update } from "firebase/database"
 import {
   ArrowLeft,
@@ -237,16 +237,21 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const [loginEmail, setLoginEmail] = useState("")
   const [loginPassword, setLoginPassword] = useState("")
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false)
+  const [, startTransition] = useTransition()
   useEffect(() => {
     if (!catalogType) return
     const cached = readCatalogCache(cacheKey)
     if (!cached) return
 
     if (Array.isArray(cached.products)) {
-      setProducts(cached.products)
+      startTransition(() => {
+        setProducts(cached.products)
+      })
     }
     if (Array.isArray(cached.newCatalogItems)) {
-      setNewCatalogItems(cached.newCatalogItems)
+      startTransition(() => {
+        setNewCatalogItems(cached.newCatalogItems)
+      })
     }
     if (typeof cached.usdRate === "number") {
       setUsdRate(cached.usdRate)
@@ -325,7 +330,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         return dateB - dateA
       })
 
-      setCustomerSales(nextSales)
+      startTransition(() => {
+        setCustomerSales(nextSales)
+      })
     })
 
     return () => unsubscribe()
@@ -360,7 +367,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           }
         })
 
-        setProducts(nextProducts)
+        startTransition(() => {
+          setProducts(nextProducts)
+        })
         writeCatalogCache(cacheKey, { products: nextProducts })
       },
       () => {
@@ -399,7 +408,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           }
         })
 
-        setNewCatalogItems(items)
+        startTransition(() => {
+          setNewCatalogItems(items)
+        })
         writeCatalogCache(cacheKey, { newCatalogItems: items })
       },
       () => {
