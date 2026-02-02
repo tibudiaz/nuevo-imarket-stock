@@ -3,7 +3,18 @@
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react"
-import { ref, onValue, query, orderByChild, equalTo, get, push, set, update } from "firebase/database"
+import {
+  ref,
+  onValue,
+  query,
+  orderByChild,
+  equalTo,
+  get,
+  push,
+  runTransaction,
+  set,
+  update,
+} from "firebase/database"
 import {
   ArrowLeft,
   ArrowRight,
@@ -409,6 +420,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!catalogType) return
+    const visitsRef = ref(database, "metrics/catalogVisits/total")
+    runTransaction(visitsRef, (current) => (typeof current === "number" ? current + 1 : 1)).catch(
+      (error) => {
+        console.error("Error al registrar visita al catálogo:", error)
+      },
+    )
+  }, [catalogType])
 
   useEffect(() => {
     const pointsRef = ref(database, "config/points")

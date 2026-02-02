@@ -106,19 +106,7 @@ export default function PublicAccessLanding() {
                   className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-slate-100 transition hover:border-emerald-300/60"
                   href="/catalogo/nuevos?auth=login"
                 >
-                  Iniciar sesión
-                </Link>
-                <Link
-                  className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-slate-100 transition hover:border-sky-300/60"
-                  href="/catalogo/nuevos?auth=register"
-                >
-                  Registrarse
-                </Link>
-                <Link
-                  className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-slate-100 transition hover:border-sky-300/60"
-                  href="/catalogo/nuevos"
-                >
-                  Entrar al catálogo
+                  Iniciar sesión / Registrarse
                 </Link>
               </div>
             </>
@@ -162,21 +150,7 @@ export default function PublicAccessLanding() {
                     className="flex items-center justify-between rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-slate-100"
                     href="/catalogo/nuevos?auth=login"
                   >
-                    Iniciar sesión
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link
-                    className="flex items-center justify-between rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 py-3 text-slate-100"
-                    href="/catalogo/nuevos?auth=register"
-                  >
-                    Registrarse
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-slate-200"
-                    href="/catalogo/nuevos"
-                  >
-                    Entrar al catálogo
+                    Iniciar sesión / Registrarse
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
