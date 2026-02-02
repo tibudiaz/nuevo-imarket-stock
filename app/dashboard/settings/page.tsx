@@ -366,7 +366,8 @@ export default function SettingsPage() {
       setOffers(offerList.filter((offer) => offer.text.trim() !== ""));
     });
 
-    const buildNewCatalogItems = (snapshot: { val: () => any }) => {
+    const newCatalogRef = ref(database, "config/newPhones");
+    const unsubscribeNewCatalog = onValue(newCatalogRef, (snapshot) => {
       const data = snapshot.val();
       const catalogList: NewCatalogItem[] = data
         ? Object.entries(data).map(([id, value]: [string, any]) => ({
@@ -378,30 +379,7 @@ export default function SettingsPage() {
           }))
         : [];
       catalogList.sort((a, b) => (a.name || "").localeCompare(b.name || "", "es"));
-      return catalogList;
-    };
-
-    const newCatalogPrimaryRef = ref(database, "catalog/newPhones");
-    const newCatalogFallbackRef = ref(database, "config/newPhones");
-    let primaryItems: NewCatalogItem[] = [];
-    let fallbackItems: NewCatalogItem[] = [];
-    let hasPrimaryItems = false;
-
-    const updateCatalogItems = () => {
-      setNewCatalogItems(hasPrimaryItems ? primaryItems : fallbackItems);
-    };
-
-    const unsubscribePrimary = onValue(newCatalogPrimaryRef, (snapshot) => {
-      primaryItems = buildNewCatalogItems(snapshot);
-      hasPrimaryItems = primaryItems.length > 0;
-      updateCatalogItems();
-    });
-
-    const unsubscribeFallback = onValue(newCatalogFallbackRef, (snapshot) => {
-      fallbackItems = buildNewCatalogItems(snapshot);
-      if (!hasPrimaryItems) {
-        updateCatalogItems();
-      }
+      setNewCatalogItems(catalogList);
     });
 
     const usersRef = ref(database, 'users');
@@ -434,8 +412,7 @@ export default function SettingsPage() {
     });
 
     return () => {
-      unsubscribePrimary();
-      unsubscribeFallback();
+      unsubscribeNewCatalog();
     };
   }, []);
 
@@ -545,7 +522,7 @@ export default function SettingsPage() {
       return;
     }
 
-    const catalogRef = push(ref(database, "catalog/newPhones"));
+    const catalogRef = push(ref(database, "config/newPhones"));
     try {
       const payload: Record<string, string | number> = {
         name: trimmedName,
@@ -570,7 +547,7 @@ export default function SettingsPage() {
 
   const handleRemoveNewCatalogItem = async (itemId: string) => {
     try {
-      await remove(ref(database, `catalog/newPhones/${itemId}`));
+      await remove(ref(database, `config/newPhones/${itemId}`));
       toast.success("Equipo eliminado.");
     } catch (error) {
       console.error("Error al eliminar equipo nuevo:", error);
