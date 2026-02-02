@@ -6,12 +6,12 @@ import PublicTopBar from "@/components/public-top-bar"
 const contactDetails = [
   {
     title: "Dirección",
-    description: "San Martín 1234, Río Cuarto, Córdoba.",
+    description: "Constitucion 981, Río Cuarto, Córdoba.--Cabrera 1095, Río Cuarto, Córdoba.",
     icon: MapPin,
   },
   {
     title: "Teléfonos",
-    description: "+54 9 358 412-3456 · +54 9 358 498-7654",
+    description: "+54 9 358 422-4464 · +54 9 358 562-5881",
     icon: Phone,
   },
 ]
