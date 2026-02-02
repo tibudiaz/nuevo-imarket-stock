@@ -366,8 +366,8 @@ export default function SettingsPage() {
       setOffers(offerList.filter((offer) => offer.text.trim() !== ""));
     });
 
-    const newCatalogRef = ref(database, 'catalog/newPhones');
-    onValue(newCatalogRef, (snapshot) => {
+    const newCatalogRef = ref(database, "config/newPhones");
+    const unsubscribeNewCatalog = onValue(newCatalogRef, (snapshot) => {
       const data = snapshot.val();
       const catalogList: NewCatalogItem[] = data
         ? Object.entries(data).map(([id, value]: [string, any]) => ({
@@ -410,6 +410,10 @@ export default function SettingsPage() {
       const data = snapshot.val();
       setCatalogVisitCount(parseNumber(data, 0));
     });
+
+    return () => {
+      unsubscribeNewCatalog();
+    };
   }, []);
 
   useEffect(() => {
@@ -518,7 +522,7 @@ export default function SettingsPage() {
       return;
     }
 
-    const catalogRef = push(ref(database, "catalog/newPhones"));
+    const catalogRef = push(ref(database, "config/newPhones"));
     try {
       const payload: Record<string, string | number> = {
         name: trimmedName,
@@ -543,7 +547,7 @@ export default function SettingsPage() {
 
   const handleRemoveNewCatalogItem = async (itemId: string) => {
     try {
-      await remove(ref(database, `catalog/newPhones/${itemId}`));
+      await remove(ref(database, `config/newPhones/${itemId}`));
       toast.success("Equipo eliminado.");
     } catch (error) {
       console.error("Error al eliminar equipo nuevo:", error);

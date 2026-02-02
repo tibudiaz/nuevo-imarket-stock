@@ -527,7 +527,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   useEffect(() => {
     if (!catalogType || catalogType.key !== "nuevos") return
-    const newCatalogRef = ref(database, "catalog/newPhones")
+    const newCatalogRef = ref(database, "config/newPhones")
     const unsubscribeNewCatalog = onValue(
       newCatalogRef,
       (snapshot) => {
