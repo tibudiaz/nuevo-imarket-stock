@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Search, Eye, Zap } from "lucide-react"
 import { ref, onValue, push, set, update, get, query, orderByChild, equalTo, runTransaction } from "firebase/database"
 import { database } from "@/lib/firebase"
@@ -274,6 +275,18 @@ export default function RepairsPage() {
     setIsDetailModalOpen(true)
   }
 
+  const handleQuickDelivery = async (repair: Repair) => {
+    if (repair.status === "delivered") {
+      toast.info("La reparación ya fue entregada.")
+      return
+    }
+
+    await handleUpdateRepair(repair.id, {
+      status: "delivered",
+      deliveredAt: repair.deliveredAt || new Date().toISOString(),
+    })
+  }
+
   const getStatusVariant = (status: Repair['status']) => {
     switch (status) {
       case 'pending': return 'destructive';
@@ -292,6 +305,9 @@ export default function RepairsPage() {
       (r.receiptNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
+
+  const quickRepairs = filteredRepairs.filter((repair) => repair.quickRepair);
+  const standardRepairs = filteredRepairs.filter((repair) => !repair.quickRepair);
 
   return (
     <DashboardLayout>
@@ -320,54 +336,122 @@ export default function RepairsPage() {
           </div>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>N° Recibo</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Equipo</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Fecha de Ingreso</TableHead>
-                <TableHead>Precio Estimado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                  Cargando reparaciones...
-                </TableCell>
-              </TableRow>
-            ) : filteredRepairs.length > 0 ? (
-              filteredRepairs.map((repair) => (
-                <TableRow key={repair.id}>
-                  <TableCell className="font-medium">{repair.receiptNumber || 'N/A'}</TableCell>
-                  <TableCell>{repair.customerName}</TableCell>
-                  <TableCell>{repair.productName}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(repair.status)}>{(repair.status || 'desconocido').replace(/_/g, ' ')}</Badge>
-                  </TableCell>
-                  <TableCell>{repair.entryDate ? new Date(repair.entryDate).toLocaleDateString() : 'N/A'}</TableCell>
-                  <TableCell>${repair.estimatedPrice?.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleViewDetails(repair)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                  No se encontraron reparaciones.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-          </Table>
-        </div>
+        <Tabs defaultValue="todas" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="todas">Todas</TabsTrigger>
+            <TabsTrigger value="rapidas">Rápidas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="todas">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N° Recibo</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Equipo</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Fecha de Ingreso</TableHead>
+                    <TableHead>Precio Estimado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                      Cargando reparaciones...
+                    </TableCell>
+                  </TableRow>
+                ) : standardRepairs.length > 0 ? (
+                  standardRepairs.map((repair) => (
+                    <TableRow key={repair.id}>
+                      <TableCell className="font-medium">{repair.receiptNumber || 'N/A'}</TableCell>
+                      <TableCell>{repair.customerName}</TableCell>
+                      <TableCell>{repair.productName}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(repair.status)}>{(repair.status || 'desconocido').replace(/_/g, ' ')}</Badge>
+                      </TableCell>
+                      <TableCell>{repair.entryDate ? new Date(repair.entryDate).toLocaleDateString() : 'N/A'}</TableCell>
+                      <TableCell>${repair.estimatedPrice?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewDetails(repair)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                      No se encontraron reparaciones.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="rapidas">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N° Recibo</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Equipo</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Ingreso</TableHead>
+                    <TableHead>Egreso</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                        Cargando reparaciones rápidas...
+                      </TableCell>
+                    </TableRow>
+                  ) : quickRepairs.length > 0 ? (
+                    quickRepairs.map((repair) => (
+                      <TableRow key={repair.id}>
+                        <TableCell className="font-medium">{repair.receiptNumber || 'N/A'}</TableCell>
+                        <TableCell>{repair.customerName}</TableCell>
+                        <TableCell>{repair.productName}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusVariant(repair.status)}>{(repair.status || 'desconocido').replace(/_/g, ' ')}</Badge>
+                        </TableCell>
+                        <TableCell>{repair.entryDate ? new Date(repair.entryDate).toLocaleString() : 'N/A'}</TableCell>
+                        <TableCell>{repair.deliveredAt ? new Date(repair.deliveredAt).toLocaleString() : 'Pendiente'}</TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleQuickDelivery(repair)}
+                            disabled={repair.status === "delivered"}
+                          >
+                            Marcar entregado
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleViewDetails(repair)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                        No se encontraron reparaciones rápidas.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <AddRepairForm isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddRepair={handleAddRepair} />
         <AddQuickRepairForm
