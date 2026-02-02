@@ -154,8 +154,19 @@ const ensureIphonePrefix = (name: string) => {
   return `iPhone ${trimmed}`
 }
 
+const WARRANTY_REGEX = /\b(gtia|gar|car)\s*(\d{1,2}\/\d{2}(?:\/\d{2})?)\b/i
+
+const stripImeiSuffix = (name: string) => {
+  return name.replace(/\bimei\b[:\s-]*\d+\s*$/i, "").trim()
+}
+
 const parseUsedPhoneDetails = (name: string) => {
-  const tokens = name.split(/\s+/).filter(Boolean)
+  const imeiTrimmed = stripImeiSuffix(name)
+  const warrantyMatch = imeiTrimmed.match(WARRANTY_REGEX)
+  const warranty = warrantyMatch?.[2] ?? null
+  const warrantyTrimmed = imeiTrimmed.replace(WARRANTY_REGEX, "").replace(/\s+/g, " ").trim()
+
+  const tokens = warrantyTrimmed.split(/\s+/).filter(Boolean)
   const batteryIndex = tokens.findIndex((token) => /(\d+)%/.test(token))
   const memoryIndex = tokens.findIndex((token) => /(\d+)\s*gb/i.test(token))
 
@@ -179,13 +190,14 @@ const parseUsedPhoneDetails = (name: string) => {
     }
     return true
   })
-  const displayName = displayTokens.join(" ").trim() || name
+  const displayName = displayTokens.join(" ").trim() || warrantyTrimmed
 
   return {
     displayName,
     batteryCondition,
     color,
     memory,
+    warranty,
   }
 }
 
@@ -1346,7 +1358,8 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                               </h3>
                               {(usedDetails.batteryCondition ||
                                 usedDetails.color ||
-                                usedDetails.memory) && (
+                                usedDetails.memory ||
+                                usedDetails.warranty) && (
                                 <div className="mt-3 grid gap-2 text-sm text-slate-300">
                                   {usedDetails.batteryCondition && (
                                     <div className="flex items-center justify-between gap-3">
@@ -1371,6 +1384,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                                       <span className="text-xs text-slate-400">Memoria</span>
                                       <span className="font-medium text-slate-100">
                                         {usedDetails.memory}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {usedDetails.warranty && (
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span className="text-xs text-slate-400">
+                                        Garantía oficial hasta:
+                                      </span>
+                                      <span className="font-medium text-slate-100">
+                                        {usedDetails.warranty}
                                       </span>
                                     </div>
                                   )}
