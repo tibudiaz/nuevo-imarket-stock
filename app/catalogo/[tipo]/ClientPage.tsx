@@ -527,34 +527,60 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   useEffect(() => {
     if (!catalogType || catalogType.key !== "nuevos") return
-    const newCatalogRef = ref(database, "catalog/newPhones")
-    const unsubscribeNewCatalog = onValue(
-      newCatalogRef,
+    const buildItems = (snapshot: { exists: () => boolean; forEach: (callback: (child: any) => void) => void }) => {
+      if (!snapshot.exists()) {
+        return []
+      }
+      const items: NewCatalogItem[] = []
+      snapshot.forEach((childSnapshot) => {
+        const value = childSnapshot.val()
+        if (value && typeof value === "object" && childSnapshot.key) {
+          items.push({
+            id: childSnapshot.key,
+            name: String(value.name ?? "").trim(),
+            price: typeof value.price === "number" ? value.price : undefined,
+            status: value.status ? String(value.status) : undefined,
+            createdAt: value.createdAt,
+          })
+        }
+      })
+      return items
+    }
+
+    const newCatalogPrimaryRef = ref(database, "catalog/newPhones")
+    const newCatalogFallbackRef = ref(database, "config/newPhones")
+    let primaryItems: NewCatalogItem[] = []
+    let fallbackItems: NewCatalogItem[] = []
+    let hasPrimaryItems = false
+
+    const updateItems = () => {
+      const items = hasPrimaryItems ? primaryItems : fallbackItems
+      startTransition(() => {
+        setNewCatalogItems(items)
+      })
+      writeCatalogCache(cacheKey, { newCatalogItems: items })
+    }
+
+    const unsubscribePrimary = onValue(
+      newCatalogPrimaryRef,
       (snapshot) => {
         setLoading(false)
-        if (!snapshot.exists()) {
-          setNewCatalogItems([])
-          return
+        primaryItems = buildItems(snapshot)
+        hasPrimaryItems = primaryItems.length > 0
+        updateItems()
+      },
+      () => {
+        setLoading(false)
+      },
+    )
+
+    const unsubscribeFallback = onValue(
+      newCatalogFallbackRef,
+      (snapshot) => {
+        fallbackItems = buildItems(snapshot)
+        if (!hasPrimaryItems) {
+          updateItems()
         }
-
-        const items: NewCatalogItem[] = []
-        snapshot.forEach((childSnapshot) => {
-          const value = childSnapshot.val()
-          if (value && typeof value === "object" && childSnapshot.key) {
-            items.push({
-              id: childSnapshot.key,
-              name: String(value.name ?? "").trim(),
-              price: typeof value.price === "number" ? value.price : undefined,
-              status: value.status ? String(value.status) : undefined,
-              createdAt: value.createdAt,
-            })
-          }
-        })
-
-        startTransition(() => {
-          setNewCatalogItems(items)
-        })
-        writeCatalogCache(cacheKey, { newCatalogItems: items })
       },
       () => {
         setLoading(false)
@@ -562,7 +588,8 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     )
 
     return () => {
-      unsubscribeNewCatalog()
+      unsubscribePrimary()
+      unsubscribeFallback()
     }
   }, [cacheKey, catalogType])
 
