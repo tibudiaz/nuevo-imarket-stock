@@ -51,8 +51,13 @@ export default function ProviderProductsPage() {
 
   const hasTextStatus = (value?: string) => Boolean(value && /[a-záéíóúñü]/i.test(value))
 
-  const fetchProducts = useCallback(async () => {
-    setIsLoading(true)
+  const fetchProducts = useCallback(async (options?: { showLoading?: boolean }) => {
+    const showLoading = options?.showLoading ?? true
+
+    if (showLoading) {
+      setIsLoading(true)
+    }
+
     setError(null)
 
     try {
@@ -70,12 +75,20 @@ export default function ProviderProductsPage() {
       const message = fetchError instanceof Error ? fetchError.message : "Error inesperado."
       setError(message)
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }, [])
 
   useEffect(() => {
     fetchProducts()
+
+    const intervalId = window.setInterval(() => {
+      fetchProducts({ showLoading: false })
+    }, 10 * 60 * 1000)
+
+    return () => window.clearInterval(intervalId)
   }, [fetchProducts])
 
   const filteredProducts = useMemo(() => {
