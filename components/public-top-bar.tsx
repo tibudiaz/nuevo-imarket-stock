@@ -22,7 +22,7 @@ export default function PublicTopBar({
         {desktopContent}
       </div>
       <div className="mt-3 overflow-hidden rounded-full border border-white/10 bg-slate-950/60">
-        <div className="flex w-max animate-marquee items-center gap-6 whitespace-nowrap px-4 py-2 text-sm text-slate-200">
+        <div className="flex min-w-full w-max animate-marquee items-center justify-start gap-6 whitespace-nowrap px-4 py-2 text-sm text-slate-200">
           {marqueeItems.map((item, index) => (
             <span key={`offer-primary-${index}`} className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
