@@ -304,6 +304,7 @@ export default function SettingsPage() {
   const [newCatalogName, setNewCatalogName] = useState("");
   const [newCatalogPrice, setNewCatalogPrice] = useState("");
   const [newCatalogStatus, setNewCatalogStatus] = useState("");
+  const [catalogVisitCount, setCatalogVisitCount] = useState(0);
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -402,6 +403,12 @@ export default function SettingsPage() {
         return nameA.localeCompare(nameB, 'es');
       });
       setCustomers(customerList);
+    });
+
+    const catalogVisitsRef = ref(database, "metrics/catalogVisits/total");
+    onValue(catalogVisitsRef, (snapshot) => {
+      const data = snapshot.val();
+      setCatalogVisitCount(parseNumber(data, 0));
     });
   }, []);
 
@@ -1216,6 +1223,24 @@ export default function SettingsPage() {
                 <Label htmlFor="points-paused">Pausar sistema de puntos</Label>
               </div>
               <Button onClick={handleSavePoints}>Guardar</Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Visitas al catálogo</CardTitle>
+              <CardDescription>Seguimiento del rendimiento del catálogo público.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl border border-slate-200/10 bg-slate-950/40 px-4 py-3">
+                <div>
+                  <p className="text-sm text-slate-400">Total acumulado</p>
+                  <p className="text-xs text-slate-500">Se actualiza cada vez que un cliente abre un catálogo.</p>
+                </div>
+                <span className="text-3xl font-semibold text-slate-100">
+                  {new Intl.NumberFormat("es-AR").format(catalogVisitCount)}
+                </span>
+              </div>
             </CardContent>
           </Card>
 
