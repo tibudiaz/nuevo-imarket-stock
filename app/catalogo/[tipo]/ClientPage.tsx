@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react"
 import { ref, onValue, query, orderByChild, equalTo, get, push, set, update } from "firebase/database"
 import {
@@ -175,11 +176,15 @@ const COLOR_PHRASES = [
   "blanco",
   "gris",
   "grafito",
+  "graphito",
   "plata",
   "plateado",
+  "rose gold",
+  "rose",
   "dorado",
   "oro",
   "rosa",
+  "desert",
   "fucsia",
   "morado",
   "violeta",
@@ -199,6 +204,7 @@ const COLOR_PHRASES = [
   "red",
   "pink",
   "purple",
+  "graphite",
   "yellow",
 ] as const
 
@@ -269,13 +275,6 @@ const resolveNewCatalogStatus = (item: NewCatalogItem) => {
   return status || "Consultar disponibilidad"
 }
 
-const formatImeiSuffix = (imei?: string) => {
-  if (!imei) return "Sin IMEI"
-  const clean = imei.replace(/\s+/g, "")
-  const suffix = clean.slice(-4)
-  return suffix ? `**** ${suffix}` : "Sin IMEI"
-}
-
 const formatUsdPrice = (price: number | undefined, usdRate: number) => {
   if (typeof price !== "number" || Number.isNaN(price)) return "Consultar"
   if (usdRate > 0) {
@@ -295,8 +294,7 @@ const buildWhatsAppLink = (product: Product, usdRate: number) => {
   const name = ensureIphonePrefix(resolveProductName(product))
   const usdPrice = formatUsdPrice(product.price, usdRate)
   const arsPrice = formatArsPriceBlue(product.price, usdRate)
-  const imeiSuffix = formatImeiSuffix(product.imei)
-  const message = `Hola estoy interesado en el siguiente celular: ${name}. Precio USD: ${usdPrice}. Precio en pesos: ${arsPrice}. IMEI: ${imeiSuffix}.`
+  const message = `Hola estoy interesado en el siguiente celular: ${name}. Precio USD: ${usdPrice}. Precio en pesos: ${arsPrice}.`
   const encodedMessage = encodeURIComponent(message)
   return `https://wa.me/5493584224464?text=${encodedMessage}`
 }
@@ -319,6 +317,7 @@ const buildWhatsAppLinkForNewCatalog = (item: NewCatalogItem, usdRate: number) =
 export default function PublicStockClient({ params }: { params: { tipo: string } }) {
   const catalogType = CATALOG_TYPES[params.tipo as CatalogTypeKey]
   const cacheKey = catalogType ? `catalog-cache-${catalogType.key}` : "catalog-cache"
+  const searchParams = useSearchParams()
 
   const [products, setProducts] = useState<Product[]>([])
   const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([])
@@ -341,6 +340,17 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     name: "",
     email: "",
   })
+
+  useEffect(() => {
+    const authParam = searchParams?.get("auth")
+    if (!authParam) return
+    if (authParam === "login" || authParam === "register") {
+      setAuthStep(authParam)
+    } else {
+      setAuthStep("choice")
+    }
+    setIsAuthPanelOpen(true)
+  }, [searchParams])
   const [registrationPassword, setRegistrationPassword] = useState("")
   const [registrationPasswordConfirm, setRegistrationPasswordConfirm] = useState("")
   const [matchedCustomer, setMatchedCustomer] = useState<{ id: string; name: string } | null>(null)
@@ -1291,7 +1301,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                   </span>
                   {!isNewCatalog && (
                     <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                      Últimos 4 dígitos de IMEI
+                      Información protegida y resumida
                     </span>
                   )}
                   {isNewCatalog && (
@@ -1466,12 +1476,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                           <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-xs text-slate-400">IMEI</p>
-                                <p className="text-sm font-medium text-slate-100">
-                                  {formatImeiSuffix(product.imei)}
-                                </p>
-                              </div>
-                              <div className="text-right">
                                 <p className="text-xs text-slate-400">Precio USD</p>
                                 <p className="text-lg font-semibold text-sky-200">
                                   {formatUsdPrice(product.price, usdRate)}
