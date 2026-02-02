@@ -19,7 +19,7 @@ const landingOptions = [
   },
   {
     title: "Celulares usados",
-    description: "Equipos testeados, con detalle de IMEI parcial y stock real.",
+    description: "Equipos testeados, con detalle de estado y stock real.",
     href: "/catalogo/usados",
     accent: "from-emerald-500/20 via-emerald-400/5 to-transparent",
     icon: Zap,
@@ -103,6 +103,18 @@ export default function PublicAccessLanding() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-slate-100 transition hover:border-emerald-300/60"
+                  href="/catalogo/nuevos?auth=login"
+                >
+                  Iniciar sesión
+                </Link>
+                <Link
+                  className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-slate-100 transition hover:border-sky-300/60"
+                  href="/catalogo/nuevos?auth=register"
+                >
+                  Registrarse
+                </Link>
+                <Link
                   className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-slate-100 transition hover:border-sky-300/60"
                   href="/catalogo/nuevos"
                 >
@@ -145,13 +157,29 @@ export default function PublicAccessLanding() {
               </div>
               <div className="space-y-2 text-sm text-slate-200">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Cuenta</p>
-                <Link
-                  className="flex items-center justify-between rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 py-3 text-slate-100"
-                  href="/catalogo/nuevos"
-                >
-                  Entrar al catálogo
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+                <div className="grid gap-2">
+                  <Link
+                    className="flex items-center justify-between rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-slate-100"
+                    href="/catalogo/nuevos?auth=login"
+                  >
+                    Iniciar sesión
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    className="flex items-center justify-between rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 py-3 text-slate-100"
+                    href="/catalogo/nuevos?auth=register"
+                  >
+                    Registrarse
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-slate-200"
+                    href="/catalogo/nuevos"
+                  >
+                    Entrar al catálogo
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
               </div>
             </div>
           }
