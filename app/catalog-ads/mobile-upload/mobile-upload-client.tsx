@@ -9,7 +9,7 @@ import { Loader2, UploadCloud } from "lucide-react"
 import { toast } from "sonner"
 import { auth, database, storage } from "@/lib/firebase"
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
-import { ref as databaseRef, onValue, get, push, update } from "firebase/database"
+import { ref as databaseRef, onValue, get, push, set, update } from "firebase/database"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
 import type { CatalogAdType } from "@/lib/catalog-ads"
 
@@ -41,6 +41,18 @@ function MobileUploadFallback() {
 export default function CatalogAdMobileUploadClient() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("sessionId") || undefined
+  const pageParam = searchParams.get("page") || undefined
+  const typeParam = searchParams.get("type") || undefined
+  const allowSessionRecovery = Boolean(pageParam || typeParam)
+
+  const resolvedPage =
+    pageParam === "nuevos" || pageParam === "usados" || pageParam === "landing"
+      ? pageParam
+      : "landing"
+  const resolvedType: CatalogAdType =
+    typeParam === "video" || typeParam === "carousel" || typeParam === "image"
+      ? typeParam
+      : "image"
 
   const [sessionData, setSessionData] = useState<CatalogAdUploadSession | null>(null)
   const [files, setFiles] = useState<UploadedAdFile[]>([])
@@ -118,14 +130,31 @@ export default function CatalogAdMobileUploadClient() {
     const sessionRef = databaseRef(database, `catalogAdUploadSessions/${sessionId}`)
 
     get(sessionRef)
-      .then((snapshot) => {
-        if (!snapshot.exists()) {
-          setIsValidSession(false)
+      .then(async (snapshot) => {
+        if (snapshot.exists()) {
+          setIsValidSession(true)
           setIsCheckingSession(false)
           return
         }
-        setIsValidSession(true)
-        setIsCheckingSession(false)
+
+        const fallbackPayload: CatalogAdUploadSession = {
+          page: resolvedPage,
+          type: resolvedType,
+          status: "pending",
+        }
+
+        try {
+          await set(sessionRef, {
+            ...fallbackPayload,
+            createdAt: new Date().toISOString(),
+          })
+          setIsValidSession(true)
+        } catch (error) {
+          console.error("Error al crear la sesión de carga:", error)
+          setIsValidSession(false)
+        } finally {
+          setIsCheckingSession(false)
+        }
       })
       .catch((error) => {
         console.error("Error al verificar la sesión de carga:", error)
@@ -135,7 +164,9 @@ export default function CatalogAdMobileUploadClient() {
 
     const unsubscribe = onValue(sessionRef, (snapshot) => {
       if (!snapshot.exists()) {
-        setIsValidSession(false)
+        if (!allowSessionRecovery) {
+          setIsValidSession(false)
+        }
         setSessionData(null)
         setFiles([])
         return
@@ -158,7 +189,7 @@ export default function CatalogAdMobileUploadClient() {
     }).catch(() => null)
 
     return () => unsubscribe()
-  }, [sessionId, isAuthReady])
+  }, [sessionId, isAuthReady, allowSessionRecovery, resolvedPage, resolvedType])
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files?.length || !sessionId || !isAuthReady) {
@@ -247,8 +278,9 @@ export default function CatalogAdMobileUploadClient() {
     )
   }
 
-  const acceptType = sessionData?.type === "video" ? "video/*" : "image/*"
-  const allowMultiple = sessionData?.type !== "video"
+  const resolvedSessionType = sessionData?.type ?? resolvedType
+  const acceptType = resolvedSessionType === "video" ? "video/*" : "image/*"
+  const allowMultiple = resolvedSessionType !== "video"
 
   return (
     <div className="min-h-screen bg-muted/40 p-6">
