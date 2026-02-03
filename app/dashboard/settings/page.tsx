@@ -305,6 +305,7 @@ export default function SettingsPage() {
   const [newCatalogPrice, setNewCatalogPrice] = useState("");
   const [newCatalogStatus, setNewCatalogStatus] = useState("");
   const [catalogVisitCount, setCatalogVisitCount] = useState(0);
+  const [usdRateAdjustment, setUsdRateAdjustment] = useState(0);
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -351,6 +352,14 @@ export default function SettingsPage() {
         setPointValue(data.value || 0);
         setPointsPaused(data.paused || false);
       }
+    });
+
+    const usdAdjustmentRef = ref(database, "config/usdRateAdjustment");
+    onValue(usdAdjustmentRef, (snapshot) => {
+      const value = snapshot.val();
+      setUsdRateAdjustment(
+        typeof value === "number" && Number.isFinite(value) ? value : 0,
+      );
     });
 
     const offersRef = ref(database, 'config/offers');
@@ -498,6 +507,16 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Error al eliminar la oferta:", error);
       toast.error("No se pudo eliminar la oferta.");
+    }
+  };
+
+  const handleSaveUsdRateAdjustment = async () => {
+    try {
+      await set(ref(database, "config/usdRateAdjustment"), usdRateAdjustment);
+      toast.success("Ajuste de cotización guardado.");
+    } catch (error) {
+      console.error("Error al guardar el ajuste de cotización:", error);
+      toast.error("No se pudo guardar el ajuste.");
     }
   };
 
@@ -1232,6 +1251,28 @@ export default function SettingsPage() {
                 <Label htmlFor="points-paused">Pausar sistema de puntos</Label>
               </div>
               <Button onClick={handleSavePoints}>Guardar</Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Ajuste de cotización USD</CardTitle>
+              <CardDescription>
+                Sumá o restá un valor fijo al dólar que recibe el sistema.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="usd-rate-adjustment">Ajuste en pesos</Label>
+                <Input
+                  id="usd-rate-adjustment"
+                  type="number"
+                  value={usdRateAdjustment}
+                  onChange={(e) => setUsdRateAdjustment(Number(e.target.value))}
+                  placeholder="Ej. 15 o -10"
+                />
+              </div>
+              <Button onClick={handleSaveUsdRateAdjustment}>Guardar</Button>
             </CardContent>
           </Card>
 
