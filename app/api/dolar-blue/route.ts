@@ -16,24 +16,20 @@ const parseRate = (value: number | string | undefined) => {
   return null
 }
 
-export const dynamic = "force-dynamic"
-export const revalidate = 0
+export const dynamic = "force-static"
 
 export async function GET() {
   try {
-    const apiResponse = await fetch(DOLAR_API_URL, { cache: "no-store" })
+    const apiResponse = await fetch(DOLAR_API_URL)
     if (apiResponse.ok) {
       const apiData = (await apiResponse.json()) as { venta?: number | string }
       const venta = parseRate(apiData.venta)
       if (venta !== null) {
-        return NextResponse.json(
-          { venta },
-          { headers: { "Cache-Control": "no-store, max-age=0" } },
-        )
+        return NextResponse.json({ venta })
       }
     }
 
-    const fallbackResponse = await fetch(DOLAR_FALLBACK_URL, { cache: "no-store" })
+    const fallbackResponse = await fetch(DOLAR_FALLBACK_URL)
     if (!fallbackResponse.ok) {
       return NextResponse.json(
         { error: "No se pudo obtener la cotización" },
@@ -46,10 +42,7 @@ export async function GET() {
     }
     const venta = parseRate(fallbackData.blue?.value_sell)
     if (venta !== null) {
-      return NextResponse.json(
-        { venta },
-        { headers: { "Cache-Control": "no-store, max-age=0" } },
-      )
+      return NextResponse.json({ venta })
     }
 
     return NextResponse.json({ error: "No se pudo interpretar la cotización" }, { status: 502 })
