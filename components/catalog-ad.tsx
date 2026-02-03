@@ -15,26 +15,13 @@ type CatalogAdProps = {
   className?: string
 }
 
-const DEFAULT_TITLE = "Publicidad destacada"
-
 export default function CatalogAd({ config, className }: CatalogAdProps) {
   if (!config?.enabled || !config.urls.length) return null
 
   return (
     <section className={cn("mt-10", className)}>
       <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-400">
-              Publicidad
-            </p>
-            <h2 className="text-xl font-semibold text-white">
-              {config.title || DEFAULT_TITLE}
-            </h2>
-          </div>
-        </div>
-
-        <div className="mt-5">
+        <div>
           {config.type === "video" ? (
             <video
               controls
@@ -51,7 +38,7 @@ export default function CatalogAd({ config, className }: CatalogAdProps) {
                     <div className="h-[240px] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 md:h-[320px]">
                       <img
                         src={url}
-                        alt={config.title ? `${config.title} ${index + 1}` : `Publicidad ${index + 1}`}
+                        alt={config.title ? `${config.title} ${index + 1}` : `Anuncio ${index + 1}`}
                         className="h-full w-full object-cover"
                         loading="lazy"
                       />
@@ -66,7 +53,7 @@ export default function CatalogAd({ config, className }: CatalogAdProps) {
             <div className="h-[240px] overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 md:h-[320px]">
               <img
                 src={config.urls[0]}
-                alt={config.title || "Publicidad"}
+                alt={config.title || "Anuncio"}
                 className="h-full w-full object-cover"
                 loading="lazy"
               />
