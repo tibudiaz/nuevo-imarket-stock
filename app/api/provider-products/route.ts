@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
-export const dynamic = "force-static"
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 const DEFAULT_RANGES = ["B:B", "C:C", "E:E", "F:F"]
 
@@ -45,7 +46,7 @@ export async function GET() {
 
   try {
     const response = await fetch(endpoint.toString(), {
-      cache: "force-cache",
+      cache: "no-store",
     })
 
     if (!response.ok) {

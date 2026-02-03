@@ -16,9 +16,12 @@ const parseRate = (value: number | string | undefined) => {
   return null
 }
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export async function GET() {
   try {
-    const apiResponse = await fetch(DOLAR_API_URL, { cache: "force-cache" })
+    const apiResponse = await fetch(DOLAR_API_URL, { cache: "no-store" })
     if (apiResponse.ok) {
       const apiData = (await apiResponse.json()) as { venta?: number | string }
       const venta = parseRate(apiData.venta)
@@ -30,7 +33,7 @@ export async function GET() {
       }
     }
 
-    const fallbackResponse = await fetch(DOLAR_FALLBACK_URL, { cache: "force-cache" })
+    const fallbackResponse = await fetch(DOLAR_FALLBACK_URL, { cache: "no-store" })
     if (!fallbackResponse.ok) {
       return NextResponse.json(
         { error: "No se pudo obtener la cotización" },
