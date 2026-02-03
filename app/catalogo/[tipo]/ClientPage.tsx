@@ -38,6 +38,8 @@ import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
 import { convertPriceToUSD, formatCurrency, formatUsdCurrency } from "@/lib/price-converter"
 import { cn } from "@/lib/utils"
+import CatalogAd from "@/components/catalog-ad"
+import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
 
 interface Product {
   id: string
@@ -339,6 +341,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     usedPhones: true,
   })
   const [offers, setOffers] = useState<string[]>([])
+  const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false)
   const [authStep, setAuthStep] = useState<"choice" | "login" | "register">("choice")
   const [currentCustomer, setCurrentCustomer] = useState<CustomerProfile | null>(null)
@@ -420,6 +423,21 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!catalogType?.key) return
+    const adRef = ref(database, `config/catalogAds/${catalogType.key}`)
+    const unsubscribe = onValue(adRef, (snapshot) => {
+      const data = snapshot.val()
+      if (!data) {
+        setCatalogAd(null)
+        return
+      }
+      setCatalogAd(normalizeCatalogAdConfig(data))
+    })
+
+    return () => unsubscribe()
+  }, [catalogType?.key])
 
   useEffect(() => {
     if (!catalogType) return
@@ -1535,6 +1553,8 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             </div>
           </section>
         )}
+
+        <CatalogAd config={catalogAd} className="mt-12" />
       </main>
 
       {isAuthPanelOpen && (
