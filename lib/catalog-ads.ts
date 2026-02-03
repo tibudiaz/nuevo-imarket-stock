@@ -20,6 +20,14 @@ const toStringValue = (value: unknown) => {
   return String(value)
 }
 
+const toArrayValue = (value: unknown) => {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>)
+  }
+  return []
+}
+
 export const normalizeCatalogAdConfig = (data: unknown): CatalogAdConfig => {
   const raw = data && typeof data === "object" ? (data as Record<string, unknown>) : {}
   const rawType = toStringValue(raw.type).toLowerCase()
@@ -28,7 +36,7 @@ export const normalizeCatalogAdConfig = (data: unknown): CatalogAdConfig => {
       ? (rawType as CatalogAdType)
       : "image"
 
-  const assetsSource = Array.isArray(raw.assets) ? raw.assets : []
+  const assetsSource = toArrayValue(raw.assets)
   const normalizedAssets = assetsSource
     .map((asset) => {
       if (!asset || typeof asset !== "object") return null
@@ -47,8 +55,8 @@ export const normalizeCatalogAdConfig = (data: unknown): CatalogAdConfig => {
   const urlsSource =
     normalizedAssets.length > 0
       ? normalizedAssets.map((asset) => asset.url)
-      : Array.isArray(raw.urls)
-        ? raw.urls
+      : toArrayValue(raw.urls).length > 0
+        ? toArrayValue(raw.urls)
         : typeof raw.urls === "string"
           ? raw.urls.split(/[\n,]+/)
           : raw.url
