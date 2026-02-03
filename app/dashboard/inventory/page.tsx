@@ -169,6 +169,14 @@ const getModelSortKey = (product: Product) => {
   };
 };
 
+const getProductDisplayName = (product: Product) => {
+  const name = [product.name, product.brand, product.model]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return name || "producto";
+};
+
 export default function InventoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -641,6 +649,11 @@ export default function InventoryPage() {
   const handleUpdateProduct = async () => {
     if (!editingProduct) return;
     try {
+      const previousProduct = products.find(
+        (product) => product.id === editingProduct.id,
+      );
+      const previousStock = Number(previousProduct?.stock ?? 0);
+      const nextStock = Number(editingProduct.stock ?? 0);
       const productRef = ref(database, `products/${editingProduct.id}`);
       const updatedProduct = {
         ...editingProduct,
@@ -649,6 +662,25 @@ export default function InventoryPage() {
           : editingProduct.entryDate,
       };
       await update(productRef, updatedProduct);
+      if (
+        user?.role === "admin" &&
+        previousProduct &&
+        previousStock !== nextStock
+      ) {
+        try {
+          const historyRef = ref(database, "systemChangeHistory");
+          await set(push(historyRef), {
+            user: user.username,
+            field: "stock",
+            productName: getProductDisplayName(editingProduct),
+            before: previousStock,
+            after: nextStock,
+            createdAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error("Error al registrar el cambio de stock:", error);
+        }
+      }
       setIsEditDialogOpen(false);
       setEditingProduct(null);
       toast.success("Producto actualizado", {
