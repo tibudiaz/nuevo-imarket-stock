@@ -15,12 +15,14 @@ import { database, storage } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator" // Importación añadida
 import { deleteObject, ref as storageRef } from "firebase/storage"
 import type { RepairPhoto } from "@/types/repair"
+import { normalizeCatalogAdConfig, serializeCatalogAdUrls, type CatalogAdConfig, type CatalogAdType } from "@/lib/catalog-ads"
 
 // ... (Interfaces sin cambios)
 interface Product {
@@ -306,6 +308,12 @@ export default function SettingsPage() {
   const [newCatalogStatus, setNewCatalogStatus] = useState("");
   const [catalogVisitCount, setCatalogVisitCount] = useState(0);
   const [usdRateAdjustment, setUsdRateAdjustment] = useState(0);
+  const [catalogAds, setCatalogAds] = useState<Record<string, CatalogAdConfig>>({});
+  const [selectedCatalogAdPage, setSelectedCatalogAdPage] = useState<"landing" | "nuevos" | "usados">("landing");
+  const [catalogAdEnabled, setCatalogAdEnabled] = useState(false);
+  const [catalogAdType, setCatalogAdType] = useState<CatalogAdType>("image");
+  const [catalogAdTitle, setCatalogAdTitle] = useState("");
+  const [catalogAdUrls, setCatalogAdUrls] = useState("");
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -375,6 +383,23 @@ export default function SettingsPage() {
       setOffers(offerList.filter((offer) => offer.text.trim() !== ""));
     });
 
+    const catalogAdsRef = ref(database, "config/catalogAds");
+    onValue(catalogAdsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        setCatalogAds({});
+        return;
+      }
+      const normalized = Object.entries(data).reduce(
+        (acc, [key, value]) => {
+          acc[key] = normalizeCatalogAdConfig(value);
+          return acc;
+        },
+        {} as Record<string, CatalogAdConfig>
+      );
+      setCatalogAds(normalized);
+    });
+
     const newCatalogRef = ref(database, "config/newPhones");
     const unsubscribeNewCatalog = onValue(newCatalogRef, (snapshot) => {
       const data = snapshot.val();
@@ -424,6 +449,21 @@ export default function SettingsPage() {
       unsubscribeNewCatalog();
     };
   }, []);
+
+  useEffect(() => {
+    const current = catalogAds[selectedCatalogAdPage];
+    if (!current) {
+      setCatalogAdEnabled(false);
+      setCatalogAdType("image");
+      setCatalogAdTitle("");
+      setCatalogAdUrls("");
+      return;
+    }
+    setCatalogAdEnabled(current.enabled);
+    setCatalogAdType(current.type);
+    setCatalogAdTitle(current.title ?? "");
+    setCatalogAdUrls(current.urls.join("\n"));
+  }, [catalogAds, selectedCatalogAdPage]);
 
   useEffect(() => {
     const historyRef = ref(database, 'systemChangeHistory');
@@ -507,6 +547,28 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Error al eliminar la oferta:", error);
       toast.error("No se pudo eliminar la oferta.");
+    }
+  };
+
+  const handleSaveCatalogAd = async () => {
+    const urls = serializeCatalogAdUrls(
+      catalogAdUrls.split(/[\n,]+/g)
+    );
+    if (catalogAdEnabled && urls.length === 0) {
+      toast.error("Agregá al menos una URL para mostrar la publicidad.");
+      return;
+    }
+    try {
+      await set(ref(database, `config/catalogAds/${selectedCatalogAdPage}`), {
+        enabled: catalogAdEnabled,
+        type: catalogAdType,
+        title: catalogAdTitle.trim(),
+        urls,
+      });
+      toast.success("Publicidad del catálogo guardada.");
+    } catch (error) {
+      console.error("Error al guardar la publicidad del catálogo:", error);
+      toast.error("No se pudo guardar la publicidad.");
     }
   };
 
@@ -1345,6 +1407,86 @@ export default function SettingsPage() {
                   )}
                 </div>
               </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Publicidad del catálogo</CardTitle>
+              <CardDescription>
+                Cargá imágenes o videos para mostrarlos al final del catálogo y en la selección de
+                nuevos/usados.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Ubicación</Label>
+                  <Select
+                    value={selectedCatalogAdPage}
+                    onValueChange={(value) =>
+                      setSelectedCatalogAdPage(value as "landing" | "nuevos" | "usados")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Elegí la sección" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="landing">Selección de catálogo</SelectItem>
+                      <SelectItem value="nuevos">Catálogo de nuevos</SelectItem>
+                      <SelectItem value="usados">Catálogo de usados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo de contenido</Label>
+                  <Select
+                    value={catalogAdType}
+                    onValueChange={(value) => setCatalogAdType(value as CatalogAdType)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Elegí el formato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="image">Imagen</SelectItem>
+                      <SelectItem value="carousel">Carrusel</SelectItem>
+                      <SelectItem value="video">Video</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="catalog-ad-enabled"
+                  checked={catalogAdEnabled}
+                  onCheckedChange={setCatalogAdEnabled}
+                />
+                <Label htmlFor="catalog-ad-enabled">Mostrar publicidad en esta sección</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="catalog-ad-title">Título</Label>
+                <Input
+                  id="catalog-ad-title"
+                  value={catalogAdTitle}
+                  onChange={(event) => setCatalogAdTitle(event.target.value)}
+                  placeholder="Ej. Accesorios destacados de la semana"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="catalog-ad-urls">URLs de imágenes o video</Label>
+                <Textarea
+                  id="catalog-ad-urls"
+                  value={catalogAdUrls}
+                  onChange={(event) => setCatalogAdUrls(event.target.value)}
+                  placeholder="Pegá una URL por línea. Para carrusel, agregá varias líneas."
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Para video se toma la primera URL. Para imagen se usa la primera URL, y para
+                  carrusel se muestran todas las URLs listadas.
+                </p>
+              </div>
+              <Button onClick={handleSaveCatalogAd}>Guardar publicidad</Button>
             </CardContent>
           </Card>
 

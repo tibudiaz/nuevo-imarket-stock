@@ -8,6 +8,8 @@ import { ArrowRight, Smartphone, Sparkles } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
+import CatalogAd from "@/components/catalog-ad"
+import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
 
 const landingOptions = [
   {
@@ -28,6 +30,7 @@ const landingOptions = [
 
 export default function PublicAccessLanding() {
   const [offers, setOffers] = useState<string[]>([])
+  const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [secretClickCount, setSecretClickCount] = useState(0)
   const router = useRouter()
 
@@ -49,6 +52,20 @@ export default function PublicAccessLanding() {
         })
         .filter((text) => text.trim().length > 0)
       setOffers(items)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const adRef = ref(database, "config/catalogAds/landing")
+    const unsubscribe = onValue(adRef, (snapshot) => {
+      const data = snapshot.val()
+      if (!data) {
+        setCatalogAd(null)
+        return
+      }
+      setCatalogAd(normalizeCatalogAdConfig(data))
     })
 
     return () => unsubscribe()
@@ -208,6 +225,8 @@ export default function PublicAccessLanding() {
             )
           })}
         </section>
+
+        <CatalogAd config={catalogAd} />
       </div>
     </div>
   )
