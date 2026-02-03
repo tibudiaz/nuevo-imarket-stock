@@ -1,10 +1,18 @@
 export type CatalogAdType = "image" | "carousel" | "video"
 
+export type CatalogAdAsset = {
+  url: string
+  path?: string
+  name?: string
+  type?: string
+}
+
 export type CatalogAdConfig = {
   enabled: boolean
   type: CatalogAdType
   title?: string
   urls: string[]
+  assets?: CatalogAdAsset[]
 }
 
 const toStringValue = (value: unknown) => {
@@ -20,13 +28,32 @@ export const normalizeCatalogAdConfig = (data: unknown): CatalogAdConfig => {
       ? (rawType as CatalogAdType)
       : "image"
 
-  const urlsSource = Array.isArray(raw.urls)
-    ? raw.urls
-    : typeof raw.urls === "string"
-      ? raw.urls.split(/[\n,]+/)
-      : raw.url
-        ? [raw.url]
-        : []
+  const assetsSource = Array.isArray(raw.assets) ? raw.assets : []
+  const normalizedAssets = assetsSource
+    .map((asset) => {
+      if (!asset || typeof asset !== "object") return null
+      const assetRecord = asset as Record<string, unknown>
+      const url = toStringValue(assetRecord.url).trim()
+      if (!url) return null
+      return {
+        url,
+        path: toStringValue(assetRecord.path).trim() || undefined,
+        name: toStringValue(assetRecord.name).trim() || undefined,
+        type: toStringValue(assetRecord.type).trim() || undefined,
+      } satisfies CatalogAdAsset
+    })
+    .filter((asset): asset is CatalogAdAsset => Boolean(asset))
+
+  const urlsSource =
+    normalizedAssets.length > 0
+      ? normalizedAssets.map((asset) => asset.url)
+      : Array.isArray(raw.urls)
+        ? raw.urls
+        : typeof raw.urls === "string"
+          ? raw.urls.split(/[\n,]+/)
+          : raw.url
+            ? [raw.url]
+            : []
 
   const urls = urlsSource
     .map((value) => toStringValue(value).trim())
@@ -37,6 +64,7 @@ export const normalizeCatalogAdConfig = (data: unknown): CatalogAdConfig => {
     type,
     title: toStringValue(raw.title).trim() || undefined,
     urls,
+    assets: normalizedAssets.length > 0 ? normalizedAssets : undefined,
   }
 }
 

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Check, ChevronsUpDown, Loader2, PlusCircle, Trash, X } from "lucide-react"
+import { Check, ChevronsUpDown, Copy, Loader2, PlusCircle, Smartphone, Trash, UploadCloud, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ref, onValue, set, push, remove, get, update } from "firebase/database"
@@ -20,9 +21,12 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator" // Importación añadida
-import { deleteObject, ref as storageRef } from "firebase/storage"
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import QRCode from "qrcode"
 import type { RepairPhoto } from "@/types/repair"
-import { normalizeCatalogAdConfig, serializeCatalogAdUrls, type CatalogAdConfig, type CatalogAdType } from "@/lib/catalog-ads"
+import { normalizeCatalogAdConfig, type CatalogAdAsset, type CatalogAdConfig, type CatalogAdType } from "@/lib/catalog-ads"
+import { getAppBaseUrl } from "@/lib/base-url"
 
 // ... (Interfaces sin cambios)
 interface Product {
@@ -153,6 +157,35 @@ const parseOptionalNumber = (value: unknown): number | undefined => {
     }
   }
   return undefined;
+};
+
+const generateUploadSessionId = () => {
+  if (
+    typeof globalThis !== "undefined" &&
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const mergeCatalogAdAssets = (
+  current: CatalogAdAsset[],
+  incoming: CatalogAdAsset[]
+): CatalogAdAsset[] => {
+  const map = new Map<string, CatalogAdAsset>();
+  current.forEach((asset) => {
+    map.set(asset.path || asset.url, asset);
+  });
+  incoming.forEach((asset) => {
+    const key = asset.path || asset.url;
+    if (!map.has(key)) {
+      map.set(key, asset);
+    }
+  });
+  return Array.from(map.values());
 };
 
 const createDefaultFinancingConfig = (): FinancingConfig => ({
@@ -313,7 +346,13 @@ export default function SettingsPage() {
   const [catalogAdEnabled, setCatalogAdEnabled] = useState(false);
   const [catalogAdType, setCatalogAdType] = useState<CatalogAdType>("image");
   const [catalogAdTitle, setCatalogAdTitle] = useState("");
-  const [catalogAdUrls, setCatalogAdUrls] = useState("");
+  const [catalogAdAssets, setCatalogAdAssets] = useState<CatalogAdAsset[]>([]);
+  const [isCatalogAdUploadOpen, setIsCatalogAdUploadOpen] = useState(false);
+  const [catalogAdUploadSessionId, setCatalogAdUploadSessionId] = useState<string | null>(null);
+  const [catalogAdUploadQr, setCatalogAdUploadQr] = useState("");
+  const [catalogAdUploadOrigin, setCatalogAdUploadOrigin] = useState("");
+  const [catalogAdUploadTargetPage, setCatalogAdUploadTargetPage] = useState<"landing" | "nuevos" | "usados">("landing");
+  const [isCatalogAdUploading, setIsCatalogAdUploading] = useState(false);
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -456,13 +495,17 @@ export default function SettingsPage() {
       setCatalogAdEnabled(false);
       setCatalogAdType("image");
       setCatalogAdTitle("");
-      setCatalogAdUrls("");
+      setCatalogAdAssets([]);
       return;
     }
     setCatalogAdEnabled(current.enabled);
     setCatalogAdType(current.type);
     setCatalogAdTitle(current.title ?? "");
-    setCatalogAdUrls(current.urls.join("\n"));
+    if (current.assets && current.assets.length > 0) {
+      setCatalogAdAssets(current.assets);
+    } else {
+      setCatalogAdAssets(current.urls.map((url) => ({ url })));
+    }
   }, [catalogAds, selectedCatalogAdPage]);
 
   useEffect(() => {
@@ -496,6 +539,78 @@ export default function SettingsPage() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const resolvedOrigin = getAppBaseUrl();
+    setCatalogAdUploadOrigin(resolvedOrigin);
+  }, []);
+
+  useEffect(() => {
+    if (!isCatalogAdUploadOpen) {
+      setCatalogAdUploadSessionId(null);
+      setCatalogAdUploadQr("");
+      return;
+    }
+    const newSession = generateUploadSessionId();
+    setCatalogAdUploadSessionId(newSession);
+  }, [isCatalogAdUploadOpen]);
+
+  useEffect(() => {
+    if (isCatalogAdUploadOpen) {
+      setCatalogAdUploadTargetPage(selectedCatalogAdPage);
+    }
+  }, [isCatalogAdUploadOpen, selectedCatalogAdPage]);
+
+  useEffect(() => {
+    if (!catalogAdUploadSessionId) return;
+    const sessionRef = ref(database, `catalogAdUploadSessions/${catalogAdUploadSessionId}`);
+    set(sessionRef, {
+      createdAt: new Date().toISOString(),
+      page: catalogAdUploadTargetPage,
+      type: catalogAdType,
+      status: "pending",
+    }).catch((error) => {
+      console.error("Error al crear la sesión de carga de publicidad:", error);
+    });
+
+    const filesRef = ref(database, `catalogAdUploadSessions/${catalogAdUploadSessionId}/files`);
+    const unsubscribe = onValue(filesRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+      const assets = Object.values(snapshot.val()).map((value) => {
+        const payload = value as Record<string, unknown>;
+        return {
+          url: String(payload.url ?? ""),
+          path: typeof payload.path === "string" ? payload.path : undefined,
+          name: typeof payload.name === "string" ? payload.name : undefined,
+          type: typeof payload.type === "string" ? payload.type : undefined,
+        } satisfies CatalogAdAsset;
+      }).filter((asset) => asset.url.length > 0);
+      setCatalogAdAssets((prev) => mergeCatalogAdAssets(prev, assets));
+    });
+
+    return () => unsubscribe();
+  }, [catalogAdUploadSessionId, catalogAdUploadTargetPage, catalogAdType]);
+
+  useEffect(() => {
+    if (!catalogAdUploadSessionId) {
+      setCatalogAdUploadQr("");
+      return;
+    }
+    const resolvedOrigin =
+      catalogAdUploadOrigin ||
+      getAppBaseUrl() ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    if (!resolvedOrigin) {
+      setCatalogAdUploadQr("");
+      return;
+    }
+    const url = `${resolvedOrigin}/catalog-ads/mobile-upload?sessionId=${catalogAdUploadSessionId}`;
+    QRCode.toDataURL(url, { width: 300 })
+      .then(setCatalogAdUploadQr)
+      .catch((error) => {
+        console.error("No se pudo generar el código QR de publicidad", error);
+      });
+  }, [catalogAdUploadOrigin, catalogAdUploadSessionId]);
 
   const resetForm = () => {
     setRuleName("");
@@ -550,12 +665,65 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCatalogAdFilesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files?.length) return;
+    const files = Array.from(event.target.files);
+    setIsCatalogAdUploading(true);
+    try {
+      if (catalogAdType === "video" && catalogAdAssets.length > 0) {
+        await Promise.all(
+          catalogAdAssets.map((asset) =>
+            asset.path ? deleteObject(storageRef(storage, asset.path)) : Promise.resolve()
+          )
+        );
+        setCatalogAdAssets([]);
+      }
+
+      for (const file of files) {
+        const storagePath = `catalog-ads/${selectedCatalogAdPage}/${Date.now()}-${file.name}`;
+        const fileRef = storageRef(storage, storagePath);
+        await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(fileRef);
+        const newAsset: CatalogAdAsset = {
+          url,
+          path: storagePath,
+          name: file.name,
+          type: file.type,
+        };
+        setCatalogAdAssets((prev) => mergeCatalogAdAssets(prev, [newAsset]));
+      }
+      toast.success("Archivos cargados correctamente.");
+    } catch (error) {
+      console.error("Error al subir archivos de publicidad:", error);
+      toast.error("No se pudieron subir los archivos.");
+    } finally {
+      event.target.value = "";
+      setIsCatalogAdUploading(false);
+    }
+  };
+
+  const handleRemoveCatalogAdAsset = async (asset: CatalogAdAsset) => {
+    try {
+      if (asset.path) {
+        await deleteObject(storageRef(storage, asset.path));
+      }
+      setCatalogAdAssets((prev) =>
+        prev.filter((item) => (item.path || item.url) !== (asset.path || asset.url))
+      );
+      toast.success("Archivo eliminado.");
+    } catch (error) {
+      console.error("Error al eliminar el archivo del storage:", error);
+      toast.error("No se pudo eliminar el archivo.");
+    }
+  };
+
   const handleSaveCatalogAd = async () => {
-    const urls = serializeCatalogAdUrls(
-      catalogAdUrls.split(/[\n,]+/g)
-    );
+    const cleanedAssets = catalogAdAssets.filter((asset) => asset.url.trim().length > 0);
+    const normalizedAssets =
+      catalogAdType === "video" ? cleanedAssets.slice(0, 1) : cleanedAssets;
+    const urls = normalizedAssets.map((asset) => asset.url);
     if (catalogAdEnabled && urls.length === 0) {
-      toast.error("Agregá al menos una URL para mostrar la publicidad.");
+      toast.error("Agregá al menos un archivo para mostrar la publicidad.");
       return;
     }
     try {
@@ -564,6 +732,7 @@ export default function SettingsPage() {
         type: catalogAdType,
         title: catalogAdTitle.trim(),
         urls,
+        assets: normalizedAssets,
       });
       toast.success("Publicidad del catálogo guardada.");
     } catch (error) {
@@ -1106,6 +1275,15 @@ export default function SettingsPage() {
     return `${user} realizó una modificación en el sistema.`;
   };
 
+  const catalogAdFileAccept = catalogAdType === "video" ? "video/*" : "image/*";
+  const catalogAdAllowMultiple = catalogAdType !== "video";
+  const catalogAdResolvedOrigin =
+    catalogAdUploadOrigin || (typeof window !== "undefined" ? window.location.origin : "");
+  const catalogAdUploadLink =
+    catalogAdUploadSessionId && catalogAdResolvedOrigin
+      ? `${catalogAdResolvedOrigin}/catalog-ads/mobile-upload?sessionId=${catalogAdUploadSessionId}`
+      : "";
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-8">
@@ -1473,22 +1651,155 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="catalog-ad-urls">URLs de imágenes o video</Label>
-                <Textarea
-                  id="catalog-ad-urls"
-                  value={catalogAdUrls}
-                  onChange={(event) => setCatalogAdUrls(event.target.value)}
-                  placeholder="Pegá una URL por línea. Para carrusel, agregá varias líneas."
-                  rows={4}
-                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>Archivos cargados</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCatalogAdUploadOpen(true)}
+                  >
+                    <UploadCloud className="mr-2 h-4 w-4" />
+                    Subir archivos
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Para video se toma la primera URL. Para imagen se usa la primera URL, y para
-                  carrusel se muestran todas las URLs listadas.
+                  Podés subir imágenes o videos desde esta PC o desde tu celular.{" "}
+                  {catalogAdType === "video"
+                    ? "Para video se utilizará el primer archivo cargado."
+                    : "Para carrusel se muestran todas las imágenes cargadas."}
                 </p>
+                <div className="space-y-2">
+                  {catalogAdAssets.length === 0 ? (
+                    <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      No hay archivos cargados.
+                    </p>
+                  ) : (
+                    catalogAdAssets.map((asset, index) => {
+                      const isVideo = asset.type?.startsWith("video") || catalogAdType === "video";
+                      return (
+                        <div
+                          key={`${asset.path || asset.url}-${index}`}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-2"
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <Badge variant="secondary">{isVideo ? "Video" : "Imagen"}</Badge>
+                            <span className="min-w-0 truncate text-sm">
+                              {asset.name || asset.url}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => handleRemoveCatalogAdAsset(asset)}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
               <Button onClick={handleSaveCatalogAd}>Guardar publicidad</Button>
             </CardContent>
           </Card>
+
+          <Dialog open={isCatalogAdUploadOpen} onOpenChange={setIsCatalogAdUploadOpen}>
+            <DialogContent className="sm:max-w-[720px]">
+              <DialogHeader>
+                <DialogTitle>Subir archivos de publicidad</DialogTitle>
+                <DialogDescription>
+                  Elegí si querés cargar las imágenes o videos desde esta PC o desde tu celular.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold">Subir desde esta PC</h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="catalog-ad-files">Seleccioná archivos</Label>
+                    <Input
+                      id="catalog-ad-files"
+                      type="file"
+                      accept={catalogAdFileAccept}
+                      multiple={catalogAdAllowMultiple}
+                      onChange={handleCatalogAdFilesUpload}
+                      disabled={isCatalogAdUploading}
+                    />
+                    {isCatalogAdUploading && (
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Subiendo archivos...
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold">Subir desde el celular</h4>
+                  <div className="flex flex-col items-center gap-2 rounded-md border p-4">
+                    {catalogAdUploadQr ? (
+                      <Image
+                        src={catalogAdUploadQr}
+                        alt="Código QR para subir publicidad"
+                        width={160}
+                        height={160}
+                        className="h-40 w-40"
+                      />
+                    ) : (
+                      <div className="flex h-40 w-40 items-center justify-center text-sm text-muted-foreground">
+                        Generando QR...
+                      </div>
+                    )}
+                    <span className="text-xs text-muted-foreground">Escanealo con tu celular</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (!catalogAdUploadLink) {
+                          toast.error("El enlace todavía no está disponible.");
+                          return;
+                        }
+                        if (navigator.clipboard?.writeText) {
+                          navigator.clipboard
+                            .writeText(catalogAdUploadLink)
+                            .then(() => toast.success("Enlace copiado al portapapeles"))
+                            .catch(() => toast.error("No se pudo copiar el enlace"));
+                        } else {
+                          toast.error("No se pudo copiar el enlace.");
+                        }
+                      }}
+                      disabled={!catalogAdUploadLink}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copiar enlace
+                    </Button>
+                    <a
+                      href={catalogAdUploadLink || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+                        catalogAdUploadLink
+                          ? "hover:bg-muted"
+                          : "cursor-not-allowed text-muted-foreground"
+                      )}
+                    >
+                      <Smartphone className="h-4 w-4" />
+                      Abrir en el celular
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsCatalogAdUploadOpen(false)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Card>
             <CardHeader>
