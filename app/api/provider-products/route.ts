@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 
-export const dynamic = "force-dynamic"
-export const revalidate = 0
+export const dynamic = "force-static"
 
 const DEFAULT_RANGES = ["B:B", "C:C", "E:E", "F:F"]
 
@@ -45,9 +44,7 @@ export async function GET() {
   endpoint.searchParams.set("key", apiKey)
 
   try {
-    const response = await fetch(endpoint.toString(), {
-      cache: "no-store",
-    })
+    const response = await fetch(endpoint.toString())
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}))
