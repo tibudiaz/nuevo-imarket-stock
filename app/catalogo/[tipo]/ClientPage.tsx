@@ -86,7 +86,6 @@ interface Sale {
 const CATEGORY_NEW = "Celulares Nuevos"
 const CATEGORY_USED = "Celulares Usados"
 const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000
-const CATALOG_BLUE_SURCHARGE = 10
 const CATALOG_RATE_REFRESH_MS = 10 * 60 * 1000
 
 const CATALOG_TYPES = {
@@ -333,6 +332,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const [products, setProducts] = useState<Product[]>([])
   const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([])
   const [usdRate, setUsdRate] = useState(0)
+  const [usdRateAdjustment, setUsdRateAdjustment] = useState(0)
   const [loading, setLoading] = useState(true)
   const [catalogVisibility, setCatalogVisibility] = useState({
     newPhones: true,
@@ -593,6 +593,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   }, [cacheKey, catalogType])
 
   useEffect(() => {
+    const adjustmentRef = ref(database, "config/usdRateAdjustment")
+    const unsubscribeAdjustment = onValue(adjustmentRef, (snapshot) => {
+      const value = snapshot.val()
+      setUsdRateAdjustment(typeof value === "number" && Number.isFinite(value) ? value : 0)
+    })
+
+    return () => unsubscribeAdjustment()
+  }, [])
+
+  useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
         const response = await fetch("/api/dolar-blue")
@@ -601,7 +611,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         }
         const data = await response.json()
         const nextRate =
-          typeof data.venta === "number" ? data.venta + CATALOG_BLUE_SURCHARGE : 0
+          typeof data.venta === "number" ? data.venta + usdRateAdjustment : 0
         setUsdRate(nextRate)
         if (catalogType) {
           writeCatalogCache(cacheKey, { usdRate: nextRate })
@@ -616,7 +626,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     const intervalId = setInterval(fetchDolarBlue, CATALOG_RATE_REFRESH_MS)
 
     return () => clearInterval(intervalId)
-  }, [cacheKey, catalogType])
+  }, [cacheKey, catalogType, usdRateAdjustment])
 
   const handlePurchaseStatusChange = (status: "yes" | "no") => {
     setPurchaseStatus(status)

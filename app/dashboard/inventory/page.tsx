@@ -120,7 +120,6 @@ interface Category {
 
 const NEW_PRODUCT_STORAGE_KEY = "inventory-new-product";
 const NEW_PRODUCT_DIALOG_OPEN_KEY = "inventory-new-product-open";
-const CATALOG_BLUE_SURCHARGE = 10;
 const DOLAR_BLUE_REFRESH_MS = 10 * 60 * 1000;
 
 const getStoreFromSelection = (
@@ -187,6 +186,7 @@ export default function InventoryPage() {
     cost: true,
   });
   const [usdRate, setUsdRate] = useState(0);
+  const [usdRateAdjustment, setUsdRateAdjustment] = useState(0);
   const [catalogVisibility, setCatalogVisibility] = useState({
     newPhones: true,
     usedPhones: true,
@@ -300,6 +300,18 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
+    const adjustmentRef = ref(database, "config/usdRateAdjustment");
+    const unsubscribeAdjustment = onValue(adjustmentRef, (snapshot) => {
+      const value = snapshot.val();
+      setUsdRateAdjustment(
+        typeof value === "number" && Number.isFinite(value) ? value : 0,
+      );
+    });
+
+    return () => unsubscribeAdjustment();
+  }, []);
+
+  useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
         const response = await fetch("/api/dolar-blue");
@@ -308,7 +320,7 @@ export default function InventoryPage() {
         }
         const data = await response.json();
         const nextRate =
-          typeof data.venta === "number" ? data.venta + CATALOG_BLUE_SURCHARGE : 0;
+          typeof data.venta === "number" ? data.venta + usdRateAdjustment : 0;
         setUsdRate(nextRate);
       } catch (error) {
         console.error("Error al obtener dólar blue:", error);
@@ -320,7 +332,7 @@ export default function InventoryPage() {
     const intervalId = setInterval(fetchDolarBlue, DOLAR_BLUE_REFRESH_MS);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [usdRateAdjustment]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
