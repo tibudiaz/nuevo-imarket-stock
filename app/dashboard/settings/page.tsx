@@ -604,7 +604,7 @@ export default function SettingsPage() {
       setCatalogAdUploadQr("");
       return;
     }
-    const url = `${resolvedOrigin}/catalog-ads/mobile-upload?sessionId=${catalogAdUploadSessionId}`;
+    const url = `${resolvedOrigin}/catalog-ads/mobile-upload?sessionId=${catalogAdUploadSessionId}&page=${catalogAdUploadTargetPage}&type=${catalogAdType}`;
     QRCode.toDataURL(url, { width: 300 })
       .then(setCatalogAdUploadQr)
       .catch((error) => {
@@ -1281,7 +1281,7 @@ export default function SettingsPage() {
     catalogAdUploadOrigin || (typeof window !== "undefined" ? window.location.origin : "");
   const catalogAdUploadLink =
     catalogAdUploadSessionId && catalogAdResolvedOrigin
-      ? `${catalogAdResolvedOrigin}/catalog-ads/mobile-upload?sessionId=${catalogAdUploadSessionId}`
+      ? `${catalogAdResolvedOrigin}/catalog-ads/mobile-upload?sessionId=${catalogAdUploadSessionId}&page=${catalogAdUploadTargetPage}&type=${catalogAdType}`
       : "";
 
   return (
