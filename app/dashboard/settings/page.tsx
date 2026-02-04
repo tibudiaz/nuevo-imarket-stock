@@ -346,6 +346,7 @@ export default function SettingsPage() {
   const [catalogAdEnabled, setCatalogAdEnabled] = useState(false);
   const [catalogAdType, setCatalogAdType] = useState<CatalogAdType>("image");
   const [catalogAdTitle, setCatalogAdTitle] = useState("");
+  const [catalogAdIntervalSeconds, setCatalogAdIntervalSeconds] = useState(5);
   const [catalogAdAssets, setCatalogAdAssets] = useState<CatalogAdAsset[]>([]);
   const [isCatalogAdUploadOpen, setIsCatalogAdUploadOpen] = useState(false);
   const [catalogAdUploadSessionId, setCatalogAdUploadSessionId] = useState<string | null>(null);
@@ -495,12 +496,14 @@ export default function SettingsPage() {
       setCatalogAdEnabled(false);
       setCatalogAdType("image");
       setCatalogAdTitle("");
+      setCatalogAdIntervalSeconds(5);
       setCatalogAdAssets([]);
       return;
     }
     setCatalogAdEnabled(current.enabled);
     setCatalogAdType(current.type);
     setCatalogAdTitle(current.title ?? "");
+    setCatalogAdIntervalSeconds(current.carouselIntervalSeconds ?? 5);
     if (current.assets && current.assets.length > 0) {
       setCatalogAdAssets(current.assets);
     } else {
@@ -731,6 +734,7 @@ export default function SettingsPage() {
         enabled: catalogAdEnabled,
         type: catalogAdType,
         title: catalogAdTitle.trim(),
+        carouselIntervalSeconds: catalogAdIntervalSeconds,
         urls,
         assets: normalizedAssets,
       });
@@ -1650,6 +1654,28 @@ export default function SettingsPage() {
                   placeholder="Ej. Accesorios destacados de la semana"
                 />
               </div>
+              {catalogAdType === "carousel" && (
+                <div className="space-y-2">
+                  <Label htmlFor="catalog-ad-interval">
+                    Intervalo del carrusel (segundos)
+                  </Label>
+                  <Input
+                    id="catalog-ad-interval"
+                    type="number"
+                    min={1}
+                    value={catalogAdIntervalSeconds}
+                    onChange={(event) => {
+                      const value = Number(event.target.value)
+                      setCatalogAdIntervalSeconds(
+                        Number.isFinite(value) && value > 0 ? value : 1
+                      )
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Definí cada cuánto tiempo cambia la imagen del carrusel.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label>Archivos cargados</Label>
