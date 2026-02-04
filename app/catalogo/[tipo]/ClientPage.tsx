@@ -1367,8 +1367,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
       <main className="mx-auto w-full max-w-6xl px-6 pb-20">
         <div className="flex flex-col gap-12">
-          <CatalogAd config={catalogAd} className="order-1 md:order-2 md:mt-12" />
-          <div className="order-2 md:order-1">
+          <div className="order-1 md:order-1">
             {loading ? (
               <div className="flex items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 text-slate-300">
                 <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-400 border-t-transparent" />
@@ -1557,6 +1556,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               </section>
             )}
           </div>
+          <CatalogAd config={catalogAd} className="order-last md:order-2 md:mt-12" />
         </div>
       </main>
 
