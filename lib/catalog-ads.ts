@@ -11,6 +11,7 @@ export type CatalogAdConfig = {
   enabled: boolean
   type: CatalogAdType
   title?: string
+  carouselIntervalSeconds?: number
   urls: string[]
   assets?: CatalogAdAsset[]
 }
@@ -26,6 +27,15 @@ const toArrayValue = (value: unknown) => {
     return Object.values(value as Record<string, unknown>)
   }
   return []
+}
+
+const toNumberValue = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value.replace(",", "."))
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  return undefined
 }
 
 export const normalizeCatalogAdConfig = (data: unknown): CatalogAdConfig => {
@@ -71,6 +81,13 @@ export const normalizeCatalogAdConfig = (data: unknown): CatalogAdConfig => {
     enabled: Boolean(raw.enabled),
     type,
     title: toStringValue(raw.title).trim() || undefined,
+    carouselIntervalSeconds: (() => {
+      const intervalSeconds = toNumberValue(raw.carouselIntervalSeconds)
+      if (intervalSeconds && intervalSeconds > 0) return intervalSeconds
+      const intervalMs = toNumberValue(raw.carouselIntervalMs)
+      if (intervalMs && intervalMs > 0) return intervalMs / 1000
+      return undefined
+    })(),
     urls,
     assets: normalizedAssets.length > 0 ? normalizedAssets : undefined,
   }
