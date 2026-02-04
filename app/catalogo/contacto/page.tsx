@@ -80,6 +80,10 @@ export default function CatalogoContactoPage() {
             )
           })}
         </section>
+
+        <footer className="pt-6 text-center text-xs text-slate-400">
+          sitio creado por Grupo iMarket. Todos los derechos reservados
+        </footer>
       </div>
     </div>
   )

@@ -6,8 +6,6 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
   type CarouselApi,
 } from "@/components/ui/carousel"
 import type { CatalogAdConfig } from "@/lib/catalog-ads"
@@ -20,6 +18,8 @@ type CatalogAdProps = {
 export default function CatalogAd({ config, className }: CatalogAdProps) {
   if (!config?.enabled || !config.urls.length) return null
   const [carouselApi, setCarouselApi] = React.useState<CarouselApi | null>(null)
+  const [selectedIndex, setSelectedIndex] = React.useState(0)
+  const [snapCount, setSnapCount] = React.useState(0)
 
   React.useEffect(() => {
     if (config.type !== "carousel" || !carouselApi || config.urls.length < 2) {
@@ -35,10 +35,25 @@ export default function CatalogAd({ config, className }: CatalogAdProps) {
     return () => window.clearInterval(interval)
   }, [carouselApi, config.carouselIntervalSeconds, config.type, config.urls.length])
 
+  React.useEffect(() => {
+    if (config.type !== "carousel" || !carouselApi) return
+    setSnapCount(carouselApi.scrollSnapList().length)
+    const updateSelected = () => {
+      setSelectedIndex(carouselApi.selectedScrollSnap())
+    }
+    updateSelected()
+    carouselApi.on("select", updateSelected)
+    carouselApi.on("reInit", updateSelected)
+    return () => {
+      carouselApi.off("select", updateSelected)
+      carouselApi.off("reInit", updateSelected)
+    }
+  }, [carouselApi, config.type])
+
   return (
     <section
       className={cn(
-        "relative left-1/2 right-1/2 mt-10 w-screen -translate-x-1/2 overflow-hidden",
+        "relative left-1/2 right-1/2 mt-10 w-screen -translate-x-1/2 overflow-hidden px-[2%] md:px-0",
         className
       )}
     >
@@ -70,8 +85,23 @@ export default function CatalogAd({ config, className }: CatalogAdProps) {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious className="left-4 border-white/10 bg-slate-950/70 text-white hover:bg-slate-900/80" />
-          <CarouselNext className="right-4 border-white/10 bg-slate-950/70 text-white hover:bg-slate-900/80" />
+          {snapCount > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              {Array.from({ length: snapCount }).map((_, index) => (
+                <button
+                  key={`catalog-ad-dot-${index}`}
+                  type="button"
+                  className={cn(
+                    "h-2 w-2 rounded-full transition",
+                    index === selectedIndex ? "bg-white" : "bg-white/40 hover:bg-white/70"
+                  )}
+                  aria-label={`Ir a la imagen ${index + 1}`}
+                  aria-current={index === selectedIndex ? "true" : "false"}
+                  onClick={() => carouselApi?.scrollTo(index)}
+                />
+              ))}
+            </div>
+          )}
         </Carousel>
       ) : (
         <div className="h-[220px] overflow-hidden md:h-[360px]">
