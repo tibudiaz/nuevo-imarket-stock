@@ -232,6 +232,24 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
   }, [origin, signatureSessionId]);
 
   useEffect(() => {
+    if (!signatureLink) return;
+    const store = completedRepair?.store ?? null;
+    if (!store) return;
+    const mostrador = store === "local2" ? "mostrador2" : "mostrador1";
+    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`);
+    set(mostradorRef, signatureLink).catch(() => null);
+  }, [completedRepair?.store, signatureLink]);
+
+  useEffect(() => {
+    if (!signatureData?.url) return;
+    const store = completedRepair?.store ?? null;
+    if (!store) return;
+    const mostrador = store === "local2" ? "mostrador2" : "mostrador1";
+    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`);
+    set(mostradorRef, null).catch(() => null);
+  }, [completedRepair?.store, signatureData?.url]);
+
+  useEffect(() => {
     if (!signatureSessionRefPath) return;
     const sessionRef = ref(database, signatureSessionRefPath);
     const unsubscribe = onValue(sessionRef, (snapshot) => {
