@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ref, runTransaction, onValue, update, set } from "firebase/database";
+import { ref, runTransaction, onValue, update, set, remove } from "firebase/database";
 import { database } from "@/lib/firebase";
 import {
   Dialog,
@@ -142,10 +142,19 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
     if (!signatureLink) return;
     const store = completedDeliveryRepair?.store ?? repair?.store ?? null;
     if (!store) return;
-    const mostrador = store === "local2" ? "mostrador2" : "mostrador1";
-    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`);
-    set(mostradorRef, signatureLink).catch(() => null);
+    const localId = store === "local2" ? "2" : "1";
+    const qrRef = ref(database, `locales/local_${localId}/qr_pendiente`);
+    set(qrRef, signatureLink).catch(() => null);
   }, [completedDeliveryRepair?.store, repair?.store, signatureLink]);
+
+  useEffect(() => {
+    const store = completedDeliveryRepair?.store ?? repair?.store ?? null;
+    if (!store) return;
+    if (!signatureData?.url && signatureStatus !== "closed") return;
+    const localId = store === "local2" ? "2" : "1";
+    const qrRef = ref(database, `locales/local_${localId}/qr_pendiente`);
+    remove(qrRef).catch(() => null);
+  }, [completedDeliveryRepair?.store, repair?.store, signatureData?.url, signatureStatus]);
 
   useEffect(() => {
     if (!signatureSessionRefPath) return;

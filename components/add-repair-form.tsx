@@ -235,10 +235,19 @@ export default function AddRepairForm({ isOpen, onClose, onAddRepair }: AddRepai
     if (!signatureLink) return;
     const store = completedRepair?.store ?? null;
     if (!store) return;
-    const mostrador = store === "local2" ? "mostrador2" : "mostrador1";
-    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`);
-    set(mostradorRef, signatureLink).catch(() => null);
+    const localId = store === "local2" ? "2" : "1";
+    const qrRef = ref(database, `locales/local_${localId}/qr_pendiente`);
+    set(qrRef, signatureLink).catch(() => null);
   }, [completedRepair?.store, signatureLink]);
+
+  useEffect(() => {
+    const store = completedRepair?.store ?? null;
+    if (!store) return;
+    if (!signatureData?.url && signatureStatus !== "closed") return;
+    const localId = store === "local2" ? "2" : "1";
+    const qrRef = ref(database, `locales/local_${localId}/qr_pendiente`);
+    remove(qrRef).catch(() => null);
+  }, [completedRepair?.store, signatureData?.url, signatureStatus]);
 
   useEffect(() => {
     if (!signatureSessionRefPath) return;
