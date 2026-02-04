@@ -362,6 +362,20 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   }, [signatureOrigin, signatureSessionId])
 
   useEffect(() => {
+    if (!signatureLink || !saleStore) return
+    const mostrador = saleStore === "local2" ? "mostrador2" : "mostrador1"
+    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`)
+    set(mostradorRef, signatureLink).catch(() => null)
+  }, [saleStore, signatureLink])
+
+  useEffect(() => {
+    if (!signatureData?.url || !saleStore) return
+    const mostrador = saleStore === "local2" ? "mostrador2" : "mostrador1"
+    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`)
+    set(mostradorRef, null).catch(() => null)
+  }, [saleStore, signatureData?.url])
+
+  useEffect(() => {
     if (!signatureSessionRefPath) return
 
     const sessionRef = ref(database, signatureSessionRefPath)
