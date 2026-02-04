@@ -363,10 +363,18 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
 
   useEffect(() => {
     if (!signatureLink || !saleStore) return
-    const mostrador = saleStore === "local2" ? "mostrador2" : "mostrador1"
-    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`)
-    set(mostradorRef, signatureLink).catch(() => null)
+    const localId = saleStore === "local2" ? "2" : "1"
+    const qrRef = ref(database, `locales/local_${localId}/qr_pendiente`)
+    set(qrRef, signatureLink).catch(() => null)
   }, [saleStore, signatureLink])
+
+  useEffect(() => {
+    if (!saleStore) return
+    if (!signatureData?.url && signatureStatus !== "closed") return
+    const localId = saleStore === "local2" ? "2" : "1"
+    const qrRef = ref(database, `locales/local_${localId}/qr_pendiente`)
+    remove(qrRef).catch(() => null)
+  }, [saleStore, signatureData?.url, signatureStatus])
 
   useEffect(() => {
     if (!signatureSessionRefPath) return
