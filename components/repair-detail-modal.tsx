@@ -139,6 +139,15 @@ export default function RepairDetailModal({ isOpen, onClose, repair, onUpdate }:
   }, [origin, signatureSessionId]);
 
   useEffect(() => {
+    if (!signatureLink) return;
+    const store = completedDeliveryRepair?.store ?? repair?.store ?? null;
+    if (!store) return;
+    const mostrador = store === "local2" ? "mostrador2" : "mostrador1";
+    const mostradorRef = ref(database, `mostradores/${mostrador}/qr_link`);
+    set(mostradorRef, signatureLink).catch(() => null);
+  }, [completedDeliveryRepair?.store, repair?.store, signatureLink]);
+
+  useEffect(() => {
     if (!signatureSessionRefPath) return;
     const sessionRef = ref(database, signatureSessionRefPath);
     const unsubscribe = onValue(sessionRef, (snapshot) => {
