@@ -192,9 +192,9 @@ export default function PublicAccessLanding() {
             </div>
           </header>
 
-          <CatalogAd config={catalogAd} className="order-2 md:order-3" />
+          <CatalogAd config={catalogAd} className="order-last md:order-3" />
 
-          <section className="order-3 grid gap-6 md:order-2 md:grid-cols-2">
+          <section className="order-2 grid gap-6 md:order-2 md:grid-cols-2">
             {landingOptions.map((option) => {
               const Icon = option.icon
               return (
