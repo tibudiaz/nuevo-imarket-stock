@@ -60,7 +60,7 @@ export default function CatalogAd({ config, className }: CatalogAdProps) {
       {config.type === "video" ? (
         <video
           controls
-          className="h-[220px] w-full object-cover md:h-[360px]"
+          className="h-[220px] w-full object-contain md:h-[360px]"
           src={config.urls[0]}
         >
           Tu navegador no soporta la reproducción de video.
@@ -74,11 +74,11 @@ export default function CatalogAd({ config, className }: CatalogAdProps) {
           <CarouselContent>
             {config.urls.map((url, index) => (
               <CarouselItem key={`${url}-${index}`}>
-                <div className="h-[220px] overflow-hidden md:h-[360px]">
+                <div className="h-[220px] overflow-hidden bg-black/10 md:h-[360px]">
                   <img
                     src={url}
                     alt={config.title ? `${config.title} ${index + 1}` : `Anuncio ${index + 1}`}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     loading="lazy"
                   />
                 </div>
@@ -104,11 +104,11 @@ export default function CatalogAd({ config, className }: CatalogAdProps) {
           )}
         </Carousel>
       ) : (
-        <div className="h-[220px] overflow-hidden md:h-[360px]">
+        <div className="h-[220px] overflow-hidden bg-black/10 md:h-[360px]">
           <img
             src={config.urls[0]}
             alt={config.title || "Anuncio"}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             loading="lazy"
           />
         </div>
