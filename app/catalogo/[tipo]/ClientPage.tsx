@@ -1560,6 +1560,10 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         </div>
       </main>
 
+      <footer className="mx-auto w-full max-w-6xl px-6 pb-12 text-center text-xs text-slate-400">
+        sitio creado por Grupo iMarket. Todos los derechos reservados
+      </footer>
+
       {isAuthPanelOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
           <button

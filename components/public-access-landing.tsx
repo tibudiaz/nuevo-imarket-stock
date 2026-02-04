@@ -229,6 +229,9 @@ export default function PublicAccessLanding() {
             })}
           </section>
         </div>
+        <footer className="mt-16 text-center text-xs text-slate-400">
+          sitio creado por Grupo iMarket. Todos los derechos reservados
+        </footer>
       </div>
     </div>
   )
