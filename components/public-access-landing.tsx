@@ -177,10 +177,15 @@ export default function PublicAccessLanding() {
                 <h1 className="text-4xl font-semibold">Catálogo de celulares</h1>
               </div>
             </div>
-            <p className="max-w-2xl text-lg text-slate-200">
-              Coordiná tu visita o escribinos por nuestros canales oficiales. Encontrá la dirección y
-              los teléfonos de contacto en un solo lugar.
-            </p>
+            <div className="max-w-2xl space-y-4 text-lg text-slate-200">
+              <p>
+                Elegí el equipo que va con vos. 📱 Te damos la bienvenida a nuestro catálogo digital.
+                Aquí vas a encontrar la mejor tecnología, ya sea que busques el último modelo o una
+                oportunidad seleccionada. Todos nuestros precios se actualizan en tiempo real en USD
+                y pesos.
+              </p>
+              <p>¿Qué estás buscando hoy?</p>
+            </div>
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
               <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
                 <Sparkles className="h-4 w-4 text-sky-300" />

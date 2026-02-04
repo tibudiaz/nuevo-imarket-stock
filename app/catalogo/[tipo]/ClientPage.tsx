@@ -894,6 +894,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   const isNewCatalog = catalogType?.key === "nuevos"
   const catalogItemsCount = isNewCatalog ? newCatalogSorted.length : inStock.length
+  const catalogIntro = isNewCatalog
+    ? "Expertos en tecnología a tu alcance. 🏠 Te damos la bienvenida a nuestra selección de equipos nuevos. Consultá precios en USD o su equivalente en pesos en tiempo real. Mostramos solo la información técnica esencial para garantizar la transparencia y la seguridad de cada dispositivo."
+    : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Contamos con valores actualizados en Dólares y Pesos al instante. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
 
   const topBarDesktopContent = (
     <>
@@ -1338,11 +1341,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
             <div className="flex flex-col gap-6">
               <div className="max-w-2xl space-y-4">
-                <p className="text-lg text-slate-200">
-                  Consultá precios actualizados en USD y en pesos al tipo de cambio Blue Río Cuarto
-                  (venta).
-                  Solo mostramos información esencial para resguardar la privacidad de cada dispositivo.
-                </p>
+                <p className="text-lg text-slate-200">{catalogIntro}</p>
                 <div className="flex flex-wrap gap-3 text-sm text-slate-300">
                   <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
                     <Sparkles className="h-4 w-4 text-sky-300" />
