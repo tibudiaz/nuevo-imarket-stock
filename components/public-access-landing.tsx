@@ -181,8 +181,7 @@ export default function PublicAccessLanding() {
               <p>
                 Elegí el equipo que va con vos. 📱 Te damos la bienvenida a nuestro catálogo digital.
                 Aquí vas a encontrar la mejor tecnología, ya sea que busques el último modelo o una
-                oportunidad seleccionada. Todos nuestros precios se actualizan en tiempo real en USD
-                y pesos.
+                oportunidad seleccionada.
               </p>
               <p>¿Qué estás buscando hoy?</p>
             </div>

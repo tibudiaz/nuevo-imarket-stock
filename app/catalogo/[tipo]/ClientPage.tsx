@@ -895,8 +895,8 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const isNewCatalog = catalogType?.key === "nuevos"
   const catalogItemsCount = isNewCatalog ? newCatalogSorted.length : inStock.length
   const catalogIntro = isNewCatalog
-    ? "Expertos en tecnología a tu alcance. 🏠 Te damos la bienvenida a nuestra selección de equipos nuevos. Consultá precios en USD o su equivalente en pesos en tiempo real. Mostramos solo la información técnica esencial para garantizar la transparencia y la seguridad de cada dispositivo."
-    : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Contamos con valores actualizados en Dólares y Pesos al instante. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
+    ? "Expertos en tecnología a tu alcance. 🏠 Te damos la bienvenida a nuestra selección de equipos nuevos. Mostramos solo la información técnica esencial para garantizar la transparencia y la seguridad de cada dispositivo."
+    : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
 
   const topBarDesktopContent = (
     <>
