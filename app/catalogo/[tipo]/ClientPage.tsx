@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
+import { fetchPublicRealtimeValue } from "@/lib/public-realtime"
 import { convertPriceToUSD, formatCurrency, formatUsdCurrency } from "@/lib/price-converter"
 import { cn } from "@/lib/utils"
 import CatalogAd from "@/components/catalog-ad"
@@ -426,17 +427,34 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   useEffect(() => {
     if (!catalogType?.key) return
-    const adRef = ref(database, `config/catalogAds/${catalogType.key}`)
-    const unsubscribe = onValue(adRef, (snapshot) => {
-      const data = snapshot.val()
-      if (!data) {
+    let isMounted = true
+    const adPath = `config/catalogAds/${catalogType.key}`
+    const syncAd = (value: unknown) => {
+      if (!isMounted) return
+      if (!value) {
         setCatalogAd(null)
         return
       }
-      setCatalogAd(normalizeCatalogAdConfig(data))
-    })
+      setCatalogAd(normalizeCatalogAdConfig(value))
+    }
 
-    return () => unsubscribe()
+    fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
+
+    const adRef = ref(database, adPath)
+    const unsubscribe = onValue(
+      adRef,
+      (snapshot) => {
+        syncAd(snapshot.val())
+      },
+      () => {
+        fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
+      },
+    )
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
   }, [catalogType?.key])
 
   useEffect(() => {

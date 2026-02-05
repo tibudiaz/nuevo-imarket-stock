@@ -8,6 +8,7 @@ import { ArrowRight, Smartphone, Sparkles } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
+import { fetchPublicRealtimeValue } from "@/lib/public-realtime"
 import CatalogAd from "@/components/catalog-ad"
 import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
 
@@ -58,17 +59,34 @@ export default function PublicAccessLanding() {
   }, [])
 
   useEffect(() => {
-    const adRef = ref(database, "config/catalogAds/landing")
-    const unsubscribe = onValue(adRef, (snapshot) => {
-      const data = snapshot.val()
-      if (!data) {
+    let isMounted = true
+    const adPath = "config/catalogAds/landing"
+    const syncAd = (value: unknown) => {
+      if (!isMounted) return
+      if (!value) {
         setCatalogAd(null)
         return
       }
-      setCatalogAd(normalizeCatalogAdConfig(data))
-    })
+      setCatalogAd(normalizeCatalogAdConfig(value))
+    }
 
-    return () => unsubscribe()
+    fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
+
+    const adRef = ref(database, adPath)
+    const unsubscribe = onValue(
+      adRef,
+      (snapshot) => {
+        syncAd(snapshot.val())
+      },
+      () => {
+        fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
+      },
+    )
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
   }, [])
 
   const marqueeItems = offers.length
