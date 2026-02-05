@@ -27,20 +27,14 @@ const nextConfig = {
     ],
   },
 
-  // Configuración de webpack para manejar archivos PDF y otros binarios
+  // Configuración de webpack para manejar archivos PDF y fuentes sin loaders externos
   webpack: (config) => {
     config.module.rules.push({
-      test: /\.(pdf|jpe?g|png|gif|woff|woff2|eot|ttf|svg)$/,
-      use: [
-        {
-          loader: 'file-loader',
-          options: {
-            name: '[name].[ext]',
-            publicPath: '/_next/static/files',
-            outputPath: 'static/files',
-          },
-        },
-      ],
+      test: /\.(pdf|woff2?|eot|ttf)$/,
+      type: 'asset/resource',
+      generator: {
+        filename: 'static/files/[name][ext]',
+      },
     });
 
     // Asegura que se use la versión para navegador de Konva
