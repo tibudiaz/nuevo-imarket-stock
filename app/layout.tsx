@@ -11,6 +11,26 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "iMarket - Sistema de Gestión",
   description: "Sistema de gestión para tienda de celulares",
+  openGraph: {
+    title: "iMarket - Sistema de Gestión",
+    description: "Sistema de gestión para tienda de celulares",
+    type: "website",
+    locale: "es_AR",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Vista previa de iMarket",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "iMarket - Sistema de Gestión",
+    description: "Sistema de gestión para tienda de celulares",
+    images: ["/opengraph-image"],
+  },
 }
 
 export default function RootLayout({
