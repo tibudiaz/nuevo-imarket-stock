@@ -32,6 +32,7 @@ const landingOptions = [
 export default function PublicAccessLanding() {
   const [offers, setOffers] = useState<string[]>([])
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
+  const [catalogBottomAd, setCatalogBottomAd] = useState<CatalogAdConfig | null>(null)
   const [secretClickCount, setSecretClickCount] = useState(0)
   const router = useRouter()
 
@@ -60,32 +61,41 @@ export default function PublicAccessLanding() {
 
   useEffect(() => {
     let isMounted = true
-    const adPath = "config/catalogAds/landing"
-    const syncAd = (value: unknown) => {
-      if (!isMounted) return
-      if (!value) {
-        setCatalogAd(null)
-        return
+
+    const bindCatalogAd = (
+      adPath: string,
+      onSync: (config: CatalogAdConfig | null) => void,
+    ) => {
+      const syncAd = (value: unknown) => {
+        if (!isMounted) return
+        if (!value) {
+          onSync(null)
+          return
+        }
+        onSync(normalizeCatalogAdConfig(value))
       }
-      setCatalogAd(normalizeCatalogAdConfig(value))
+
+      fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
+
+      const adRef = ref(database, adPath)
+      return onValue(
+        adRef,
+        (snapshot) => {
+          syncAd(snapshot.val())
+        },
+        () => {
+          fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
+        },
+      )
     }
 
-    fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
-
-    const adRef = ref(database, adPath)
-    const unsubscribe = onValue(
-      adRef,
-      (snapshot) => {
-        syncAd(snapshot.val())
-      },
-      () => {
-        fetchPublicRealtimeValue<unknown>(adPath).then(syncAd)
-      },
-    )
+    const unsubscribeTopAd = bindCatalogAd("config/catalogAds/landing", setCatalogAd)
+    const unsubscribeBottomAd = bindCatalogAd("config/catalogAds/landingBottom", setCatalogBottomAd)
 
     return () => {
       isMounted = false
-      unsubscribe()
+      unsubscribeTopAd()
+      unsubscribeBottomAd()
     }
   }, [])
 
@@ -251,6 +261,8 @@ export default function PublicAccessLanding() {
             })}
           </section>
         </div>
+        <CatalogAd config={catalogBottomAd} className="mt-2" />
+
         <footer className="mt-16 text-center text-xs text-slate-400">
           sitio creado por Grupo iMarket. Todos los derechos reservados
         </footer>

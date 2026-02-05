@@ -25,7 +25,7 @@ import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "fi
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import QRCode from "qrcode"
 import type { RepairPhoto } from "@/types/repair"
-import { normalizeCatalogAdConfig, type CatalogAdAsset, type CatalogAdConfig, type CatalogAdType } from "@/lib/catalog-ads"
+import { normalizeCatalogAdConfig, type CatalogAdAsset, type CatalogAdConfig, type CatalogAdPage, type CatalogAdType } from "@/lib/catalog-ads"
 import { getAppBaseUrl } from "@/lib/base-url"
 
 // ... (Interfaces sin cambios)
@@ -342,7 +342,7 @@ export default function SettingsPage() {
   const [catalogVisitCount, setCatalogVisitCount] = useState(0);
   const [usdRateAdjustment, setUsdRateAdjustment] = useState(0);
   const [catalogAds, setCatalogAds] = useState<Record<string, CatalogAdConfig>>({});
-  const [selectedCatalogAdPage, setSelectedCatalogAdPage] = useState<"landing" | "nuevos" | "usados">("landing");
+  const [selectedCatalogAdPage, setSelectedCatalogAdPage] = useState<CatalogAdPage>("landing");
   const [catalogAdEnabled, setCatalogAdEnabled] = useState(false);
   const [catalogAdType, setCatalogAdType] = useState<CatalogAdType>("image");
   const [catalogAdTitle, setCatalogAdTitle] = useState("");
@@ -352,7 +352,7 @@ export default function SettingsPage() {
   const [catalogAdUploadSessionId, setCatalogAdUploadSessionId] = useState<string | null>(null);
   const [catalogAdUploadQr, setCatalogAdUploadQr] = useState("");
   const [catalogAdUploadOrigin, setCatalogAdUploadOrigin] = useState("");
-  const [catalogAdUploadTargetPage, setCatalogAdUploadTargetPage] = useState<"landing" | "nuevos" | "usados">("landing");
+  const [catalogAdUploadTargetPage, setCatalogAdUploadTargetPage] = useState<CatalogAdPage>("landing");
   const [isCatalogAdUploading, setIsCatalogAdUploading] = useState(false);
 
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -1596,8 +1596,8 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Publicidad del catálogo</CardTitle>
               <CardDescription>
-                Cargá imágenes o videos para mostrarlos al final del catálogo y en la selección de
-                nuevos/usados.
+                Cargá imágenes o videos para mostrarlos al final del catálogo y en la selección
+                pública (superior o inferior).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1607,14 +1607,15 @@ export default function SettingsPage() {
                   <Select
                     value={selectedCatalogAdPage}
                     onValueChange={(value) =>
-                      setSelectedCatalogAdPage(value as "landing" | "nuevos" | "usados")
+                      setSelectedCatalogAdPage(value as CatalogAdPage)
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Elegí la sección" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="landing">Selección de catálogo</SelectItem>
+                      <SelectItem value="landing">Selección de catálogo (superior)</SelectItem>
+                      <SelectItem value="landingBottom">Selección de catálogo (inferior)</SelectItem>
                       <SelectItem value="nuevos">Catálogo de nuevos</SelectItem>
                       <SelectItem value="usados">Catálogo de usados</SelectItem>
                     </SelectContent>

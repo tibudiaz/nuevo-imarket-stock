@@ -11,7 +11,7 @@ import { auth, database, storage } from "@/lib/firebase"
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
 import { ref as databaseRef, onValue, get, push, set, update } from "firebase/database"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
-import type { CatalogAdType } from "@/lib/catalog-ads"
+import type { CatalogAdPage, CatalogAdType } from "@/lib/catalog-ads"
 
 type UploadedAdFile = {
   id: string
@@ -22,7 +22,7 @@ type UploadedAdFile = {
 }
 
 type CatalogAdUploadSession = {
-  page?: string
+  page?: CatalogAdPage
   type?: CatalogAdType
   status?: string
   files?: Record<string, Omit<UploadedAdFile, "id">>
@@ -45,8 +45,8 @@ export default function CatalogAdMobileUploadClient() {
   const typeParam = searchParams.get("type") || undefined
   const allowSessionRecovery = Boolean(pageParam || typeParam)
 
-  const resolvedPage =
-    pageParam === "nuevos" || pageParam === "usados" || pageParam === "landing"
+  const resolvedPage: CatalogAdPage =
+    pageParam === "nuevos" || pageParam === "usados" || pageParam === "landing" || pageParam === "landingBottom"
       ? pageParam
       : "landing"
   const resolvedType: CatalogAdType =
