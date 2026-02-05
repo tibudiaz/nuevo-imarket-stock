@@ -7,6 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { ref, onValue, push, set, update, get } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useStore } from "@/hooks/use-store";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 interface JblProduct {
@@ -57,10 +67,14 @@ const createInitialForm = () => ({
 
 export default function JBLPage() {
   const { selectedStore } = useStore();
+  const { user } = useAuth();
   const [products, setProducts] = useState<JblProduct[]>([]);
   const [form, setForm] = useState(createInitialForm());
   const [sellingId, setSellingId] = useState<string | null>(null);
   const [sellQuantity, setSellQuantity] = useState(1);
+  const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
+
+  const showCost = user?.role === "admin";
 
   useEffect(() => {
     const jblRef = ref(database, "jblProducts");
@@ -98,9 +112,9 @@ export default function JBLPage() {
       });
       return;
     }
-    if (!form.name || form.salePrice <= 0 || form.quantity <= 0) {
+    if (!form.name || !form.model.trim() || form.salePrice <= 0 || form.quantity <= 0) {
       toast.error("Datos incompletos", {
-        description: "Completá nombre, precio de venta y cantidad.",
+        description: "Completá nombre, número de serie o modelo, precio de venta y cantidad.",
       });
       return;
     }
@@ -144,6 +158,7 @@ export default function JBLPage() {
       });
 
       setForm(createInitialForm());
+      setIsLoadDialogOpen(false);
       toast.success("Producto JBL cargado", {
         description:
           form.stockMode === "consignment"
@@ -236,54 +251,78 @@ export default function JBLPage() {
           <CardHeader>
             <CardTitle>Nuevo producto JBL</CardTitle>
             <CardDescription>
-              Elegí si ingresa como inventario propio o como consignación.
+              Usá el botón para abrir la carga en un modal y registrar por número de serie o modelo.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
-            <div>
-              <Label>Nombre</Label>
-              <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Modelo</Label>
-              <Input value={form.model} onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Categoría</Label>
-              <Input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Precio venta</Label>
-              <Input type="number" value={form.salePrice} onChange={(e) => setForm((p) => ({ ...p, salePrice: Number(e.target.value) || 0 }))} />
-            </div>
-            <div>
-              <Label>Costo unitario (ganancia)</Label>
-              <Input type="number" value={form.cost} onChange={(e) => setForm((p) => ({ ...p, cost: Number(e.target.value) || 0 }))} />
-            </div>
-            <div>
-              <Label>Cantidad</Label>
-              <Input type="number" min={1} value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: Number(e.target.value) || 0 }))} />
-            </div>
-            <div>
-              <Label>Tipo de ingreso</Label>
-              <Select
-                value={form.stockMode}
-                onValueChange={(value: "inventory" | "consignment") =>
-                  setForm((p) => ({ ...p, stockMode: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="inventory">Inventario propio</SelectItem>
-                  <SelectItem value="consignment">Consignación</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleAdd} className="w-full">Cargar producto JBL</Button>
-            </div>
+          <CardContent>
+            <Dialog open={isLoadDialogOpen} onOpenChange={setIsLoadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>Cargar producto JBL</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Cargar producto JBL</DialogTitle>
+                  <DialogDescription>
+                    Completá los datos del equipo. Debés indicar número de serie o modelo.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-2 md:grid-cols-2">
+                  <div>
+                    <Label>Nombre</Label>
+                    <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Número de serie o modelo</Label>
+                    <Input
+                      value={form.model}
+                      onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+                      placeholder="Ej: JBLCHG5BLK o Charge 5"
+                    />
+                  </div>
+                  <div>
+                    <Label>Categoría</Label>
+                    <Input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Precio venta</Label>
+                    <Input type="number" value={form.salePrice} onChange={(e) => setForm((p) => ({ ...p, salePrice: Number(e.target.value) || 0 }))} />
+                  </div>
+                  {showCost && (
+                    <div>
+                      <Label>Costo unitario (ganancia)</Label>
+                      <Input type="number" value={form.cost} onChange={(e) => setForm((p) => ({ ...p, cost: Number(e.target.value) || 0 }))} />
+                    </div>
+                  )}
+                  <div>
+                    <Label>Cantidad</Label>
+                    <Input type="number" min={1} value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: Number(e.target.value) || 0 }))} />
+                  </div>
+                  <div>
+                    <Label>Tipo de ingreso</Label>
+                    <Select
+                      value={form.stockMode}
+                      onValueChange={(value: "inventory" | "consignment") =>
+                        setForm((p) => ({ ...p, stockMode: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inventory">Inventario propio</SelectItem>
+                        <SelectItem value="consignment">Consignación</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsLoadDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleAdd}>Guardar carga</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 
@@ -298,7 +337,7 @@ export default function JBLPage() {
                   <TableHead>Producto</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Precio</TableHead>
-                  <TableHead>Costo</TableHead>
+                  {showCost && <TableHead>Costo</TableHead>}
                   <TableHead>Disponible</TableHead>
                   <TableHead>Vendidos</TableHead>
                   <TableHead>Acción</TableHead>
@@ -314,7 +353,7 @@ export default function JBLPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>${Number(product.salePrice || 0).toFixed(2)}</TableCell>
-                    <TableCell>${Number(product.cost || 0).toFixed(2)}</TableCell>
+                    {showCost && <TableCell>${Number(product.cost || 0).toFixed(2)}</TableCell>}
                     <TableCell>{product.availableQuantity}</TableCell>
                     <TableCell>{product.soldQuantity}</TableCell>
                     <TableCell>
