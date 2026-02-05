@@ -29,6 +29,7 @@ import {
   X,
   ClipboardList,
   Truck,
+  Speaker,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth, signOut } from "firebase/auth"
@@ -479,6 +480,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 icon={Truck}
                 label="Productos Proveedor"
                 active={pathname === "/dashboard/provider-products"}
+              />
+
+              <NavItem
+                href="/dashboard/jbl"
+                icon={Speaker}
+                label="JBL"
+                active={pathname === "/dashboard/jbl"}
               />
 
               <NavItem
