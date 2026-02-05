@@ -31,11 +31,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ref, onValue, push, set, update, get } from "firebase/database";
+import { ref, onValue, push, set, update, get, remove } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useStore } from "@/hooks/use-store";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import SellProductModal from "@/components/sell-product-modal";
+import { Edit, Trash2 } from "lucide-react";
 
 interface JblProduct {
   id: string;
@@ -71,8 +73,10 @@ export default function JBLPage() {
   const [products, setProducts] = useState<JblProduct[]>([]);
   const [form, setForm] = useState(createInitialForm());
   const [sellingId, setSellingId] = useState<string | null>(null);
-  const [sellQuantity, setSellQuantity] = useState(1);
   const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
+  const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
+  const [selectedSellProduct, setSelectedSellProduct] = useState<any | null>(null);
+  const [editingProduct, setEditingProduct] = useState<JblProduct | null>(null);
 
   const showCost = user?.role === "admin";
 
@@ -120,25 +124,23 @@ export default function JBLPage() {
     }
 
     try {
-      let linkedProductId: string | undefined;
-      if (form.stockMode === "inventory") {
-        const productRef = push(ref(database, "products"));
-        linkedProductId = productRef.key || undefined;
-        await set(productRef, {
-          id: linkedProductId,
-          name: form.name,
-          brand: form.brand,
-          model: form.model || "JBL",
-          category: "JBL",
-          provider: "JBL",
-          cost: Number(form.cost || 0),
-          price: Number(form.salePrice || 0),
-          stock: Number(form.quantity || 0),
-          store: selectedStore === "local2" ? "local2" : "local1",
-          createdAt: new Date().toISOString(),
-          entryDate: new Date().toISOString(),
-        });
-      }
+      const productRef = push(ref(database, "products"));
+      const linkedProductId = productRef.key || undefined;
+      await set(productRef, {
+        id: linkedProductId,
+        name: form.name,
+        brand: form.brand,
+        model: form.model || "JBL",
+        category: "JBL",
+        provider: form.stockMode === "consignment" ? "JBL (Consignación)" : "JBL",
+        cost: Number(form.cost || 0),
+        price: Number(form.salePrice || 0),
+        stock: Number(form.quantity || 0),
+        store: selectedStore === "local2" ? "local2" : "local1",
+        createdAt: new Date().toISOString(),
+        entryDate: new Date().toISOString(),
+        stockMode: form.stockMode,
+      });
 
       const jblRef = push(ref(database, "jblProducts"));
       await set(jblRef, {
@@ -152,7 +154,7 @@ export default function JBLPage() {
         availableQuantity: Number(form.quantity || 0),
         soldQuantity: 0,
         stockMode: form.stockMode,
-        linkedProductId: linkedProductId || null,
+        linkedProductId: linkedProductId ?? null,
         store: selectedStore === "local2" ? "local2" : "local1",
         createdAt: new Date().toISOString(),
       });
@@ -171,68 +173,125 @@ export default function JBLPage() {
     }
   };
 
-  const handleSell = async (product: JblProduct) => {
-    if (sellQuantity <= 0 || sellQuantity > product.availableQuantity) {
-      toast.error("Cantidad inválida");
-      return;
+  const syncJblStockFromLinkedProduct = async (jblProductId: string) => {
+    const jblRef = ref(database, `jblProducts/${jblProductId}`);
+    const jblSnapshot = await get(jblRef);
+    if (!jblSnapshot.exists()) return;
+    const jblProduct = jblSnapshot.val() as JblProduct;
+    if (!jblProduct.linkedProductId) return;
+
+    const productRef = ref(database, `products/${jblProduct.linkedProductId}`);
+    const productSnapshot = await get(productRef);
+    const linkedStock = productSnapshot.exists() ? Number(productSnapshot.val().stock || 0) : 0;
+    const sold = Math.max(Number(jblProduct.quantityLoaded || 0) - linkedStock, 0);
+
+    await update(jblRef, {
+      availableQuantity: linkedStock,
+      soldQuantity: sold,
+    });
+  };
+
+  const ensureLinkedProduct = async (product: JblProduct) => {
+    if (product.linkedProductId) {
+      const existingRef = ref(database, `products/${product.linkedProductId}`);
+      const existingSnapshot = await get(existingRef);
+      if (existingSnapshot.exists()) {
+        return product.linkedProductId;
+      }
     }
 
+    const productRef = push(ref(database, "products"));
+    const linkedProductId = productRef.key || "";
+    await set(productRef, {
+      id: linkedProductId,
+      name: product.name,
+      brand: product.brand || "JBL",
+      model: product.model || "JBL",
+      category: "JBL",
+      provider: product.stockMode === "consignment" ? "JBL (Consignación)" : "JBL",
+      cost: Number(product.cost || 0),
+      price: Number(product.salePrice || 0),
+      stock: Number(product.availableQuantity || 0),
+      stockMode: product.stockMode,
+      store: product.store,
+      createdAt: new Date().toISOString(),
+      entryDate: new Date().toISOString(),
+    });
+
+    await update(ref(database, `jblProducts/${product.id}`), {
+      linkedProductId,
+    });
+    return linkedProductId;
+  };
+
+  const handleOpenSellModal = async (product: JblProduct) => {
+    if (product.availableQuantity <= 0) {
+      toast.error("Sin stock disponible");
+      return;
+    }
     try {
-      if (product.stockMode === "inventory" && product.linkedProductId) {
-        const productRef = ref(database, `products/${product.linkedProductId}`);
-        const snapshot = await get(productRef);
-        if (!snapshot.exists()) {
-          toast.error("No existe el producto en inventario para descontar stock.");
-          return;
-        }
-        const currentStock = Number(snapshot.val().stock || 0);
-        if (currentStock < sellQuantity) {
-          toast.error("Stock insuficiente en inventario.");
-          return;
-        }
-        await update(productRef, { stock: currentStock - sellQuantity });
+      const linkedProductId = await ensureLinkedProduct(product);
+      setSellingId(product.id);
+      setSelectedSellProduct({
+        id: linkedProductId,
+        name: `${product.name} ${product.model || ""}`.trim(),
+        price: Number(product.salePrice || 0),
+        stock: Number(product.availableQuantity || 0),
+        category: "JBL",
+        model: product.model,
+        brand: product.brand,
+        provider: product.stockMode === "consignment" ? "JBL (Consignación)" : "JBL",
+        store: product.store,
+        cost: Number(product.cost || 0),
+      });
+      setIsSellDialogOpen(true);
+    } catch (error) {
+      console.error("Error al preparar venta JBL:", error);
+      toast.error("No se pudo abrir la venta JBL.");
+    }
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return;
+    try {
+      await update(ref(database, `jblProducts/${editingProduct.id}`), {
+        name: editingProduct.name,
+        model: editingProduct.model,
+        category: editingProduct.category,
+        salePrice: Number(editingProduct.salePrice || 0),
+        cost: Number(editingProduct.cost || 0),
+      });
+
+      if (editingProduct.linkedProductId) {
+        await update(ref(database, `products/${editingProduct.linkedProductId}`), {
+          name: editingProduct.name,
+          model: editingProduct.model,
+          price: Number(editingProduct.salePrice || 0),
+          cost: Number(editingProduct.cost || 0),
+          provider: editingProduct.stockMode === "consignment" ? "JBL (Consignación)" : "JBL",
+        });
       }
 
-      const jblRef = ref(database, `jblProducts/${product.id}`);
-      await update(jblRef, {
-        availableQuantity: Number(product.availableQuantity || 0) - sellQuantity,
-        soldQuantity: Number(product.soldQuantity || 0) + sellQuantity,
-      });
-
-      const saleRef = push(ref(database, "sales"));
-      await set(saleRef, {
-        id: saleRef.key,
-        date: new Date().toISOString(),
-        customerName: "Venta JBL",
-        customerDni: "-",
-        items: [
-          {
-            productId: product.linkedProductId || product.id,
-            productName: `${product.name} ${product.model || ""}`.trim(),
-            quantity: sellQuantity,
-            price: Number(product.salePrice || 0),
-            category: "JBL",
-            cost: Number(product.cost || 0),
-            provider: "JBL",
-            store: product.store,
-          },
-        ],
-        totalAmount: Number(product.salePrice || 0) * sellQuantity,
-        paymentMethod: "efectivo",
-        store: product.store,
-        status: "completed",
-        completedAt: new Date().toISOString(),
-      });
-
-      setSellingId(null);
-      setSellQuantity(1);
-      toast.success("Venta registrada", {
-        description:
-          "La venta JBL quedó en la lista de ventas y con ganancia calculable por costo.",
-      });
+      toast.success("Producto JBL actualizado");
+      setEditingProduct(null);
     } catch (error) {
-      console.error("Error al vender JBL:", error);
-      toast.error("No se pudo registrar la venta JBL.");
+      console.error("Error al actualizar JBL:", error);
+      toast.error("No se pudo actualizar el producto JBL.");
+    }
+  };
+
+  const handleDeleteProduct = async (product: JblProduct) => {
+    const confirmed = window.confirm("¿Seguro que desea eliminar este producto JBL?");
+    if (!confirmed) return;
+    try {
+      await remove(ref(database, `jblProducts/${product.id}`));
+      if (product.linkedProductId) {
+        await remove(ref(database, `products/${product.linkedProductId}`));
+      }
+      toast.success("Producto JBL eliminado");
+    } catch (error) {
+      console.error("Error al eliminar JBL:", error);
+      toast.error("No se pudo eliminar el producto JBL.");
     }
   };
 
@@ -340,7 +399,7 @@ export default function JBLPage() {
                   {showCost && <TableHead>Costo</TableHead>}
                   <TableHead>Disponible</TableHead>
                   <TableHead>Vendidos</TableHead>
-                  <TableHead>Acción</TableHead>
+                    <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -357,36 +416,26 @@ export default function JBLPage() {
                     <TableCell>{product.availableQuantity}</TableCell>
                     <TableCell>{product.soldQuantity}</TableCell>
                     <TableCell>
-                      {sellingId === product.id ? (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min={1}
-                            max={product.availableQuantity}
-                            className="w-20"
-                            value={sellQuantity}
-                            onChange={(e) => setSellQuantity(Number(e.target.value) || 1)}
-                          />
-                          <Button size="sm" onClick={() => handleSell(product)}>
-                            Confirmar
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setSellingId(null)}>
-                            Cancelar
-                          </Button>
-                        </div>
-                      ) : (
+                      <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
                           disabled={product.availableQuantity <= 0}
-                          onClick={() => {
-                            setSellingId(product.id);
-                            setSellQuantity(1);
-                          }}
+                          onClick={() => handleOpenSellModal(product)}
                         >
                           Vender
                         </Button>
-                      )}
+                        {user?.role === "admin" && (
+                          <>
+                            <Button size="icon" variant="ghost" onClick={() => setEditingProduct(product)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => handleDeleteProduct(product)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -394,6 +443,64 @@ export default function JBLPage() {
             </Table>
           </CardContent>
         </Card>
+
+        {selectedSellProduct && (
+          <SellProductModal
+            isOpen={isSellDialogOpen}
+            onClose={() => {
+              setIsSellDialogOpen(false);
+              setSelectedSellProduct(null);
+              setSellingId(null);
+            }}
+            product={selectedSellProduct}
+            onProductSold={async () => {
+              if (sellingId) {
+                await syncJblStockFromLinkedProduct(sellingId);
+              }
+            }}
+          />
+        )}
+
+        <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Modificar producto JBL</DialogTitle>
+              <DialogDescription>Actualice los datos principales del producto.</DialogDescription>
+            </DialogHeader>
+            {editingProduct && (
+              <div className="grid gap-4 py-2">
+                <div>
+                  <Label>Nombre</Label>
+                  <Input value={editingProduct.name} onChange={(e) => setEditingProduct((p) => (p ? { ...p, name: e.target.value } : p))} />
+                </div>
+                <div>
+                  <Label>Modelo o serie</Label>
+                  <Input value={editingProduct.model} onChange={(e) => setEditingProduct((p) => (p ? { ...p, model: e.target.value } : p))} />
+                </div>
+                <div>
+                  <Label>Categoría</Label>
+                  <Input value={editingProduct.category} onChange={(e) => setEditingProduct((p) => (p ? { ...p, category: e.target.value } : p))} />
+                </div>
+                <div>
+                  <Label>Precio venta</Label>
+                  <Input type="number" value={editingProduct.salePrice} onChange={(e) => setEditingProduct((p) => (p ? { ...p, salePrice: Number(e.target.value) || 0 } : p))} />
+                </div>
+                {showCost && (
+                  <div>
+                    <Label>Costo</Label>
+                    <Input type="number" value={editingProduct.cost} onChange={(e) => setEditingProduct((p) => (p ? { ...p, cost: Number(e.target.value) || 0 } : p))} />
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingProduct(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdateProduct}>Guardar cambios</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
