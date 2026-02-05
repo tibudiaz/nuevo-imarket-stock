@@ -8,28 +8,30 @@ import type { Metadata } from "next"
 
 const inter = Inter({ subsets: ["latin"] })
 
+const LOCAL_STORE_IMAGE_PATH = "/local-store-image.jpg"
+
 export const metadata: Metadata = {
-  title: "iMarket - Sistema de Gestión",
-  description: "Sistema de gestión para tienda de celulares",
+  title: "iMarket - Tu próximo celular está aquí",
+  description: "Tu próximo celular está aquí",
   openGraph: {
-    title: "iMarket - Sistema de Gestión",
-    description: "Sistema de gestión para tienda de celulares",
+    title: "iMarket - Tu próximo celular está aquí",
+    description: "Tu próximo celular está aquí",
     type: "website",
     locale: "es_AR",
     images: [
       {
-        url: "/opengraph-image",
+        url: LOCAL_STORE_IMAGE_PATH,
         width: 1200,
         height: 630,
-        alt: "Vista previa de iMarket",
+        alt: "Tu próximo celular está aquí",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "iMarket - Sistema de Gestión",
-    description: "Sistema de gestión para tienda de celulares",
-    images: ["/opengraph-image"],
+    title: "iMarket - Tu próximo celular está aquí",
+    description: "Tu próximo celular está aquí",
+    images: [LOCAL_STORE_IMAGE_PATH],
   },
 }
 

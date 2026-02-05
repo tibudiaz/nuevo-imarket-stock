@@ -385,7 +385,7 @@ export default function Dashboard() {
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <h1 className="text-4xl font-bold text-slate-800">iMarket</h1>
-            <p className="mt-2 text-slate-600">Sistema de gestión para tu negocio de celulares</p>
+            <p className="mt-2 text-slate-600">Tu próximo celular está aquí</p>
           </div>
           <LoginForm />
         </div>
