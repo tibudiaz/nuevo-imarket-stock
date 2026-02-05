@@ -11,6 +11,7 @@ const inter = Inter({ subsets: ["latin"] })
 const LOCAL_STORE_IMAGE_PATH = "/local-store-image.jpg"
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: "iMarket - Tu próximo celular está aquí",
   description: "Tu próximo celular está aquí",
   openGraph: {

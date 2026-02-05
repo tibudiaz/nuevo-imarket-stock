@@ -30,7 +30,7 @@ export default function OpengraphImage() {
             position: "absolute",
             inset: 0,
             background:
-              "repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 10px)",
+              "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 55%)",
           }}
         />
 
