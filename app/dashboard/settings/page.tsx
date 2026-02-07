@@ -1618,6 +1618,7 @@ export default function SettingsPage() {
                       <SelectItem value="landingBottom">Selección de catálogo (inferior)</SelectItem>
                       <SelectItem value="nuevos">Catálogo de nuevos</SelectItem>
                       <SelectItem value="usados">Catálogo de usados</SelectItem>
+                      <SelectItem value="gaming-audio">Catálogo de gaming y audio</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

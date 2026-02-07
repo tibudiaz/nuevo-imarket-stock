@@ -1,6 +1,11 @@
 export type CatalogAdType = "image" | "carousel" | "video"
 
-export type CatalogAdPage = "landing" | "landingBottom" | "nuevos" | "usados"
+export type CatalogAdPage =
+  | "landing"
+  | "landingBottom"
+  | "nuevos"
+  | "usados"
+  | "gaming-audio"
 
 export type CatalogAdAsset = {
   url: string
