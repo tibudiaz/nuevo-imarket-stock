@@ -430,6 +430,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <>
                     <DropdownMenuItem asChild><Link href="/dashboard/caja"><Wallet className="mr-2 h-4 w-4" /><span>Caja</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/finances"><DollarSign className="mr-2 h-4 w-4" /><span>Finanzas</span></Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/proveedores-pagos"><ClipboardList className="mr-2 h-4 w-4" /><span>Proveedores - Pagos</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/reports"><BarChart className="mr-2 h-4 w-4" /><span>Reportes</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/notifications"><Bell className="mr-2 h-4 w-4" /><span>Notificaciones</span></Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/backup"><Database className="mr-2 h-4 w-4" /><span>Backup</span></Link></DropdownMenuItem>
