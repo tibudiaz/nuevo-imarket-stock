@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
-import { ArrowRight, Smartphone, Sparkles } from "lucide-react"
+import { ArrowRight, Smartphone, Sparkles, Speaker } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
@@ -26,6 +26,13 @@ const landingOptions = [
     href: "/catalogo/usados",
     accent: "from-sky-500/20 via-sky-400/5 to-transparent",
     icon: Smartphone,
+  },
+  {
+    title: "Gaming y audio",
+    description: "Descubrí parlantes, auriculares y accesorios JBL listos para entrega.",
+    href: "/catalogo/gaming-audio",
+    accent: "from-fuchsia-500/20 via-purple-400/5 to-transparent",
+    icon: Speaker,
   },
 ]
 
@@ -202,14 +209,13 @@ export default function PublicAccessLanding() {
               </button>
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-slate-400">iMarket</p>
-                <h1 className="text-4xl font-semibold">Catálogo de celulares</h1>
+                <h1 className="text-4xl font-semibold">Catálogo de iMarket</h1>
               </div>
             </div>
             <div className="max-w-2xl space-y-4 text-lg text-slate-200">
               <p>
-                Elegí el equipo que va con vos. 📱 Te damos la bienvenida a nuestro catálogo digital.
-                Aquí vas a encontrar la mejor tecnología, ya sea que busques el último modelo o una
-                oportunidad seleccionada.
+                Elegí la tecnología que va con vos. 📱🔊 Te damos la bienvenida a nuestro catálogo
+                digital. Aquí vas a encontrar celulares y accesorios JBL con stock actualizado.
               </p>
               <p>¿Qué estás buscando hoy?</p>
             </div>

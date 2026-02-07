@@ -25,6 +25,7 @@ import {
   Mail,
   ShieldCheck,
   Smartphone,
+  Speaker,
   Sparkles,
   UserPlus,
   X,
@@ -61,6 +62,17 @@ interface NewCatalogItem {
   price?: number
   status?: string
   createdAt?: string
+}
+
+interface JblCatalogItem {
+  id: string
+  name?: string
+  brand?: string
+  model?: string
+  category?: string
+  salePrice?: number
+  availableQuantity?: number
+  [key: string]: any
 }
 
 interface CustomerProfile {
@@ -104,6 +116,11 @@ const CATALOG_TYPES = {
     category: CATEGORY_USED,
     accent: "from-emerald-500/20 to-green-500/5",
   },
+  "gaming-audio": {
+    key: "gaming-audio",
+    title: "Gaming y audio",
+    accent: "from-fuchsia-500/20 to-purple-500/10",
+  },
 }
 
 type CatalogTypeKey = keyof typeof CATALOG_TYPES
@@ -111,6 +128,7 @@ type CatalogTypeKey = keyof typeof CATALOG_TYPES
 type CatalogCache = {
   products?: Product[]
   newCatalogItems?: NewCatalogItem[]
+  jblCatalogItems?: JblCatalogItem[]
   usdRate?: number
   catalogVisibility?: { newPhones?: boolean; usedPhones?: boolean }
   updatedAt?: number
@@ -288,6 +306,17 @@ const resolveNewCatalogStatus = (item: NewCatalogItem) => {
   return status || "Consultar disponibilidad"
 }
 
+const resolveJblCatalogName = (item: JblCatalogItem) => {
+  const name = item.name?.trim()
+  if (name) return name
+  const brand = item.brand?.trim()
+  const model = item.model?.trim()
+  if (brand && model) return `${brand} ${model}`
+  if (brand) return brand
+  if (model) return model
+  return "Accesorio JBL"
+}
+
 const formatUsdPrice = (price: number | undefined, usdRate: number) => {
   if (typeof price !== "number" || Number.isNaN(price)) return "Consultar"
   if (usdRate > 0) {
@@ -327,6 +356,15 @@ const buildWhatsAppLinkForNewCatalog = (item: NewCatalogItem, usdRate: number) =
   return `https://wa.me/5493584224464?text=${encodedMessage}`
 }
 
+const buildWhatsAppLinkForJbl = (item: JblCatalogItem, usdRate: number) => {
+  const name = resolveJblCatalogName(item)
+  const usdPrice = formatUsdPrice(item.salePrice, usdRate)
+  const arsPrice = formatArsPriceBlue(item.salePrice, usdRate)
+  const message = `Hola! Estoy interesado en ${name}. Precio USD: ${usdPrice}. Precio en pesos: ${arsPrice}.`
+  const encodedMessage = encodeURIComponent(message)
+  return `https://wa.me/5493584224464?text=${encodedMessage}`
+}
+
 export default function PublicStockClient({ params }: { params: { tipo: string } }) {
   const catalogType = CATALOG_TYPES[params.tipo as CatalogTypeKey]
   const cacheKey = catalogType ? `catalog-cache-${catalogType.key}` : "catalog-cache"
@@ -334,6 +372,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   const [products, setProducts] = useState<Product[]>([])
   const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([])
+  const [jblCatalogItems, setJblCatalogItems] = useState<JblCatalogItem[]>([])
   const [usdRate, setUsdRate] = useState(0)
   const [usdRateAdjustment, setUsdRateAdjustment] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -388,6 +427,11 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     if (Array.isArray(cached.newCatalogItems)) {
       startTransition(() => {
         setNewCatalogItems(cached.newCatalogItems)
+      })
+    }
+    if (Array.isArray(cached.jblCatalogItems)) {
+      startTransition(() => {
+        setJblCatalogItems(cached.jblCatalogItems)
       })
     }
     if (typeof cached.usdRate === "number") {
@@ -519,7 +563,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   useEffect(() => {
     if (!catalogType) return
-    if (catalogType.key === "nuevos") return
+    if (catalogType.key !== "usados") return
     const productsRef = ref(database, "products")
     const productsQuery = query(
       productsRef,
@@ -599,6 +643,53 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
     return () => {
       unsubscribeNewCatalog()
+    }
+  }, [cacheKey, catalogType])
+
+  useEffect(() => {
+    if (!catalogType || catalogType.key !== "gaming-audio") return
+    const jblCatalogRef = ref(database, "jblProducts")
+    const unsubscribeJblCatalog = onValue(
+      jblCatalogRef,
+      (snapshot) => {
+        setLoading(false)
+        if (!snapshot.exists()) {
+          setJblCatalogItems([])
+          return
+        }
+
+        const items: JblCatalogItem[] = []
+        snapshot.forEach((childSnapshot) => {
+          const value = childSnapshot.val()
+          if (value && typeof value === "object" && childSnapshot.key) {
+            items.push({
+              id: childSnapshot.key,
+              name: value.name ? String(value.name) : undefined,
+              brand: value.brand ? String(value.brand) : undefined,
+              model: value.model ? String(value.model) : undefined,
+              category: value.category ? String(value.category) : undefined,
+              salePrice:
+                typeof value.salePrice === "number" ? value.salePrice : Number(value.salePrice),
+              availableQuantity:
+                typeof value.availableQuantity === "number"
+                  ? value.availableQuantity
+                  : Number(value.availableQuantity),
+            })
+          }
+        })
+
+        startTransition(() => {
+          setJblCatalogItems(items)
+        })
+        writeCatalogCache(cacheKey, { jblCatalogItems: items })
+      },
+      () => {
+        setLoading(false)
+      },
+    )
+
+    return () => {
+      unsubscribeJblCatalog()
     }
   }, [cacheKey, catalogType])
 
@@ -898,23 +989,45 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     )
   }, [newCatalogItems])
 
+  const jblInStock = useMemo(() => {
+    return jblCatalogItems
+      .filter((item) => (item.availableQuantity ?? 0) > 0)
+      .sort((a, b) =>
+        resolveJblCatalogName(a).localeCompare(resolveJblCatalogName(b), "es", {
+          sensitivity: "base",
+        }),
+      )
+  }, [jblCatalogItems])
+
   const isSectionVisible = useMemo(() => {
     if (!catalogType) return false
     if (catalogType.key === "nuevos") return catalogVisibility.newPhones
-    return catalogVisibility.usedPhones
+    if (catalogType.key === "usados") return catalogVisibility.usedPhones
+    return true
   }, [catalogType, catalogVisibility])
 
-  const alternateType = catalogType?.key === "nuevos" ? CATALOG_TYPES.usados : CATALOG_TYPES.nuevos
+  const alternateTypes = catalogType
+    ? Object.values(CATALOG_TYPES).filter((type) => type.key !== catalogType.key)
+    : []
 
   const marqueeItems = offers.length
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
 
   const isNewCatalog = catalogType?.key === "nuevos"
-  const catalogItemsCount = isNewCatalog ? newCatalogSorted.length : inStock.length
+  const isUsedCatalog = catalogType?.key === "usados"
+  const isGamingAudioCatalog = catalogType?.key === "gaming-audio"
+  const catalogItemsCount = isNewCatalog
+    ? newCatalogSorted.length
+    : isGamingAudioCatalog
+      ? jblInStock.length
+      : inStock.length
+  const catalogItemsLabel = isGamingAudioCatalog ? "productos" : "equipos"
   const catalogIntro = isNewCatalog
     ? "Expertos en tecnología a tu alcance. 🏠 Te damos la bienvenida a nuestra selección de equipos nuevos. Mostramos solo la información técnica esencial para garantizar la transparencia y la seguridad de cada dispositivo."
-    : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
+    : isGamingAudioCatalog
+      ? "Potenciá tu experiencia gamer y musical. 🎧 Descubrí parlantes, auriculares y accesorios JBL con disponibilidad en tiempo real."
+      : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
 
   const topBarDesktopContent = (
     <>
@@ -926,13 +1039,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           <ArrowLeft className="h-4 w-4" />
           Elegir otra categoría
         </Link>
-        <Link
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-          href={`/catalogo/${alternateType.key}`}
-        >
-          {alternateType.title}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+        {alternateTypes.map((type) => (
+          <Link
+            key={type.key}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+            href={`/catalogo/${type.key}`}
+          >
+            {type.title}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        ))}
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
         <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
@@ -982,13 +1098,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             Elegir otra categoría
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <Link
-            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-            href={`/catalogo/${alternateType.key}`}
-          >
-            {alternateType.title}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          {alternateTypes.map((type) => (
+            <Link
+              key={type.key}
+              className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+              href={`/catalogo/${type.key}`}
+            >
+              {type.title}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          ))}
         </div>
       </div>
       <div className="space-y-2 text-sm text-slate-300">
@@ -1348,7 +1467,11 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                  <Smartphone className="h-6 w-6 text-sky-300" />
+                  {isGamingAudioCatalog ? (
+                    <Speaker className="h-6 w-6 text-fuchsia-300" />
+                  ) : (
+                    <Smartphone className="h-6 w-6 text-sky-300" />
+                  )}
                 </div>
                 <div>
                   <p className="text-sm uppercase tracking-[0.25em] text-slate-400">iMarket</p>
@@ -1365,7 +1488,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                     <Sparkles className="h-4 w-4 text-sky-300" />
                     Precios en USD y ARS
                   </span>
-                  {!isNewCatalog && (
+                  {isUsedCatalog && (
                     <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
                       Información protegida y resumida
                     </span>
@@ -1373,6 +1496,11 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                   {isNewCatalog && (
                     <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
                       Modelos seleccionados
+                    </span>
+                  )}
+                  {isGamingAudioCatalog && (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
+                      Productos JBL en tiempo real
                     </span>
                   )}
                 </div>
@@ -1389,7 +1517,11 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               <div className="flex items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 text-slate-300">
                 <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-400 border-t-transparent" />
                 <span className="ml-4">
-                  {isNewCatalog ? "Cargando catálogo de equipos nuevos..." : "Cargando stock en tiempo real..."}
+                  {isNewCatalog
+                    ? "Cargando catálogo de equipos nuevos..."
+                    : isGamingAudioCatalog
+                      ? "Cargando catálogo de gaming y audio..."
+                      : "Cargando stock en tiempo real..."}
                 </span>
               </div>
             ) : !isSectionVisible ? (
@@ -1398,7 +1530,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               </div>
             ) : catalogItemsCount === 0 ? (
               <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
-                No hay equipos disponibles por el momento.
+                No hay {catalogItemsLabel} disponibles por el momento.
               </div>
             ) : (
               <section className="space-y-6">
@@ -1406,7 +1538,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                   <div>
                     <h2 className="text-2xl font-semibold">{catalogType.title}</h2>
                     <p className="text-sm text-slate-400">
-                      {catalogItemsCount} equipos disponibles
+                      {catalogItemsCount} {catalogItemsLabel} disponibles
                     </p>
                   </div>
                 </div>
@@ -1470,13 +1602,10 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                           </div>
                         </div>
                       ))
-                    : inStock.map((product) => {
-                        const usedDetails = parseUsedPhoneDetails(
-                          ensureIphonePrefix(resolveProductName(product)),
-                        )
-                        return (
+                    : isGamingAudioCatalog
+                      ? jblInStock.map((item) => (
                           <div
-                            key={product.id}
+                            key={item.id}
                             className={cn(
                               "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
                               "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
@@ -1490,54 +1619,16 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                                     {catalogType.title}
                                   </p>
                                   <h3 className="text-lg font-semibold text-white">
-                                    {usedDetails.displayName}
+                                    {resolveJblCatalogName(item)}
                                   </h3>
-                                  {(usedDetails.batteryCondition ||
-                                    usedDetails.color ||
-                                    usedDetails.memory ||
-                                    usedDetails.warranty) && (
-                                    <div className="mt-3 grid gap-2 text-sm text-slate-300">
-                                      {usedDetails.batteryCondition && (
-                                        <div className="flex items-center justify-between gap-3">
-                                          <span className="text-xs text-slate-400">
-                                            Condición de batería
-                                          </span>
-                                          <span className="font-medium text-slate-100">
-                                            {usedDetails.batteryCondition}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {usedDetails.color && (
-                                        <div className="flex items-center justify-between gap-3">
-                                          <span className="text-xs text-slate-400">Color</span>
-                                          <span className="font-medium text-slate-100">
-                                            {usedDetails.color}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {usedDetails.memory && (
-                                        <div className="flex items-center justify-between gap-3">
-                                          <span className="text-xs text-slate-400">Memoria</span>
-                                          <span className="font-medium text-slate-100">
-                                            {usedDetails.memory}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {usedDetails.warranty && (
-                                        <div className="flex items-center justify-between gap-3">
-                                          <span className="text-xs text-slate-400">
-                                            Garantía oficial hasta:
-                                          </span>
-                                          <span className="font-medium text-slate-100">
-                                            {usedDetails.warranty}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
+                                  {item.category && (
+                                    <p className="mt-2 text-sm text-slate-300">
+                                      {item.category}
+                                    </p>
                                   )}
                                 </div>
                                 <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
-                                  Stock: {product.stock ?? 0}
+                                  Stock: {item.availableQuantity ?? 0}
                                 </div>
                               </div>
 
@@ -1546,20 +1637,20 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                                   <div>
                                     <p className="text-xs text-slate-400">Precio USD</p>
                                     <p className="text-lg font-semibold text-sky-200">
-                                      {formatUsdPrice(product.price, usdRate)}
+                                      {formatUsdPrice(item.salePrice, usdRate)}
                                     </p>
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
                                   <span className="text-xs text-slate-400">Precio en pesos actual</span>
                                   <span className="font-semibold text-emerald-200">
-                                    {formatArsPriceBlue(product.price, usdRate)}
+                                    {formatArsPriceBlue(item.salePrice, usdRate)}
                                   </span>
                                 </div>
                               </div>
                               <a
                                 className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
-                                href={buildWhatsAppLink(product, usdRate)}
+                                href={buildWhatsAppLinkForJbl(item, usdRate)}
                                 target="_blank"
                                 rel="noreferrer"
                               >
@@ -1567,8 +1658,106 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                               </a>
                             </div>
                           </div>
-                        )
-                      })}
+                        ))
+                      : inStock.map((product) => {
+                          const usedDetails = parseUsedPhoneDetails(
+                            ensureIphonePrefix(resolveProductName(product)),
+                          )
+                          return (
+                            <div
+                              key={product.id}
+                              className={cn(
+                                "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20",
+                                "before:absolute before:inset-0 before:bg-gradient-to-br before:opacity-0 before:transition-opacity before:duration-300 group-hover:before:opacity-100",
+                                `before:${catalogType.accent}`,
+                              )}
+                            >
+                              <div className="relative space-y-4">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                                      {catalogType.title}
+                                    </p>
+                                    <h3 className="text-lg font-semibold text-white">
+                                      {usedDetails.displayName}
+                                    </h3>
+                                    {(usedDetails.batteryCondition ||
+                                      usedDetails.color ||
+                                      usedDetails.memory ||
+                                      usedDetails.warranty) && (
+                                      <div className="mt-3 grid gap-2 text-sm text-slate-300">
+                                        {usedDetails.batteryCondition && (
+                                          <div className="flex items-center justify-between gap-3">
+                                            <span className="text-xs text-slate-400">
+                                              Condición de batería
+                                            </span>
+                                            <span className="font-medium text-slate-100">
+                                              {usedDetails.batteryCondition}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {usedDetails.color && (
+                                          <div className="flex items-center justify-between gap-3">
+                                            <span className="text-xs text-slate-400">Color</span>
+                                            <span className="font-medium text-slate-100">
+                                              {usedDetails.color}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {usedDetails.memory && (
+                                          <div className="flex items-center justify-between gap-3">
+                                            <span className="text-xs text-slate-400">Memoria</span>
+                                            <span className="font-medium text-slate-100">
+                                              {usedDetails.memory}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {usedDetails.warranty && (
+                                          <div className="flex items-center justify-between gap-3">
+                                            <span className="text-xs text-slate-400">
+                                              Garantía oficial hasta:
+                                            </span>
+                                            <span className="font-medium text-slate-100">
+                                              {usedDetails.warranty}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="rounded-2xl bg-white/10 px-3 py-1 text-xs text-slate-200">
+                                    Stock: {product.stock ?? 0}
+                                  </div>
+                                </div>
+
+                                <div className="grid gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs text-slate-400">Precio USD</p>
+                                      <p className="text-lg font-semibold text-sky-200">
+                                        {formatUsdPrice(product.price, usdRate)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
+                                    <span className="text-xs text-slate-400">Precio en pesos actual</span>
+                                    <span className="font-semibold text-emerald-200">
+                                      {formatArsPriceBlue(product.price, usdRate)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <a
+                                  className="inline-flex items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
+                                  href={buildWhatsAppLink(product, usdRate)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Consultar por WhatsApp
+                                </a>
+                              </div>
+                            </div>
+                          )
+                        })}
                 </div>
               </section>
             )}
