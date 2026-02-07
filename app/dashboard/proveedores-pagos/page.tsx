@@ -6,6 +6,14 @@ import DashboardLayout from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -57,6 +65,7 @@ export default function ProveedoresPagosPage() {
   const [transactions, setTransactions] = useState<Record<string, ProviderTransaction[]>>({})
   const [activeProviderId, setActiveProviderId] = useState<string>("")
   const [newProviderName, setNewProviderName] = useState("")
+  const [isCreateProviderOpen, setIsCreateProviderOpen] = useState(false)
   const [formsByProvider, setFormsByProvider] = useState<Record<string, ProviderFormState>>({})
 
   useEffect(() => {
@@ -138,6 +147,7 @@ export default function ProveedoresPagosPage() {
         createdAt: new Date().toISOString(),
       })
       setNewProviderName("")
+      setIsCreateProviderOpen(false)
       toast.success("Proveedor creado", { description: "El proveedor fue agregado correctamente." })
     } catch (error) {
       console.error("Error al crear proveedor:", error)
@@ -380,13 +390,27 @@ export default function ProveedoresPagosPage() {
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Nuevo proveedor</CardTitle>
-            <CardDescription>Agrega proveedores para gestionar sus compras y pagos.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-2">
+        <div>
+          <Button onClick={() => setIsCreateProviderOpen(true)}>Nuevo proveedor</Button>
+        </div>
+
+        <Dialog
+          open={isCreateProviderOpen}
+          onOpenChange={(open) => {
+            setIsCreateProviderOpen(open)
+            if (!open) {
+              setNewProviderName("")
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Nuevo proveedor</DialogTitle>
+              <DialogDescription>
+                Agrega proveedores para gestionar sus compras y pagos.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
               <Label htmlFor="provider-name">Nombre del proveedor</Label>
               <Input
                 id="provider-name"
@@ -395,9 +419,14 @@ export default function ProveedoresPagosPage() {
                 onChange={(event) => setNewProviderName(event.target.value)}
               />
             </div>
-            <Button onClick={handleAddProvider}>Crear proveedor</Button>
-          </CardContent>
-        </Card>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateProviderOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleAddProvider}>Crear proveedor</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {providers.length === 0 ? (
           <Card>
