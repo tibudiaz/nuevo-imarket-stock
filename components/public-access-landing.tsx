@@ -12,25 +12,34 @@ import { fetchPublicRealtimeValue } from "@/lib/public-realtime"
 import CatalogAd from "@/components/catalog-ad"
 import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
 
+type PublicCatalog = {
+  id: string
+  key: string
+  name: string
+  logoUrl?: string
+  welcomeText?: string
+  createdAt?: string
+}
+
 const baseLandingOptions = [
   {
     title: "Celulares nuevos",
     description: "Explorá los últimos modelos con garantía oficial y stock actualizado.",
-    href: "/catalogo/nuevos",
+    href: "/catalogo?tipo=nuevos",
     accent: "from-emerald-400/20 via-emerald-300/5 to-transparent",
     icon: Sparkles,
   },
   {
     title: "Celulares usados",
     description: "Revisá el stock de equipos usados certificados y listos para entrega.",
-    href: "/catalogo/usados",
+    href: "/catalogo?tipo=usados",
     accent: "from-sky-500/20 via-sky-400/5 to-transparent",
     icon: Smartphone,
   },
   {
     title: "Gaming y audio",
     description: "Descubrí parlantes, auriculares y accesorios JBL listos para entrega.",
-    href: "/catalogo/gaming-audio",
+    href: "/catalogo?tipo=gaming-audio",
     accent: "from-fuchsia-500/20 via-purple-400/5 to-transparent",
     icon: Speaker,
   },
@@ -40,6 +49,7 @@ export default function PublicAccessLanding() {
   const [offers, setOffers] = useState<string[]>([])
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [catalogBottomAd, setCatalogBottomAd] = useState<CatalogAdConfig | null>(null)
+  const [publicCatalogs, setPublicCatalogs] = useState<PublicCatalog[]>([])
   const [secretClickCount, setSecretClickCount] = useState(0)
   const router = useRouter()
 
@@ -61,6 +71,27 @@ export default function PublicAccessLanding() {
         })
         .filter((text) => text.trim().length > 0)
       setOffers(items)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const catalogsRef = ref(database, "config/publicCatalogs")
+    const unsubscribe = onValue(catalogsRef, (snapshot) => {
+      const data = snapshot.val()
+      const list: PublicCatalog[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({
+            id,
+            key: value?.key ? String(value.key) : id,
+            name: value?.name ? String(value.name) : id,
+            logoUrl: value?.logoUrl ? String(value.logoUrl) : undefined,
+            welcomeText: value?.welcomeText ? String(value.welcomeText) : undefined,
+            createdAt: value?.createdAt,
+          }))
+        : []
+      list.sort((a, b) => a.name.localeCompare(b.name, "es"))
+      setPublicCatalogs(list)
     })
 
     return () => unsubscribe()
@@ -110,7 +141,16 @@ export default function PublicAccessLanding() {
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
 
-  const landingOptions = baseLandingOptions
+  const landingOptions = [
+    ...baseLandingOptions,
+    ...publicCatalogs.map((catalog) => ({
+      title: catalog.name,
+      description: "Catálogo personalizado con equipos nuevos seleccionados.",
+      href: `/catalogo?tipo=${encodeURIComponent(catalog.key)}`,
+      accent: "from-emerald-400/20 via-emerald-300/5 to-transparent",
+      icon: Sparkles,
+    })),
+  ]
 
   const handleSecretDashboardAccess = () => {
     setSecretClickCount((previous) => {
@@ -141,7 +181,7 @@ export default function PublicAccessLanding() {
               </Link>
               <Link
                 className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-slate-100 transition hover:border-emerald-300/60"
-                href="/catalogo/nuevos?auth=login"
+                href="/catalogo?tipo=nuevos&auth=login"
               >
                 Iniciar sesión / Registrarse
               </Link>
@@ -177,7 +217,7 @@ export default function PublicAccessLanding() {
                 <div className="grid gap-2">
                   <Link
                     className="flex items-center justify-between rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-slate-100"
-                    href="/catalogo/nuevos?auth=login"
+                    href="/catalogo?tipo=nuevos&auth=login"
                   >
                     Iniciar sesión / Registrarse
                     <ArrowRight className="h-4 w-4" />
