@@ -11,6 +11,8 @@ import {
   Wifi,
 } from "lucide-react"
 
+import PublicTopBar from "@/components/public-top-bar"
+
 const quickTips = [
   {
     title: "Usá carga inteligente",
@@ -119,19 +121,41 @@ export default function IphoneCarePage() {
       <div className="pointer-events-none absolute -left-20 top-24 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl animate-pulse" />
       <div className="pointer-events-none absolute -right-24 bottom-10 h-80 w-80 rounded-full bg-sky-400/10 blur-3xl animate-pulse" />
       <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pb-20 pt-10">
+        <PublicTopBar
+          marqueeItems={[
+            "Cuidados simples para que tu iPhone rinda más.",
+            "Tips claros para batería, limpieza y seguridad.",
+            "Protegé tu equipo con hábitos que suman.",
+          ]}
+          desktopContent={
+            <div className="flex items-center gap-3 text-sm text-slate-300">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/10"
+              >
+                Volver al inicio
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200/90">
+                Guía de cuidado
+              </span>
+            </div>
+          }
+          mobileContent={
+            <div className="space-y-3 text-sm text-slate-200">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Accesos</p>
+              <Link
+                href="/"
+                className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+              >
+                Volver al inicio
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          }
+        />
+
         <header className="flex flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/10"
-            >
-              Volver al inicio
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200/90">
-              Guía de cuidado
-            </span>
-          </div>
           <div className="space-y-4">
             <h1 className="text-4xl font-semibold md:text-5xl">
               Recomendaciones para cuidar tu iPhone
@@ -151,51 +175,6 @@ export default function IphoneCarePage() {
             </span>
           </div>
         </header>
-
-        <section className="grid items-center gap-10 rounded-3xl border border-white/10 bg-white/5 p-8 md:grid-cols-[1.1fr,0.9fr]">
-          <div className="space-y-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-              Cuidado guiado
-            </p>
-            <h2 className="text-3xl font-semibold text-white">
-              Recordatorios visuales para cuidar cada detalle.
-            </h2>
-            <p className="text-sm text-slate-300">
-              Un vistazo rápido para identificar las mejores prácticas de carga, limpieza y
-              protección. Mantené tu equipo siempre listo con hábitos simples.
-            </p>
-            <div className="flex flex-wrap gap-3 text-xs text-slate-300">
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                Rutina clara
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                Señales sutiles
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                Enfoque en protección
-              </span>
-            </div>
-          </div>
-          <div className="relative mx-auto flex h-64 w-full max-w-sm items-center justify-center">
-            <div className="absolute inset-0 rounded-[32px] bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.2),transparent_65%)]" />
-            <div className="relative h-56 w-56">
-              <div className="absolute left-10 top-3 h-44 w-24 rounded-[28px] border border-white/15 bg-slate-900/70 shadow-[0_10px_30px_rgba(15,23,42,0.5)] animate-phone-float">
-                <div className="absolute left-2 top-2 h-3 w-8 rounded-full bg-white/10" />
-                <div className="absolute inset-3 rounded-[22px] bg-gradient-to-br from-slate-800 via-slate-900 to-black/80 animate-charge-pulse" />
-                <div className="absolute bottom-3 left-7 h-2 w-10 rounded-full bg-emerald-300/40" />
-              </div>
-              <div className="absolute left-0 bottom-6 h-1.5 w-28 rounded-full bg-white/20 animate-cable-pulse" />
-              <div className="absolute -left-4 bottom-2 h-12 w-16 rounded-2xl border border-white/20 bg-slate-900/80 animate-plug-in">
-                <div className="absolute inset-3 rounded-xl bg-slate-800/80" />
-                <div className="absolute right-3 top-4 h-4 w-1 rounded-full bg-emerald-300/70" />
-                <div className="absolute right-6 top-4 h-4 w-1 rounded-full bg-emerald-300/70" />
-              </div>
-              <div className="absolute left-24 top-1 h-3 w-3 rounded-full bg-emerald-300/60 blur-[0.5px] animate-spark" />
-              <div className="absolute left-4 top-14 h-2 w-2 rounded-full bg-sky-300/50 blur-[0.5px] animate-spark [animation-delay:0.6s]" />
-              <div className="absolute right-6 top-10 h-2.5 w-2.5 rounded-full bg-white/40 blur-[0.5px] animate-spark [animation-delay:1.2s]" />
-            </div>
-          </div>
-        </section>
 
         <section className="grid gap-6 md:grid-cols-2">
           {quickTips.map((tip) => {
@@ -230,6 +209,20 @@ export default function IphoneCarePage() {
                 />
                 <div className="pointer-events-none absolute right-6 top-6 h-10 w-10 rounded-full border border-white/15 bg-white/5 motion-safe:animate-care-orbit" />
                 <div className="pointer-events-none absolute left-4 top-6 h-16 w-0.5 rounded-full bg-gradient-to-b from-white/5 via-white/30 to-white/5 motion-safe:animate-care-line" />
+                <div className="pointer-events-none absolute -bottom-8 right-0 h-28 w-20 rounded-[26px] border border-white/10 bg-slate-900/60 shadow-[0_10px_30px_rgba(15,23,42,0.45)] opacity-70 motion-safe:animate-phone-float">
+                  <div className="absolute left-2 top-2 h-3 w-8 rounded-full bg-white/10" />
+                  <div className="absolute inset-3 rounded-[20px] bg-gradient-to-br from-slate-800 via-slate-900 to-black/80 motion-safe:animate-charge-pulse" />
+                  <div className="absolute bottom-3 left-6 h-1.5 w-8 rounded-full bg-emerald-300/40" />
+                </div>
+                <div className="pointer-events-none absolute bottom-4 right-16 h-1.5 w-16 rounded-full bg-white/15 opacity-60 motion-safe:animate-cable-pulse" />
+                <div className="pointer-events-none absolute bottom-1 right-20 h-10 w-12 rounded-2xl border border-white/15 bg-slate-900/70 opacity-70 motion-safe:animate-plug-in">
+                  <div className="absolute inset-2 rounded-xl bg-slate-800/80" />
+                  <div className="absolute right-2 top-3 h-3 w-0.5 rounded-full bg-emerald-300/70" />
+                  <div className="absolute right-4 top-3 h-3 w-0.5 rounded-full bg-emerald-300/70" />
+                </div>
+                <div className="pointer-events-none absolute right-8 top-16 h-2.5 w-2.5 rounded-full bg-emerald-300/60 blur-[0.5px] motion-safe:animate-spark" />
+                <div className="pointer-events-none absolute right-16 top-10 h-2 w-2 rounded-full bg-sky-300/50 blur-[0.5px] motion-safe:animate-spark [animation-delay:0.6s]" />
+                <div className="pointer-events-none absolute right-2 top-12 h-3 w-3 rounded-full bg-white/40 blur-[0.5px] motion-safe:animate-spark [animation-delay:1.2s]" />
                 <div className="flex items-center gap-3">
                   <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 transition group-hover:scale-105 group-hover:bg-sky-500/10">
                     <div className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 blur-md transition group-hover:opacity-100 motion-safe:animate-care-glow" />
