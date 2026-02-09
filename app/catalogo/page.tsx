@@ -1,16 +1,15 @@
-"use client"
-
-import { Suspense, useMemo } from "react"
-import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 
 import PublicStockClient from "./[tipo]/ClientPage"
 
-export default function PublicCatalogPage() {
-  const searchParams = useSearchParams()
-  const tipo = useMemo(() => {
-    const value = searchParams?.get("tipo")
-    return typeof value === "string" && value.trim().length > 0 ? value : "nuevos"
-  }, [searchParams])
+type CatalogPageProps = {
+  searchParams?: { tipo?: string }
+}
+
+export default function PublicCatalogPage({ searchParams }: CatalogPageProps) {
+  const tipo = typeof searchParams?.tipo === "string" && searchParams.tipo.trim().length > 0
+    ? searchParams.tipo
+    : "nuevos"
 
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Cargando…</div>}>
