@@ -18,7 +18,7 @@ export default function PublicTopBar({
 }: PublicTopBarProps) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-black/10">
-      <div className="hidden w-full flex-wrap items-center justify-between gap-4 md:flex">
+      <div className="hidden w-full items-center justify-between gap-4 md:flex md:flex-nowrap">
         {desktopContent}
       </div>
       <div className="mt-3 flex items-center gap-3">
