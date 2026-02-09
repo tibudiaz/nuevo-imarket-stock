@@ -6,6 +6,7 @@ export type CatalogAdPage =
   | "nuevos"
   | "usados"
   | "gaming-audio"
+  | (string & {})
 
 export type CatalogAdAsset = {
   url: string

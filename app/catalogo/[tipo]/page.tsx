@@ -2,7 +2,7 @@ import { Suspense } from "react"
 
 import PublicStockClient from "./ClientPage"
 
-export const dynamicParams = false
+export const dynamicParams = true
 
 export function generateStaticParams() {
   return [{ tipo: "nuevos" }, { tipo: "usados" }, { tipo: "gaming-audio" }]

@@ -93,6 +93,14 @@ interface NewCatalogItem {
   name: string;
   price?: number;
   status?: string;
+  catalogKey?: string;
+  createdAt?: string;
+}
+
+interface PublicCatalog {
+  id: string;
+  key: string;
+  name: string;
   createdAt?: string;
 }
 
@@ -157,6 +165,16 @@ const parseOptionalNumber = (value: unknown): number | undefined => {
     }
   }
   return undefined;
+};
+
+const slugifyCatalogKey = (value: string): string => {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
 };
 
 const generateUploadSessionId = () => {
@@ -336,6 +354,9 @@ export default function SettingsPage() {
   const [offers, setOffers] = useState<OfferItem[]>([]);
   const [newOfferText, setNewOfferText] = useState("");
   const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([]);
+  const [publicCatalogs, setPublicCatalogs] = useState<PublicCatalog[]>([]);
+  const [newPublicCatalogName, setNewPublicCatalogName] = useState("");
+  const [selectedNewCatalogKey, setSelectedNewCatalogKey] = useState("nuevos");
   const [newCatalogName, setNewCatalogName] = useState("");
   const [newCatalogPrice, setNewCatalogPrice] = useState("");
   const [newCatalogStatus, setNewCatalogStatus] = useState("");
@@ -423,6 +444,21 @@ export default function SettingsPage() {
       setOffers(offerList.filter((offer) => offer.text.trim() !== ""));
     });
 
+    const publicCatalogsRef = ref(database, "config/publicCatalogs");
+    onValue(publicCatalogsRef, (snapshot) => {
+      const data = snapshot.val();
+      const catalogList: PublicCatalog[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({
+            id,
+            key: value?.key ? String(value.key) : id,
+            name: value?.name ? String(value.name) : id,
+            createdAt: value?.createdAt,
+          }))
+        : [];
+      catalogList.sort((a, b) => a.name.localeCompare(b.name, "es"));
+      setPublicCatalogs(catalogList);
+    });
+
     const catalogAdsRef = ref(database, "config/catalogAds");
     onValue(catalogAdsRef, (snapshot) => {
       const data = snapshot.val();
@@ -449,6 +485,7 @@ export default function SettingsPage() {
             name: String(value?.name ?? ""),
             price: typeof value?.price === "number" ? value.price : undefined,
             status: value?.status ? String(value.status) : undefined,
+            catalogKey: value?.catalogKey ? String(value.catalogKey) : "nuevos",
             createdAt: value?.createdAt,
           }))
         : [];
@@ -489,6 +526,15 @@ export default function SettingsPage() {
       unsubscribeNewCatalog();
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      selectedNewCatalogKey !== "nuevos" &&
+      !publicCatalogs.some((catalog) => catalog.key === selectedNewCatalogKey)
+    ) {
+      setSelectedNewCatalogKey("nuevos");
+    }
+  }, [publicCatalogs, selectedNewCatalogKey]);
 
   useEffect(() => {
     const current = catalogAds[selectedCatalogAdPage];
@@ -755,6 +801,52 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAddPublicCatalog = async () => {
+    const trimmedName = newPublicCatalogName.trim();
+    if (!trimmedName) {
+      toast.error("El nombre del catálogo es obligatorio.");
+      return;
+    }
+
+    const key = slugifyCatalogKey(trimmedName);
+    if (!key) {
+      toast.error("Ingresá un nombre válido para generar el enlace.");
+      return;
+    }
+    if (key === "nuevos" || key === "usados" || key === "gaming-audio") {
+      toast.error("Ese nombre ya está reservado para un catálogo existente.");
+      return;
+    }
+    if (publicCatalogs.some((catalog) => catalog.key === key)) {
+      toast.error("Ya existe un catálogo con ese nombre.");
+      return;
+    }
+
+    try {
+      await set(ref(database, `config/publicCatalogs/${key}`), {
+        key,
+        name: trimmedName,
+        createdAt: new Date().toISOString(),
+      });
+      setNewPublicCatalogName("");
+      toast.success("Catálogo público creado.");
+    } catch (error) {
+      console.error("Error al crear catálogo público:", error);
+      toast.error("No se pudo crear el catálogo.");
+    }
+  };
+
+  const handleRemovePublicCatalog = async (catalogKey: string) => {
+    if (!window.confirm("¿Seguro que querés eliminar este catálogo público?")) return;
+    try {
+      await remove(ref(database, `config/publicCatalogs/${catalogKey}`));
+      toast.success("Catálogo eliminado.");
+    } catch (error) {
+      console.error("Error al eliminar catálogo público:", error);
+      toast.error("No se pudo eliminar el catálogo.");
+    }
+  };
+
   const handleAddNewCatalogItem = async () => {
     const trimmedName = newCatalogName.trim();
     const trimmedStatus = newCatalogStatus.trim();
@@ -780,6 +872,7 @@ export default function SettingsPage() {
     try {
       const payload: Record<string, string | number> = {
         name: trimmedName,
+        catalogKey: selectedNewCatalogKey,
         createdAt: new Date().toISOString(),
       };
       if (typeof price === "number") {
@@ -1281,6 +1374,27 @@ export default function SettingsPage() {
 
   const catalogAdFileAccept = catalogAdType === "video" ? "video/*" : "image/*";
   const catalogAdAllowMultiple = catalogAdType !== "video";
+  const catalogOptions = [
+    { key: "nuevos", label: "Catálogo de nuevos" },
+    ...publicCatalogs.map((catalog) => ({
+      key: catalog.key,
+      label: catalog.name,
+    })),
+  ];
+  const catalogOptionsByKey = new Map(
+    catalogOptions.map((option) => [option.key, option.label])
+  );
+  const catalogAdLocations = [
+    { key: "landing", label: "Selección de catálogo (superior)" },
+    { key: "landingBottom", label: "Selección de catálogo (inferior)" },
+    { key: "nuevos", label: "Catálogo de nuevos" },
+    { key: "usados", label: "Catálogo de usados" },
+    { key: "gaming-audio", label: "Catálogo de gaming y audio" },
+    ...publicCatalogs.map((catalog) => ({
+      key: catalog.key,
+      label: `Catálogo de ${catalog.name}`,
+    })),
+  ];
   const catalogAdResolvedOrigin =
     catalogAdUploadOrigin || (typeof window !== "undefined" ? window.location.origin : "");
   const catalogAdUploadLink =
@@ -1614,11 +1728,11 @@ export default function SettingsPage() {
                       <SelectValue placeholder="Elegí la sección" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="landing">Selección de catálogo (superior)</SelectItem>
-                      <SelectItem value="landingBottom">Selección de catálogo (inferior)</SelectItem>
-                      <SelectItem value="nuevos">Catálogo de nuevos</SelectItem>
-                      <SelectItem value="usados">Catálogo de usados</SelectItem>
-                      <SelectItem value="gaming-audio">Catálogo de gaming y audio</SelectItem>
+                      {catalogAdLocations.map((location) => (
+                        <SelectItem key={location.key} value={location.key}>
+                          {location.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1831,6 +1945,67 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle>Catálogos públicos personalizados</CardTitle>
+              <CardDescription>
+                Creá nuevas secciones públicas que funcionan igual que el catálogo de nuevos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="public-catalog-name">Nombre del catálogo</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="public-catalog-name"
+                    value={newPublicCatalogName}
+                    onChange={(event) => setNewPublicCatalogName(event.target.value)}
+                    placeholder="Ej. Celulares premium"
+                  />
+                  <Button onClick={handleAddPublicCatalog} className="sm:w-40">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Crear catálogo
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  El enlace público se genera automáticamente con el nombre que ingreses.
+                </p>
+              </div>
+              <Separator />
+              <ScrollArea className="h-48">
+                <div className="space-y-2">
+                  {publicCatalogs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No hay catálogos personalizados creados.
+                    </p>
+                  ) : (
+                    publicCatalogs.map((catalog) => (
+                      <div
+                        key={catalog.key}
+                        className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-medium">{catalog.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Enlace: /catalogo/{catalog.key}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleRemovePublicCatalog(catalog.key)}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Catálogo de equipos nuevos</CardTitle>
               <CardDescription>
                 Cargá modelos nuevos que no se descuentan del stock. Podés incluir precio y/o una
@@ -1838,7 +2013,7 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-4">
                 <div className="space-y-2 md:col-span-1">
                   <Label htmlFor="new-catalog-name">Nombre del equipo</Label>
                   <Input
@@ -1847,6 +2022,24 @@ export default function SettingsPage() {
                     onChange={(e) => setNewCatalogName(e.target.value)}
                     placeholder="Ej. iPhone 15 Pro"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Catálogo</Label>
+                  <Select
+                    value={selectedNewCatalogKey}
+                    onValueChange={(value) => setSelectedNewCatalogKey(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Elegí el catálogo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catalogOptions.map((option) => (
+                        <SelectItem key={option.key} value={option.key}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-catalog-price">Precio</Label>
@@ -1889,6 +2082,10 @@ export default function SettingsPage() {
                       >
                         <div>
                           <p className="font-medium">{item.name}</p>
+                          <Badge variant="secondary" className="mt-1 w-fit">
+                            {catalogOptionsByKey.get(item.catalogKey ?? "nuevos") ??
+                              "Catálogo de nuevos"}
+                          </Badge>
                           <div className="text-xs text-muted-foreground">
                             {typeof item.price === "number"
                               ? `Precio: ${item.price}`
