@@ -25,6 +25,12 @@ body {
   .animate-spark {
     animation: spark 3s ease-in-out infinite;
   }
+  .animate-ambient-float {
+    animation: ambient-float 12s ease-in-out infinite;
+  }
+  .animate-ambient-float-slow {
+    animation: ambient-float 16s ease-in-out infinite;
+  }
 }
 
 @keyframes phone-float {
@@ -78,6 +84,16 @@ body {
   50% {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+@keyframes ambient-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -16px, 0);
   }
 }
 
