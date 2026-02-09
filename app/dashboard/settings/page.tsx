@@ -101,6 +101,8 @@ interface PublicCatalog {
   id: string;
   key: string;
   name: string;
+  logoUrl?: string;
+  welcomeText?: string;
   createdAt?: string;
 }
 
@@ -356,6 +358,8 @@ export default function SettingsPage() {
   const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([]);
   const [publicCatalogs, setPublicCatalogs] = useState<PublicCatalog[]>([]);
   const [newPublicCatalogName, setNewPublicCatalogName] = useState("");
+  const [newPublicCatalogLogoUrl, setNewPublicCatalogLogoUrl] = useState("");
+  const [newPublicCatalogWelcomeText, setNewPublicCatalogWelcomeText] = useState("");
   const [selectedNewCatalogKey, setSelectedNewCatalogKey] = useState("nuevos");
   const [newCatalogName, setNewCatalogName] = useState("");
   const [newCatalogPrice, setNewCatalogPrice] = useState("");
@@ -452,6 +456,8 @@ export default function SettingsPage() {
             id,
             key: value?.key ? String(value.key) : id,
             name: value?.name ? String(value.name) : id,
+            logoUrl: value?.logoUrl ? String(value.logoUrl) : undefined,
+            welcomeText: value?.welcomeText ? String(value.welcomeText) : undefined,
             createdAt: value?.createdAt,
           }))
         : [];
@@ -803,6 +809,8 @@ export default function SettingsPage() {
 
   const handleAddPublicCatalog = async () => {
     const trimmedName = newPublicCatalogName.trim();
+    const trimmedLogoUrl = newPublicCatalogLogoUrl.trim();
+    const trimmedWelcomeText = newPublicCatalogWelcomeText.trim();
     if (!trimmedName) {
       toast.error("El nombre del catálogo es obligatorio.");
       return;
@@ -826,9 +834,13 @@ export default function SettingsPage() {
       await set(ref(database, `config/publicCatalogs/${key}`), {
         key,
         name: trimmedName,
+        logoUrl: trimmedLogoUrl || null,
+        welcomeText: trimmedWelcomeText || null,
         createdAt: new Date().toISOString(),
       });
       setNewPublicCatalogName("");
+      setNewPublicCatalogLogoUrl("");
+      setNewPublicCatalogWelcomeText("");
       toast.success("Catálogo público creado.");
     } catch (error) {
       console.error("Error al crear catálogo público:", error);
@@ -1969,6 +1981,30 @@ export default function SettingsPage() {
                   El enlace público se genera automáticamente con el nombre que ingreses.
                 </p>
               </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="public-catalog-logo">Logo del catálogo (URL)</Label>
+                  <Input
+                    id="public-catalog-logo"
+                    value={newPublicCatalogLogoUrl}
+                    onChange={(event) => setNewPublicCatalogLogoUrl(event.target.value)}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Podés usar una imagen alojada en Firebase Storage u otro servicio.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="public-catalog-welcome">Texto de bienvenida</Label>
+                  <Textarea
+                    id="public-catalog-welcome"
+                    value={newPublicCatalogWelcomeText}
+                    onChange={(event) => setNewPublicCatalogWelcomeText(event.target.value)}
+                    placeholder="Ej. Bienvenido a nuestro catálogo premium."
+                    rows={3}
+                  />
+                </div>
+              </div>
               <Separator />
               <ScrollArea className="h-48">
                 <div className="space-y-2">
@@ -1985,7 +2021,7 @@ export default function SettingsPage() {
                         <div>
                           <p className="font-medium">{catalog.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Enlace: /catalogo/{catalog.key}
+                            Enlace: /catalogo?tipo={catalog.key}
                           </p>
                         </div>
                         <Button
