@@ -20,8 +20,8 @@ type Obstacle = {
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 const createObstacle = (canvasWidth: number): Obstacle => {
-  const width = 16 + Math.random() * 18
-  const height = 22 + Math.random() * 24
+  const width = 18 + Math.random() * 10
+  const height = 32 + Math.random() * 20
   return {
     x: canvasWidth + width,
     width,
@@ -103,20 +103,30 @@ export default function DinoRunner({ className }: { className?: string }) {
       context.lineTo(canvasWidth, CANVAS_HEIGHT - GROUND_HEIGHT + 2)
       context.stroke()
 
-      context.fillStyle = "#e2e8f0"
-      context.fillRect(52, dinoYRef.current, DINO_WIDTH, DINO_HEIGHT)
-      context.fillStyle = "#0f172a"
-      context.fillRect(66, dinoYRef.current + 8, 6, 6)
-      context.fillRect(60, dinoYRef.current + 22, 12, 4)
+      const runnerX = 52
+      const runnerY = dinoYRef.current
 
-      context.fillStyle = "#38bdf8"
+      context.fillStyle = "#e2e8f0"
+      context.beginPath()
+      context.arc(runnerX + 14, runnerY + 6, 6, 0, Math.PI * 2)
+      context.fill()
+      context.fillRect(runnerX + 11, runnerY + 12, 6, 12)
+      context.fillRect(runnerX + 6, runnerY + 14, 5, 3)
+      context.fillRect(runnerX + 17, runnerY + 14, 5, 3)
+      context.fillRect(runnerX + 9, runnerY + 24, 4, 8)
+      context.fillRect(runnerX + 15, runnerY + 24, 4, 8)
+
+      context.fillStyle = "#0f172a"
+      context.fillRect(runnerX + 13, runnerY + 4, 2, 2)
+
       obstaclesRef.current.forEach((obstacle) => {
-        context.fillRect(
-          obstacle.x,
-          CANVAS_HEIGHT - GROUND_HEIGHT - obstacle.height,
-          obstacle.width,
-          obstacle.height,
-        )
+        const phoneY = CANVAS_HEIGHT - GROUND_HEIGHT - obstacle.height
+        context.fillStyle = "#38bdf8"
+        context.fillRect(obstacle.x, phoneY, obstacle.width, obstacle.height)
+        context.fillStyle = "#0f172a"
+        context.fillRect(obstacle.x + 2, phoneY + 4, obstacle.width - 4, obstacle.height - 8)
+        context.fillStyle = "#e2e8f0"
+        context.fillRect(obstacle.x + obstacle.width / 2 - 3, phoneY + 2, 6, 2)
       })
 
       context.fillStyle = "rgba(226, 232, 240, 0.85)"
