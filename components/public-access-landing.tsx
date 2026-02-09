@@ -11,6 +11,7 @@ import { database } from "@/lib/firebase"
 import { fetchPublicRealtimeValue } from "@/lib/public-realtime"
 import CatalogAd from "@/components/catalog-ad"
 import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
+import DinoRunner from "@/components/dino-runner"
 
 const landingOptions = [
   {
@@ -40,6 +41,7 @@ export default function PublicAccessLanding() {
   const [offers, setOffers] = useState<string[]>([])
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [catalogBottomAd, setCatalogBottomAd] = useState<CatalogAdConfig | null>(null)
+  const [landingGameEnabled, setLandingGameEnabled] = useState(true)
   const [secretClickCount, setSecretClickCount] = useState(0)
   const router = useRouter()
 
@@ -103,6 +105,41 @@ export default function PublicAccessLanding() {
       isMounted = false
       unsubscribeTopAd()
       unsubscribeBottomAd()
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const syncGameConfig = (value: unknown) => {
+      if (!isMounted) return
+      if (!value) {
+        setLandingGameEnabled(true)
+        return
+      }
+      if (typeof value === "object" && value && "enabled" in value) {
+        setLandingGameEnabled(Boolean((value as { enabled?: boolean }).enabled))
+        return
+      }
+      setLandingGameEnabled(Boolean(value))
+    }
+
+    fetchPublicRealtimeValue<unknown>("config/landingGame").then(syncGameConfig)
+
+    const gameRef = ref(database, "config/landingGame")
+    const unsubscribe = onValue(
+      gameRef,
+      (snapshot) => {
+        syncGameConfig(snapshot.val())
+      },
+      () => {
+        fetchPublicRealtimeValue<unknown>("config/landingGame").then(syncGameConfig)
+      },
+    )
+
+    return () => {
+      isMounted = false
+      unsubscribe()
     }
   }, [])
 
@@ -287,78 +324,38 @@ export default function PublicAccessLanding() {
           </section>
 
         </div>
-        <CatalogAd config={catalogBottomAd} className="mt-2" />
 
-        <section className="mt-12 flex flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-8">
-          <div className="flex flex-col gap-3">
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Zona de juego</p>
-            <h2 className="text-2xl font-semibold text-white">
-              Mario Bross: misión rescatar el iPhone
-            </h2>
-            <p className="max-w-3xl text-sm text-slate-300">
-              El clásico estilo Mario Bross, pero con una misión distinta: atravesá el reino,
-              evitá las trampas y llegá al castillo para salvar un iPhone en lugar de la
-              princesa.
-            </p>
-          </div>
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-6">
-              <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
-                <span>Mario Bross</span>
-                <span>World 1-1</span>
-              </div>
-              <div className="mt-5 flex flex-col gap-4">
-                <div className="grid grid-cols-12 gap-1">
-                  {Array.from({ length: 24 }).map((_, index) => (
-                    <div
-                      key={`block-${index}`}
-                      className="col-span-2 h-3 rounded-sm bg-amber-500/80"
-                    />
-                  ))}
+        {landingGameEnabled && (
+          <section className="mt-8 flex flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-8">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Zona de juego</p>
+              <h2 className="text-2xl font-semibold text-white">Dino Rex Runner</h2>
+              <p className="max-w-3xl text-sm text-slate-300">
+                Un runner clásico sin copyrights: esquivá obstáculos, acelerá el ritmo y superá
+                tu mejor puntaje.
+              </p>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <DinoRunner />
+              <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 via-slate-950/70 to-slate-900/90 p-6">
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-white">¿Cómo se juega?</h3>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    <li>• Saltá con espacio (o tocando la pantalla).</li>
+                    <li>• Esquivá los cactus y mantené el ritmo.</li>
+                    <li>• Cada metro suma, cada choque reinicia.</li>
+                  </ul>
                 </div>
-                <div className="relative flex h-32 items-end justify-between rounded-xl bg-gradient-to-b from-sky-500/30 via-sky-400/10 to-slate-950/80 px-6 py-4">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-10 w-10 rounded-sm bg-red-500 shadow-[0_0_18px_rgba(248,113,113,0.7)]" />
-                    <span className="text-[11px] text-slate-300">Mario</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-12 w-8 rounded-sm bg-emerald-500/80" />
-                    <span className="text-[11px] text-slate-300">Tubo</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-12 w-16 rounded-sm bg-amber-400/80" />
-                    <span className="text-[11px] text-slate-300">Castillo</span>
-                  </div>
-                  <div className="absolute right-8 top-6 flex flex-col items-center gap-1">
-                    <div className="h-8 w-5 rounded-[6px] bg-slate-200" />
-                    <div className="h-1.5 w-2 rounded-full bg-slate-950" />
-                    <span className="text-[10px] text-slate-200">iPhone</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>Salvá el iPhone antes de que caiga el tiempo.</span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-200">
-                    Próximamente jugable
-                  </span>
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
+                  Ajustá la dificultad con tu propio tiempo de reacción y buscá el mejor score
+                  diario.
                 </div>
               </div>
             </div>
-            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 via-slate-950/70 to-slate-900/90 p-6">
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-white">¿Cómo se juega?</h3>
-                <ul className="space-y-2 text-sm text-slate-300">
-                  <li>• Saltá bloques, esquivá enemigos y recolectá monedas.</li>
-                  <li>• Encontrá el iPhone escondido en el castillo final.</li>
-                  <li>• Mantené el estilo clásico con estética 8-bit.</li>
-                </ul>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
-                Pronto sumaremos niveles especiales y desafíos exclusivos para la comunidad
-                iMarket.
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
+
+        <CatalogAd config={catalogBottomAd} className="mt-2" />
 
         <footer className="mt-16 text-center text-xs text-slate-400">
           sitio creado por Grupo iMarket. Todos los derechos reservados
