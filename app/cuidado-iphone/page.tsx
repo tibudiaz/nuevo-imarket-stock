@@ -45,6 +45,7 @@ const careSections = [
     items: [
       "Activá la carga optimizada y evitá dejarlo enchufado toda la noche en ambientes calurosos.",
       "Usá cargadores certificados (MFi o equivalentes) y cables en buen estado.",
+      "El porcentaje de salud de batería es un estimativo: puede variar por malas cargas o cargadores de baja calidad.",
       "Si vas a guardar el equipo por mucho tiempo, dejalo con 50% de batería.",
     ],
   },
@@ -103,12 +104,14 @@ export default function IphoneCarePage() {
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.22),transparent_45%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.18),transparent_45%)]" />
       <div className="absolute inset-0 opacity-50 [background:linear-gradient(120deg,_rgba(15,23,42,0.6)_0%,_rgba(2,6,23,0.95)_100%)]" />
+      <div className="pointer-events-none absolute -left-20 top-24 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl animate-pulse" />
+      <div className="pointer-events-none absolute -right-24 bottom-10 h-80 w-80 rounded-full bg-sky-400/10 blur-3xl animate-pulse" />
       <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pb-20 pt-10">
         <header className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/30"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/10"
             >
               Volver al inicio
               <ArrowRight className="h-4 w-4" />
@@ -143,11 +146,11 @@ export default function IphoneCarePage() {
             return (
               <div
                 key={tip.title}
-                className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-emerald-300/50"
+                className="group rounded-3xl border border-white/10 bg-white/5 p-6 transition duration-300 hover:-translate-y-1 hover:border-emerald-300/50 hover:bg-white/10 hover:shadow-[0_20px_60px_-30px_rgba(16,185,129,0.7)]"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">
-                    <Icon className="h-6 w-6 text-emerald-200" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 transition group-hover:scale-105 group-hover:bg-emerald-500/20">
+                    <Icon className="h-6 w-6 text-emerald-200 transition group-hover:text-emerald-100" />
                   </div>
                   <h2 className="text-xl font-semibold text-white">{tip.title}</h2>
                 </div>
@@ -163,11 +166,11 @@ export default function IphoneCarePage() {
             return (
               <article
                 key={section.title}
-                className="rounded-3xl border border-white/10 bg-slate-950/60 p-6"
+                className="group rounded-3xl border border-white/10 bg-slate-950/60 p-6 transition duration-300 hover:-translate-y-1 hover:border-sky-300/40 hover:bg-slate-900/60"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                    <Icon className="h-6 w-6 text-sky-200" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 transition group-hover:scale-105 group-hover:bg-sky-500/10">
+                    <Icon className="h-6 w-6 text-sky-200 transition group-hover:text-sky-100" />
                   </div>
                   <h3 className="text-xl font-semibold text-white">{section.title}</h3>
                 </div>
@@ -205,10 +208,10 @@ export default function IphoneCarePage() {
               return (
                 <div
                   key={item.title}
-                  className="rounded-2xl border border-white/10 bg-slate-950/60 p-4"
+                  className="group rounded-2xl border border-white/10 bg-slate-950/60 p-4 transition duration-300 hover:-translate-y-1 hover:border-rose-300/50 hover:bg-slate-900/60"
                 >
                   <div className="flex items-center gap-2 text-sm text-slate-200">
-                    <Icon className="h-4 w-4 text-rose-200" />
+                    <Icon className="h-4 w-4 text-rose-200 transition group-hover:scale-110 group-hover:text-rose-100" />
                     <span className="font-semibold">{item.title}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-300">{item.description}</p>
@@ -216,6 +219,19 @@ export default function IphoneCarePage() {
               )}
             )}
           </div>
+        </section>
+
+        <section className="rounded-3xl border border-emerald-400/30 bg-emerald-500/10 p-6 shadow-[0_20px_60px_-40px_rgba(16,185,129,0.7)]">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-emerald-100">
+            <Sparkles className="h-5 w-5" />
+            <span className="font-semibold">
+              Nota sobre la salud de batería: el porcentaje es un estimativo
+            </span>
+          </div>
+          <p className="mt-3 text-sm text-emerald-100/90">
+            La lectura puede variar según el uso, ciclos de carga y la calidad de cargadores o
+            cables. Si notás cambios bruscos, consultá para revisar el estado real.
+          </p>
         </section>
 
         <section className="grid gap-6 md:grid-cols-2">
@@ -254,8 +270,9 @@ export default function IphoneCarePage() {
           </div>
         </section>
 
-        <footer className="text-center text-xs text-slate-400">
-          Cuidá tu iPhone hoy, disfrutalo por más tiempo.
+        <footer className="space-y-2 text-center text-xs text-slate-400">
+          <p>Cuidá tu iPhone hoy, disfrutalo por más tiempo.</p>
+          <p className="text-slate-500">Sitio creado por Grupo iMarket.</p>
         </footer>
       </div>
     </div>
