@@ -354,7 +354,6 @@ export default function SettingsPage() {
   const [catalogAdUploadOrigin, setCatalogAdUploadOrigin] = useState("");
   const [catalogAdUploadTargetPage, setCatalogAdUploadTargetPage] = useState<CatalogAdPage>("landing");
   const [isCatalogAdUploading, setIsCatalogAdUploading] = useState(false);
-  const [landingGameEnabled, setLandingGameEnabled] = useState(true);
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -439,16 +438,6 @@ export default function SettingsPage() {
         {} as Record<string, CatalogAdConfig>
       );
       setCatalogAds(normalized);
-    });
-
-    const landingGameRef = ref(database, "config/landingGame");
-    onValue(landingGameRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data && typeof data === "object" && "enabled" in data) {
-        setLandingGameEnabled(Boolean(data.enabled));
-        return;
-      }
-      setLandingGameEnabled(data === null || typeof data === "undefined" ? true : Boolean(data));
     });
 
     const newCatalogRef = ref(database, "config/newPhones");
@@ -753,18 +742,6 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Error al guardar la publicidad del catálogo:", error);
       toast.error("No se pudo guardar la publicidad.");
-    }
-  };
-
-  const handleSaveLandingGame = async () => {
-    try {
-      await set(ref(database, "config/landingGame"), {
-        enabled: landingGameEnabled,
-      });
-      toast.success("Configuración del juego guardada.");
-    } catch (error) {
-      console.error("Error al guardar la configuración del juego:", error);
-      toast.error("No se pudo guardar la configuración del juego.");
     }
   };
 
@@ -1754,26 +1731,6 @@ export default function SettingsPage() {
                 </div>
               </div>
               <Button onClick={handleSaveCatalogAd}>Guardar publicidad</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Zona de juego del catálogo</CardTitle>
-              <CardDescription>
-                Controlá si el juego Dino Rex Runner se muestra en el acceso público.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="landing-game-enabled"
-                  checked={landingGameEnabled}
-                  onCheckedChange={setLandingGameEnabled}
-                />
-                <Label htmlFor="landing-game-enabled">Mostrar zona de juego</Label>
-              </div>
-              <Button onClick={handleSaveLandingGame}>Guardar configuración</Button>
             </CardContent>
           </Card>
 
