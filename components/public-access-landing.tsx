@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
-import { ArrowRight, Smartphone, Sparkles, Speaker } from "lucide-react"
+import { ArrowRight, ShieldCheck, Smartphone, Sparkles, Speaker } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
@@ -254,6 +254,36 @@ export default function PublicAccessLanding() {
                 </Link>
               )
             })}
+          </section>
+
+          <section className="order-3">
+            <Link
+              href="/cuidado-iphone"
+              className="group relative flex flex-col gap-6 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-8 transition hover:-translate-y-1 hover:border-emerald-300/60 md:flex-row md:items-center md:justify-between"
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.25),transparent_45%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <div className="relative flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-200">
+                  <ShieldCheck className="h-7 w-7" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.3em] text-emerald-200/80">
+                    Guía recomendada
+                  </p>
+                  <h2 className="text-2xl font-semibold text-white">
+                    Cómo cuidar tu iPhone en el día a día
+                  </h2>
+                  <p className="max-w-2xl text-sm text-slate-300">
+                    Consejos claros sobre batería, limpieza, accesorios y seguridad para mantener
+                    tu equipo como nuevo.
+                  </p>
+                </div>
+              </div>
+              <span className="relative inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">
+                Ver recomendaciones
+                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </span>
+            </Link>
           </section>
         </div>
         <CatalogAd config={catalogBottomAd} className="mt-2" />
