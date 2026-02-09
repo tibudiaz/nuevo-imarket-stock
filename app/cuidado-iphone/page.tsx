@@ -42,6 +42,9 @@ const careSections = [
   {
     title: "Batería que dura más",
     icon: BatteryCharging,
+    accent: "from-emerald-400/20 via-transparent to-transparent",
+    dot: "bg-emerald-300",
+    pulse: "bg-emerald-300/50",
     items: [
       "Activá la carga optimizada y evitá dejarlo enchufado toda la noche en ambientes calurosos.",
       "Usá cargadores certificados (MFi o equivalentes) y cables en buen estado.",
@@ -52,6 +55,9 @@ const careSections = [
   {
     title: "Pantalla y estructura",
     icon: ShieldCheck,
+    accent: "from-sky-400/20 via-transparent to-transparent",
+    dot: "bg-sky-300",
+    pulse: "bg-sky-300/50",
     items: [
       "Elegí fundas con bordes elevados y materiales que absorban impactos.",
       "Evitá apoyar el teléfono boca abajo sobre superficies rugosas.",
@@ -61,6 +67,9 @@ const careSections = [
   {
     title: "Limpieza sin riesgos",
     icon: Droplets,
+    accent: "from-amber-300/20 via-transparent to-transparent",
+    dot: "bg-amber-200",
+    pulse: "bg-amber-200/50",
     items: [
       "Usá paños de microfibra y agua apenas humedecida, sin rociar directo al equipo.",
       "No uses aerosoles, limpiavidrios o solventes agresivos.",
@@ -70,6 +79,9 @@ const careSections = [
   {
     title: "Conectividad y seguridad",
     icon: Wifi,
+    accent: "from-indigo-400/20 via-transparent to-transparent",
+    dot: "bg-indigo-300",
+    pulse: "bg-indigo-300/50",
     items: [
       "Mantené iOS actualizado para tener los últimos parches de seguridad.",
       "Activá Face ID/Touch ID y el código de desbloqueo para proteger tu información.",
@@ -211,10 +223,16 @@ export default function IphoneCarePage() {
             return (
               <article
                 key={section.title}
-                className="group rounded-3xl border border-white/10 bg-slate-950/60 p-6 transition duration-300 hover:-translate-y-1 hover:border-sky-300/40 hover:bg-slate-900/60"
+                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60 p-6 transition duration-300 hover:-translate-y-1 hover:border-sky-300/40 hover:bg-slate-900/60"
               >
+                <div
+                  className={`pointer-events-none absolute -left-10 top-6 h-40 w-40 rounded-full bg-gradient-to-br ${section.accent} blur-2xl opacity-70`}
+                />
+                <div className="pointer-events-none absolute right-6 top-6 h-10 w-10 rounded-full border border-white/15 bg-white/5 motion-safe:animate-care-orbit" />
+                <div className="pointer-events-none absolute left-4 top-6 h-16 w-0.5 rounded-full bg-gradient-to-b from-white/5 via-white/30 to-white/5 motion-safe:animate-care-line" />
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 transition group-hover:scale-105 group-hover:bg-sky-500/10">
+                  <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 transition group-hover:scale-105 group-hover:bg-sky-500/10">
+                    <div className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 blur-md transition group-hover:opacity-100 motion-safe:animate-care-glow" />
                     <Icon className="h-6 w-6 text-sky-200 transition group-hover:text-sky-100" />
                   </div>
                   <h3 className="text-xl font-semibold text-white">{section.title}</h3>
@@ -222,7 +240,13 @@ export default function IphoneCarePage() {
                 <ul className="mt-4 space-y-3 text-sm text-slate-300">
                   {section.items.map((item) => (
                     <li key={item} className="flex gap-3">
-                      <span className="mt-1 h-2 w-2 flex-none rounded-full bg-emerald-300" />
+                      <span
+                        className={`relative mt-1 h-2 w-2 flex-none rounded-full ${section.dot}`}
+                      >
+                        <span
+                          className={`absolute inset-0 rounded-full ${section.pulse} opacity-0 motion-safe:animate-care-pulse`}
+                        />
+                      </span>
                       <span>{item}</span>
                     </li>
                   ))}

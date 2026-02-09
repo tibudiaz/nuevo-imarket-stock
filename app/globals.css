@@ -31,6 +31,18 @@ body {
   .animate-ambient-float-slow {
     animation: ambient-float 16s ease-in-out infinite;
   }
+  .animate-care-line {
+    animation: care-line 7s ease-in-out infinite;
+  }
+  .animate-care-orbit {
+    animation: care-orbit 9s ease-in-out infinite;
+  }
+  .animate-care-glow {
+    animation: care-glow 6s ease-in-out infinite;
+  }
+  .animate-care-pulse {
+    animation: care-pulse 4s ease-in-out infinite;
+  }
 }
 
 @keyframes phone-float {
@@ -94,6 +106,54 @@ body {
   }
   50% {
     transform: translate3d(0, -16px, 0);
+  }
+}
+
+@keyframes care-line {
+  0%,
+  100% {
+    transform: translateY(-12px);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(14px);
+    opacity: 0.8;
+  }
+}
+
+@keyframes care-orbit {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.9);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate3d(-6px, 8px, 0) scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes care-glow {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.6;
+  }
+}
+
+@keyframes care-pulse {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.15;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.6;
   }
 }
 
