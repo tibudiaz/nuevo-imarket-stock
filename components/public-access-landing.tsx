@@ -4,7 +4,15 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
-import { ArrowRight, ShieldCheck, Smartphone, Sparkles, Speaker } from "lucide-react"
+import {
+  ArrowRight,
+  BatteryCharging,
+  Headphones,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Speaker,
+} from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
 import { database } from "@/lib/firebase"
@@ -41,6 +49,7 @@ export default function PublicAccessLanding() {
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [catalogBottomAd, setCatalogBottomAd] = useState<CatalogAdConfig | null>(null)
   const [secretClickCount, setSecretClickCount] = useState(0)
+  const [chargeScore, setChargeScore] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -120,6 +129,31 @@ export default function PublicAccessLanding() {
       return next
     })
   }
+
+  const accessoryMilestones = [
+    {
+      points: 5,
+      label: "Funda premium",
+      description: "Protege tu equipo con estilo.",
+    },
+    {
+      points: 12,
+      label: "Power bank",
+      description: "Energía extra para todo el día.",
+    },
+    {
+      points: 20,
+      label: "Auriculares",
+      description: "Música sin cortes en cualquier lugar.",
+    },
+  ]
+
+  const unlockedAccessories = accessoryMilestones.filter(
+    (milestone) => chargeScore >= milestone.points,
+  )
+  const nextAccessory = accessoryMilestones.find((milestone) => chargeScore < milestone.points)
+  const progressMax = nextAccessory?.points ?? accessoryMilestones[accessoryMilestones.length - 1].points
+  const progressValue = Math.min(chargeScore, progressMax)
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
@@ -284,6 +318,103 @@ export default function PublicAccessLanding() {
                 <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
               </span>
             </Link>
+          </section>
+
+          <section className="order-4">
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.28),transparent_45%)]" />
+              <div className="relative flex flex-col gap-8">
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Minijuego</p>
+                  <h2 className="text-2xl font-semibold text-white">
+                    Cargá tu combo móvil
+                  </h2>
+                  <p className="max-w-2xl text-sm text-slate-300">
+                    Sumá puntos tocando el botón de carga y desbloqueá accesorios para tu celular.
+                    Ideal para pasar el rato mientras elegís tu próximo equipo.
+                  </p>
+                </div>
+                <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+                  <div className="space-y-6 rounded-2xl border border-white/10 bg-slate-950/40 p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm text-slate-300">Puntaje actual</p>
+                        <p className="text-4xl font-semibold text-white">{chargeScore}</p>
+                      </div>
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-200">
+                        <BatteryCharging className="h-6 w-6" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
+                        <span>Progreso</span>
+                        <span>{progressValue}/{progressMax}</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-sky-400 via-emerald-300 to-lime-300 transition-all"
+                          style={{ width: `${(progressValue / progressMax) * 100}%` }}
+                        />
+                      </div>
+                      {nextAccessory ? (
+                        <p className="text-sm text-slate-300">
+                          Próximo desbloqueo:{" "}
+                          <span className="font-semibold text-white">{nextAccessory.label}</span>{" "}
+                          en {nextAccessory.points - chargeScore} puntos.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-emerald-200">
+                          ¡Desbloqueaste todos los accesorios!
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setChargeScore((previous) => previous + 1)}
+                        className="inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-5 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/30"
+                      >
+                        <BatteryCharging className="h-4 w-4" />
+                        Cargar +1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChargeScore(0)}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-slate-200 transition hover:border-white/30"
+                      >
+                        Reiniciar
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
+                        Accesorios desbloqueados
+                      </p>
+                      <Headphones className="h-5 w-5 text-slate-300" />
+                    </div>
+                    {unlockedAccessories.length ? (
+                      <div className="space-y-3">
+                        {unlockedAccessories.map((accessory) => (
+                          <div
+                            key={accessory.label}
+                            className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"
+                          >
+                            <p className="text-sm font-semibold text-white">{accessory.label}</p>
+                            <p className="text-xs text-slate-300">{accessory.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-300">
+                        Tocá el botón de carga para sumar puntos y desbloquear tu primer
+                        accesorio.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
         </div>
         <CatalogAd config={catalogBottomAd} className="mt-2" />
