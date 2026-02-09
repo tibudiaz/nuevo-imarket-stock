@@ -12,7 +12,14 @@ import { fetchPublicRealtimeValue } from "@/lib/public-realtime"
 import CatalogAd from "@/components/catalog-ad"
 import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
 
-const landingOptions = [
+type PublicCatalog = {
+  id: string
+  key: string
+  name: string
+  createdAt?: string
+}
+
+const baseLandingOptions = [
   {
     title: "Celulares nuevos",
     description: "Explorá los últimos modelos con garantía oficial y stock actualizado.",
@@ -40,6 +47,7 @@ export default function PublicAccessLanding() {
   const [offers, setOffers] = useState<string[]>([])
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [catalogBottomAd, setCatalogBottomAd] = useState<CatalogAdConfig | null>(null)
+  const [publicCatalogs, setPublicCatalogs] = useState<PublicCatalog[]>([])
   const [secretClickCount, setSecretClickCount] = useState(0)
   const router = useRouter()
 
@@ -61,6 +69,25 @@ export default function PublicAccessLanding() {
         })
         .filter((text) => text.trim().length > 0)
       setOffers(items)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const catalogsRef = ref(database, "config/publicCatalogs")
+    const unsubscribe = onValue(catalogsRef, (snapshot) => {
+      const data = snapshot.val()
+      const list: PublicCatalog[] = data
+        ? Object.entries(data).map(([id, value]: [string, any]) => ({
+            id,
+            key: value?.key ? String(value.key) : id,
+            name: value?.name ? String(value.name) : id,
+            createdAt: value?.createdAt,
+          }))
+        : []
+      list.sort((a, b) => a.name.localeCompare(b.name, "es"))
+      setPublicCatalogs(list)
     })
 
     return () => unsubscribe()
@@ -109,6 +136,17 @@ export default function PublicAccessLanding() {
   const marqueeItems = offers.length
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
+
+  const landingOptions = [
+    ...baseLandingOptions,
+    ...publicCatalogs.map((catalog) => ({
+      title: catalog.name,
+      description: "Catálogo personalizado con equipos nuevos seleccionados.",
+      href: `/catalogo/${catalog.key}`,
+      accent: "from-emerald-400/20 via-emerald-300/5 to-transparent",
+      icon: Sparkles,
+    })),
+  ]
 
   const handleSecretDashboardAccess = () => {
     setSecretClickCount((previous) => {

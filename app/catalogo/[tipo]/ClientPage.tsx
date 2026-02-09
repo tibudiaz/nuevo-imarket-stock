@@ -21,6 +21,7 @@ import {
   BadgeCheck,
   Globe,
   IdCard,
+  Loader2,
   LogIn,
   Mail,
   ShieldCheck,
@@ -61,6 +62,14 @@ interface NewCatalogItem {
   name: string
   price?: number
   status?: string
+  catalogKey?: string
+  createdAt?: string
+}
+
+interface PublicCatalog {
+  id: string
+  key: string
+  name: string
   createdAt?: string
 }
 
@@ -103,27 +112,38 @@ const CATEGORY_USED = "Celulares Usados"
 const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000
 const CATALOG_RATE_REFRESH_MS = 10 * 60 * 1000
 
-const CATALOG_TYPES = {
+type CatalogKind = "new" | "used" | "gaming"
+
+type CatalogType = {
+  key: string
+  title: string
+  category?: string
+  accent: string
+  kind: CatalogKind
+}
+
+const BASE_CATALOG_TYPES: Record<string, CatalogType> = {
   nuevos: {
     key: "nuevos",
     title: "Celulares Nuevos",
     category: CATEGORY_NEW,
     accent: "from-sky-500/20 to-blue-500/5",
+    kind: "new",
   },
   usados: {
     key: "usados",
     title: "Celulares Usados",
     category: CATEGORY_USED,
     accent: "from-emerald-500/20 to-green-500/5",
+    kind: "used",
   },
   "gaming-audio": {
     key: "gaming-audio",
     title: "Gaming y audio",
     accent: "from-fuchsia-500/20 to-purple-500/10",
+    kind: "gaming",
   },
 }
-
-type CatalogTypeKey = keyof typeof CATALOG_TYPES
 
 type CatalogCache = {
   products?: Product[]
@@ -378,8 +398,6 @@ const buildWhatsAppLinkForJbl = (item: JblCatalogItem, usdRate: number) => {
 }
 
 export default function PublicStockClient({ params }: { params: { tipo: string } }) {
-  const catalogType = CATALOG_TYPES[params.tipo as CatalogTypeKey]
-  const cacheKey = catalogType ? `catalog-cache-${catalogType.key}` : "catalog-cache"
   const searchParams = useSearchParams()
 
   const [products, setProducts] = useState<Product[]>([])
@@ -394,6 +412,8 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   })
   const [offers, setOffers] = useState<string[]>([])
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
+  const [publicCatalogs, setPublicCatalogs] = useState<PublicCatalog[]>([])
+  const [isCatalogsLoading, setIsCatalogsLoading] = useState(true)
   const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false)
   const [authStep, setAuthStep] = useState<"choice" | "login" | "register">("choice")
   const [currentCustomer, setCurrentCustomer] = useState<CustomerProfile | null>(null)
@@ -407,6 +427,34 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     email: "",
   })
 
+  const availableCatalogs = useMemo(() => {
+    const base = Object.values(BASE_CATALOG_TYPES)
+    const custom = publicCatalogs.map<CatalogType>((catalog) => ({
+      key: catalog.key,
+      title: catalog.name,
+      accent: BASE_CATALOG_TYPES.nuevos.accent,
+      kind: "new",
+    }))
+    return [...base, ...custom]
+  }, [publicCatalogs])
+
+  const catalogType = useMemo(() => {
+    const base = BASE_CATALOG_TYPES[params.tipo]
+    if (base) return base
+    const custom = publicCatalogs.find((catalog) => catalog.key === params.tipo)
+    if (custom) {
+      return {
+        key: custom.key,
+        title: custom.name,
+        accent: BASE_CATALOG_TYPES.nuevos.accent,
+        kind: "new",
+      } satisfies CatalogType
+    }
+    return undefined
+  }, [params.tipo, publicCatalogs])
+
+  const cacheKey = catalogType ? `catalog-cache-${catalogType.key}` : "catalog-cache"
+
   useEffect(() => {
     const authParam = searchParams?.get("auth")
     if (!authParam) return
@@ -417,6 +465,33 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     }
     setIsAuthPanelOpen(true)
   }, [searchParams])
+
+  useEffect(() => {
+    const catalogsRef = ref(database, "config/publicCatalogs")
+    const unsubscribe = onValue(
+      catalogsRef,
+      (snapshot) => {
+        const data = snapshot.val()
+        const list: PublicCatalog[] = data
+          ? Object.entries(data).map(([id, value]: [string, any]) => ({
+              id,
+              key: value?.key ? String(value.key) : id,
+              name: value?.name ? String(value.name) : id,
+              createdAt: value?.createdAt,
+            }))
+          : []
+        list.sort((a, b) => a.name.localeCompare(b.name, "es"))
+        setPublicCatalogs(list)
+        setIsCatalogsLoading(false)
+      },
+      () => {
+        setIsCatalogsLoading(false)
+      },
+    )
+
+    return () => unsubscribe()
+  }, [])
+
   const [registrationPassword, setRegistrationPassword] = useState("")
   const [registrationPasswordConfirm, setRegistrationPasswordConfirm] = useState("")
   const [matchedCustomer, setMatchedCustomer] = useState<{ id: string; name: string } | null>(null)
@@ -618,7 +693,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   }, [cacheKey, catalogType])
 
   useEffect(() => {
-    if (!catalogType || catalogType.key !== "nuevos") return
+    if (!catalogType || catalogType.kind !== "new") return
     const newCatalogRef = ref(database, "config/newPhones")
     const unsubscribeNewCatalog = onValue(
       newCatalogRef,
@@ -638,6 +713,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               name: String(value.name ?? "").trim(),
               price: typeof value.price === "number" ? value.price : undefined,
               status: value.status ? String(value.status) : undefined,
+              catalogKey: value.catalogKey ? String(value.catalogKey) : "nuevos",
               createdAt: value.createdAt,
             })
           }
@@ -993,13 +1069,21 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       )
   }, [products])
 
+  const selectedNewCatalogKey = catalogType?.kind === "new" ? catalogType.key : "nuevos"
+  const newCatalogFiltered = useMemo(() => {
+    if (catalogType?.kind !== "new") return []
+    return newCatalogItems.filter(
+      (item) => (item.catalogKey ?? "nuevos") === selectedNewCatalogKey,
+    )
+  }, [catalogType?.kind, newCatalogItems, selectedNewCatalogKey])
+
   const newCatalogSorted = useMemo(() => {
-    return [...newCatalogItems].sort((a, b) =>
+    return [...newCatalogFiltered].sort((a, b) =>
       resolveNewCatalogName(a).localeCompare(resolveNewCatalogName(b), "es", {
         sensitivity: "base",
       }),
     )
-  }, [newCatalogItems])
+  }, [newCatalogFiltered])
 
   const jblInStock = useMemo(() => {
     return jblCatalogItems
@@ -1013,22 +1097,22 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   const isSectionVisible = useMemo(() => {
     if (!catalogType) return false
-    if (catalogType.key === "nuevos") return catalogVisibility.newPhones
-    if (catalogType.key === "usados") return catalogVisibility.usedPhones
+    if (catalogType.kind === "new") return catalogVisibility.newPhones
+    if (catalogType.kind === "used") return catalogVisibility.usedPhones
     return true
   }, [catalogType, catalogVisibility])
 
   const alternateTypes = catalogType
-    ? Object.values(CATALOG_TYPES).filter((type) => type.key !== catalogType.key)
+    ? availableCatalogs.filter((type) => type.key !== catalogType.key)
     : []
 
   const marqueeItems = offers.length
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
 
-  const isNewCatalog = catalogType?.key === "nuevos"
-  const isUsedCatalog = catalogType?.key === "usados"
-  const isGamingAudioCatalog = catalogType?.key === "gaming-audio"
+  const isNewCatalog = catalogType?.kind === "new"
+  const isUsedCatalog = catalogType?.kind === "used"
+  const isGamingAudioCatalog = catalogType?.kind === "gaming"
   const catalogItemsCount = isNewCatalog
     ? newCatalogSorted.length
     : isGamingAudioCatalog
@@ -1422,6 +1506,15 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   )
 
   if (!catalogType) {
+    if (isCatalogsLoading) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+          <div className="flex items-center gap-2 text-slate-300">
+            <Loader2 className="h-5 w-5 animate-spin" /> Cargando catálogo...
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="min-h-screen bg-slate-950 px-6 py-20 text-white">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-10 text-center">

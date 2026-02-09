@@ -45,10 +45,9 @@ export default function CatalogAdMobileUploadClient() {
   const typeParam = searchParams.get("type") || undefined
   const allowSessionRecovery = Boolean(pageParam || typeParam)
 
-  const resolvedPage: CatalogAdPage =
-    pageParam === "nuevos" || pageParam === "usados" || pageParam === "landing" || pageParam === "landingBottom"
-      ? pageParam
-      : "landing"
+  const resolvedPage: CatalogAdPage = (pageParam && pageParam.trim().length > 0
+    ? pageParam.trim()
+    : "landing") as CatalogAdPage
   const resolvedType: CatalogAdType =
     typeParam === "video" || typeParam === "carousel" || typeParam === "image"
       ? typeParam
