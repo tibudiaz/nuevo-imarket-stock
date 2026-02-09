@@ -60,6 +60,7 @@ export default function PublicAccessLanding() {
   const [pulsePosition, setPulsePosition] = useState(10)
   const [targetZone, setTargetZone] = useState({ start: 35, end: 55 })
   const [statusMessage, setStatusMessage] = useState("Listo para despegar.")
+  const [bestScore, setBestScore] = useState(0)
   const directionRef = useRef(1)
   const router = useRouter()
 
@@ -126,6 +127,23 @@ export default function PublicAccessLanding() {
     }
   }, [])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const storedScore = window.localStorage.getItem("turboPulseBestScore")
+    if (!storedScore) return
+    const parsed = Number(storedScore)
+    if (!Number.isNaN(parsed)) {
+      setBestScore(parsed)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (score <= bestScore) return
+    setBestScore(score)
+    window.localStorage.setItem("turboPulseBestScore", String(score))
+  }, [bestScore, score])
+
   const marqueeItems = offers.length
     ? offers
     : ["Promociones en tienda, cuotas y bonificaciones especiales."]
@@ -143,6 +161,18 @@ export default function PublicAccessLanding() {
 
   const level = useMemo(() => Math.min(5, Math.floor(score / 80) + 1), [score])
   const speed = useMemo(() => 0.8 + level * 0.6, [level])
+  const isInZone = useMemo(
+    () => pulsePosition >= targetZone.start && pulsePosition <= targetZone.end,
+    [pulsePosition, targetZone],
+  )
+  const comboProgress = useMemo(() => Math.min((streak / 6) * 100, 100), [streak])
+  const levelLabel = useMemo(() => {
+    if (level >= 5) return "Modo leyenda"
+    if (level >= 4) return "Nivel estelar"
+    if (level >= 3) return "Nivel turbo"
+    if (level >= 2) return "Nivel avanzado"
+    return "Nivel inicial"
+  }, [level])
 
   useEffect(() => {
     if (!gameActive) return
@@ -200,8 +230,7 @@ export default function PublicAccessLanding() {
   const handleBoost = () => {
     if (!gameActive) return
 
-    const isHit = pulsePosition >= targetZone.start && pulsePosition <= targetZone.end
-    if (isHit) {
+    if (isInZone) {
       setScore((previous) => previous + 10 + streak * 2 + level * 3)
       setStreak((previous) => previous + 1)
       setEnergy((previous) => Math.min(previous + 8, 100))
@@ -385,6 +414,8 @@ export default function PublicAccessLanding() {
           <section className="order-4">
             <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-8">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),transparent_50%),radial-gradient(circle_at_bottom,_rgba(244,114,182,0.2),transparent_45%)]" />
+              <div className="pointer-events-none absolute -left-24 top-10 h-56 w-56 rounded-full bg-sky-500/20 blur-3xl" />
+              <div className="pointer-events-none absolute -right-16 bottom-6 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
               <div className="relative flex flex-col gap-8">
                 <div className="flex flex-col gap-3">
                   <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Minijuego</p>
@@ -393,9 +424,20 @@ export default function PublicAccessLanding() {
                     Cronometrá el impulso, mantené la energía alta y acumulá combos. Cuanto más
                     preciso seas, más puntos y brillo desbloqueás.
                   </p>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
+                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
+                      {levelLabel}
+                    </span>
+                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-100">
+                      Bonus +{Math.min(streak * 2, 20)} pts
+                    </span>
+                    <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-sky-100">
+                      Velocidad x{speed.toFixed(1)}
+                    </span>
+                  </div>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-                  <div className="space-y-6 rounded-2xl border border-white/10 bg-slate-950/50 p-6">
+                  <div className="space-y-6 rounded-2xl border border-white/10 bg-slate-950/50 p-6 shadow-[0_0_40px_rgba(56,189,248,0.2)]">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-2">
                         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
@@ -415,6 +457,21 @@ export default function PublicAccessLanding() {
                         <Rocket className="h-6 w-6" />
                       </div>
                     </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
+                        <span>Combo activo</span>
+                        <span>{streak}x</span>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 via-sky-400 to-emerald-300 transition-all"
+                          style={{ width: `${comboProgress}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-slate-300">
+                        Sumá 6 combos para encender el modo brillo.
+                      </p>
+                    </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
                         <span>Zona de impulso</span>
@@ -422,14 +479,16 @@ export default function PublicAccessLanding() {
                       </div>
                       <div className="relative h-3 w-full rounded-full bg-white/10">
                         <div
-                          className="absolute top-0 h-full rounded-full bg-emerald-400/40"
+                          className="absolute top-0 h-full rounded-full bg-emerald-400/40 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
                           style={{
                             left: `${targetZone.start}%`,
                             width: `${targetZone.end - targetZone.start}%`,
                           }}
                         />
                         <div
-                          className="absolute -top-1 h-5 w-2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+                          className={`absolute -top-1 h-5 w-2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.7)] transition-transform ${
+                            isInZone ? "scale-y-110" : "scale-y-100"
+                          }`}
                           style={{ left: `${pulsePosition}%` }}
                         />
                       </div>
@@ -486,6 +545,15 @@ export default function PublicAccessLanding() {
                       <Trophy className="h-5 w-5 text-slate-300" />
                     </div>
                     <div className="grid gap-3">
+                      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-sky-500/10 via-white/5 to-transparent p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                            Récord local
+                          </p>
+                          <Trophy className="h-4 w-4 text-sky-200" />
+                        </div>
+                        <p className="text-3xl font-semibold text-white">{bestScore}</p>
+                      </div>
                       <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
                         <div className="flex items-center justify-between">
                           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
