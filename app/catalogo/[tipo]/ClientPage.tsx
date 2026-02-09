@@ -70,8 +70,6 @@ interface PublicCatalog {
   id: string
   key: string
   name: string
-  logoUrl?: string
-  welcomeText?: string
   createdAt?: string
 }
 
@@ -114,8 +112,6 @@ const CATEGORY_USED = "Celulares Usados"
 const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000
 const CATALOG_RATE_REFRESH_MS = 10 * 60 * 1000
 
-const getCatalogHref = (key: string) => `/catalogo?tipo=${encodeURIComponent(key)}`
-
 type CatalogKind = "new" | "used" | "gaming"
 
 type CatalogType = {
@@ -124,8 +120,6 @@ type CatalogType = {
   category?: string
   accent: string
   kind: CatalogKind
-  logoUrl?: string
-  welcomeText?: string
 }
 
 const BASE_CATALOG_TYPES: Record<string, CatalogType> = {
@@ -440,8 +434,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       title: catalog.name,
       accent: BASE_CATALOG_TYPES.nuevos.accent,
       kind: "new",
-      logoUrl: catalog.logoUrl,
-      welcomeText: catalog.welcomeText,
     }))
     return [...base, ...custom]
   }, [publicCatalogs])
@@ -456,8 +448,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         title: custom.name,
         accent: BASE_CATALOG_TYPES.nuevos.accent,
         kind: "new",
-        logoUrl: custom.logoUrl,
-        welcomeText: custom.welcomeText,
       } satisfies CatalogType
     }
     return undefined
@@ -487,8 +477,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               id,
               key: value?.key ? String(value.key) : id,
               name: value?.name ? String(value.name) : id,
-              logoUrl: value?.logoUrl ? String(value.logoUrl) : undefined,
-              welcomeText: value?.welcomeText ? String(value.welcomeText) : undefined,
               createdAt: value?.createdAt,
             }))
           : []
@@ -1131,14 +1119,11 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       ? jblInStock.length
       : inStock.length
   const catalogItemsLabel = isGamingAudioCatalog ? "productos" : "equipos"
-  const catalogIntro =
-    catalogType?.welcomeText?.trim().length
-      ? catalogType.welcomeText
-      : isNewCatalog
-        ? "Expertos en tecnología a tu alcance. 🏠 Te damos la bienvenida a nuestra selección de equipos nuevos. Mostramos solo la información técnica esencial para garantizar la transparencia y la seguridad de cada dispositivo."
-        : isGamingAudioCatalog
-          ? "Potenciá tu experiencia gamer y musical. 🎧 Descubrí parlantes, auriculares y accesorios JBL con disponibilidad en tiempo real."
-          : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
+  const catalogIntro = isNewCatalog
+    ? "Expertos en tecnología a tu alcance. 🏠 Te damos la bienvenida a nuestra selección de equipos nuevos. Mostramos solo la información técnica esencial para garantizar la transparencia y la seguridad de cada dispositivo."
+    : isGamingAudioCatalog
+      ? "Potenciá tu experiencia gamer y musical. 🎧 Descubrí parlantes, auriculares y accesorios JBL con disponibilidad en tiempo real."
+      : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
 
   const topBarDesktopContent = (
     <>
@@ -1154,7 +1139,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           <Link
             key={type.key}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-            href={getCatalogHref(type.key)}
+            href={`/catalogo/${type.key}`}
           >
             {type.title}
             <ArrowRight className="h-4 w-4" />
@@ -1205,7 +1190,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             <Link
               key={type.key}
               className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-              href={getCatalogHref(type.key)}
+              href={`/catalogo/${type.key}`}
             >
               {type.title}
               <ArrowRight className="h-4 w-4" />
@@ -1568,13 +1553,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                  {catalogType?.logoUrl ? (
-                    <img
-                      src={catalogType.logoUrl}
-                      alt={`Logo de ${catalogType.title}`}
-                      className="h-10 w-10 rounded-xl object-contain"
-                    />
-                  ) : isGamingAudioCatalog ? (
+                  {isGamingAudioCatalog ? (
                     <Speaker className="h-6 w-6 text-fuchsia-300" />
                   ) : (
                     <Smartphone className="h-6 w-6 text-sky-300" />
