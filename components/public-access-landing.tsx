@@ -219,6 +219,51 @@ export default function PublicAccessLanding() {
             </div>
           </header>
 
+          <section className="grid items-center gap-10 rounded-3xl border border-white/10 bg-white/5 p-8 md:grid-cols-[1.1fr,0.9fr]">
+            <div className="space-y-4">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                Experiencia minimalista
+              </p>
+              <h2 className="text-3xl font-semibold text-white">
+                Animaciones suaves para destacar lo esencial.
+              </h2>
+              <p className="text-sm text-slate-300">
+                Un toque dinámico para que el catálogo se sienta vivo: microinteracciones, brillo
+                sutil y un gesto clásico de “enchufar y cargar” que mantiene la estética limpia.
+              </p>
+              <div className="flex flex-wrap gap-3 text-xs text-slate-300">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                  Movimiento sutil
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                  Sin ruido visual
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                  Claridad y foco
+                </span>
+              </div>
+            </div>
+            <div className="relative mx-auto flex h-64 w-full max-w-sm items-center justify-center">
+              <div className="absolute inset-0 rounded-[32px] bg-[radial-gradient(circle_at_center,_rgba(56,189,248,0.18),transparent_65%)]" />
+              <div className="relative h-56 w-56">
+                <div className="absolute left-10 top-3 h-44 w-24 rounded-[28px] border border-white/15 bg-slate-900/70 shadow-[0_10px_30px_rgba(15,23,42,0.5)] animate-phone-float">
+                  <div className="absolute left-2 top-2 h-3 w-8 rounded-full bg-white/10" />
+                  <div className="absolute inset-3 rounded-[22px] bg-gradient-to-br from-slate-800 via-slate-900 to-black/80 animate-charge-pulse" />
+                  <div className="absolute bottom-3 left-7 h-2 w-10 rounded-full bg-emerald-300/40" />
+                </div>
+                <div className="absolute left-0 bottom-6 h-1.5 w-28 rounded-full bg-white/20 animate-cable-pulse" />
+                <div className="absolute -left-4 bottom-2 h-12 w-16 rounded-2xl border border-white/20 bg-slate-900/80 animate-plug-in">
+                  <div className="absolute inset-3 rounded-xl bg-slate-800/80" />
+                  <div className="absolute right-3 top-4 h-4 w-1 rounded-full bg-emerald-300/70" />
+                  <div className="absolute right-6 top-4 h-4 w-1 rounded-full bg-emerald-300/70" />
+                </div>
+                <div className="absolute left-24 top-1 h-3 w-3 rounded-full bg-sky-300/60 blur-[0.5px] animate-spark" />
+                <div className="absolute left-4 top-14 h-2 w-2 rounded-full bg-emerald-300/50 blur-[0.5px] animate-spark [animation-delay:0.6s]" />
+                <div className="absolute right-6 top-10 h-2.5 w-2.5 rounded-full bg-white/40 blur-[0.5px] animate-spark [animation-delay:1.2s]" />
+              </div>
+            </div>
+          </section>
+
           <CatalogAd config={catalogAd} className="order-last md:order-3" />
 
           <section className="order-2 grid gap-6 md:order-2 md:grid-cols-2">
