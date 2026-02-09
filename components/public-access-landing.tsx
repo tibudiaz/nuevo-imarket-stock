@@ -6,16 +6,12 @@ import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
 import {
   ArrowRight,
-  BatteryCharging,
-  Headphones,
-  Rocket,
-  Shield,
+  Gamepad2,
   ShieldCheck,
   Smartphone,
   Sparkles,
   Speaker,
   Trophy,
-  Zap,
 } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
@@ -55,16 +51,17 @@ export default function PublicAccessLanding() {
   const [secretClickCount, setSecretClickCount] = useState(0)
   const [gameActive, setGameActive] = useState(false)
   const [score, setScore] = useState(0)
-  const [streak, setStreak] = useState(0)
-  const [energy, setEnergy] = useState(72)
-  const [powerCells, setPowerCells] = useState(0)
-  const [misses, setMisses] = useState(0)
-  const [turboActive, setTurboActive] = useState(false)
-  const [pulsePosition, setPulsePosition] = useState(10)
-  const [targetZone, setTargetZone] = useState({ start: 35, end: 55 })
-  const [statusMessage, setStatusMessage] = useState("Listo para despegar.")
+  const [playerY, setPlayerY] = useState(0)
+  const [obstacleX, setObstacleX] = useState(110)
+  const [obstacleHeight, setObstacleHeight] = useState(24)
+  const [speed, setSpeed] = useState(2.8)
+  const [statusMessage, setStatusMessage] = useState("Tocá para empezar a correr.")
   const [bestScore, setBestScore] = useState(0)
-  const directionRef = useRef(1)
+  const velocityRef = useRef(0)
+  const playerYRef = useRef(0)
+  const obstacleXRef = useRef(110)
+  const obstacleHeightRef = useRef(24)
+  const speedRef = useRef(2.8)
   const router = useRouter()
 
   useEffect(() => {
@@ -132,7 +129,7 @@ export default function PublicAccessLanding() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const storedScore = window.localStorage.getItem("turboPulseBestScore")
+    const storedScore = window.localStorage.getItem("pixelRunBestScore")
     if (!storedScore) return
     const parsed = Number(storedScore)
     if (!Number.isNaN(parsed)) {
@@ -144,7 +141,7 @@ export default function PublicAccessLanding() {
     if (typeof window === "undefined") return
     if (score <= bestScore) return
     setBestScore(score)
-    window.localStorage.setItem("turboPulseBestScore", String(score))
+    window.localStorage.setItem("pixelRunBestScore", String(score))
   }, [bestScore, score])
 
   const marqueeItems = offers.length
@@ -162,128 +159,82 @@ export default function PublicAccessLanding() {
     })
   }
 
-  const level = useMemo(() => Math.min(5, Math.floor(score / 80) + 1), [score])
-  const baseSpeed = useMemo(() => 0.8 + level * 0.6, [level])
-  const pulseSpeed = useMemo(() => (turboActive ? baseSpeed * 1.35 : baseSpeed), [baseSpeed, turboActive])
-  const isInZone = useMemo(
-    () => pulsePosition >= targetZone.start && pulsePosition <= targetZone.end,
-    [pulsePosition, targetZone],
-  )
-  const comboProgress = useMemo(() => Math.min((streak / 6) * 100, 100), [streak])
-  const signalStrength = useMemo(() => Math.max(1, Math.min(5, Math.ceil(energy / 20))), [energy])
-  const heatLevel = useMemo(() => Math.min(100, misses * 22 + (100 - energy) * 0.4), [misses, energy])
-  const deviceMode = useMemo(() => {
-    if (turboActive) return "Modo hiper"
-    if (streak >= 6) return "Modo brillo"
-    if (energy < 25) return "Modo ahorro"
-    if (level >= 4) return "Modo ultra"
-    return "Modo normal"
-  }, [energy, level, streak, turboActive])
-  const levelLabel = useMemo(() => {
-    if (level >= 5) return "Modo leyenda"
-    if (level >= 4) return "Nivel estelar"
-    if (level >= 3) return "Nivel turbo"
-    if (level >= 2) return "Nivel avanzado"
-    return "Nivel inicial"
-  }, [level])
-  const powerReady = powerCells >= 3
+  const difficultyLabel = useMemo(() => {
+    if (score >= 40) return "Turbo pro"
+    if (score >= 25) return "Ritmo alto"
+    if (score >= 10) return "Modo runner"
+    return "Modo casual"
+  }, [score])
 
   useEffect(() => {
     if (!gameActive) return
 
     const interval = window.setInterval(() => {
-      setPulsePosition((previous) => {
-        let next = previous + pulseSpeed * directionRef.current
-        if (next >= 100) {
-          next = 100
-          directionRef.current = -1
-        }
-        if (next <= 0) {
-          next = 0
-          directionRef.current = 1
-        }
-        return next
-      })
-    }, 60)
+      velocityRef.current -= 0.9
+      let nextPlayerY = playerYRef.current + velocityRef.current
+      if (nextPlayerY < 0) {
+        nextPlayerY = 0
+        velocityRef.current = 0
+      }
+      playerYRef.current = nextPlayerY
+      setPlayerY(nextPlayerY)
+
+      let nextObstacleX = obstacleXRef.current - speedRef.current
+      if (nextObstacleX < -12) {
+        nextObstacleX = 110
+        const nextHeight = 16 + Math.floor(Math.random() * 28)
+        obstacleHeightRef.current = nextHeight
+        setObstacleHeight(nextHeight)
+        setScore((previous) => previous + 1)
+      }
+      obstacleXRef.current = nextObstacleX
+      setObstacleX(nextObstacleX)
+
+      const playerX = 12
+      const obstacleWidth = 10
+      const hit =
+        nextObstacleX < playerX + 8 &&
+        nextObstacleX + obstacleWidth > playerX &&
+        nextPlayerY < obstacleHeightRef.current + 6
+      if (hit) {
+        setGameActive(false)
+        setStatusMessage("¡Ups! Tocá reiniciar para volver a correr.")
+      }
+    }, 45)
 
     return () => window.clearInterval(interval)
-  }, [gameActive, pulseSpeed])
+  }, [gameActive])
 
   useEffect(() => {
-    if (!gameActive) return
-
-    const drain = window.setInterval(() => {
-      setEnergy((previous) => {
-        const next = Math.max(previous - 1, 0)
-        if (next === 0) {
-          setGameActive(false)
-          setStatusMessage("Energía agotada. Reiniciá para volver a jugar.")
-        }
-        return next
-      })
-    }, turboActive ? 800 : 1000)
-
-    return () => window.clearInterval(drain)
-  }, [gameActive, turboActive])
-
-  useEffect(() => {
-    if (!turboActive) return
-    const timeout = window.setTimeout(() => {
-      setTurboActive(false)
-      setStatusMessage("Turbo finalizado. Volvé a cargar células.")
-    }, 4000)
-
-    return () => window.clearTimeout(timeout)
-  }, [turboActive])
+    const nextSpeed = Math.min(6, 2.8 + score * 0.08)
+    setSpeed(nextSpeed)
+    speedRef.current = nextSpeed
+  }, [score])
 
   const resetGame = () => {
     setScore(0)
-    setStreak(0)
-    setEnergy(72)
-    setPowerCells(0)
-    setMisses(0)
-    setTurboActive(false)
-    setPulsePosition(10)
-    setTargetZone({ start: 35, end: 55 })
-    setStatusMessage("Listo para despegar.")
-    directionRef.current = 1
+    setPlayerY(0)
+    setObstacleX(110)
+    setObstacleHeight(24)
+    setSpeed(2.8)
+    setStatusMessage("Listo. Tocá para saltar.")
+    velocityRef.current = 0
+    playerYRef.current = 0
+    obstacleXRef.current = 110
+    obstacleHeightRef.current = 24
+    speedRef.current = 2.8
   }
 
   const startGame = () => {
     resetGame()
     setGameActive(true)
+    setStatusMessage("¡Corré! Tocá para saltar obstáculos.")
   }
 
-  const handleBoost = () => {
+  const handleJump = () => {
     if (!gameActive) return
-
-    if (isInZone) {
-      setScore((previous) => previous + 10 + streak * 2 + level * 3 + (turboActive ? 12 : 0))
-      setStreak((previous) => previous + 1)
-      setPowerCells((previous) => Math.min(previous + 1, 3))
-      setMisses(0)
-      setEnergy((previous) => Math.min(previous + 8, 100))
-      setStatusMessage("¡Combo perfecto! La batería se carga al máximo.")
-    } else {
-      setStreak(0)
-      setMisses((previous) => previous + 1)
-      setPowerCells((previous) => Math.max(previous - 1, 0))
-      setEnergy((previous) => Math.max(previous - 12, 0))
-      setStatusMessage("Señal inestable. Ajustá el timing para el próximo impulso.")
-    }
-
-    const zoneSize = 18 - Math.min(level * 2, 8)
-    const zoneStart = Math.floor(Math.random() * (100 - zoneSize))
-    setTargetZone({ start: zoneStart, end: zoneStart + zoneSize })
-  }
-
-  const handleTurboCharge = () => {
-    if (!gameActive || !powerReady) return
-    setTurboActive(true)
-    setPowerCells(0)
-    setEnergy((previous) => Math.min(previous + 18, 100))
-    setScore((previous) => previous + 25 + level * 6)
-    setStatusMessage("Turbo 5G activado. ¡Doble velocidad y puntos!")
+    velocityRef.current = 12
+    setStatusMessage("¡Salto perfecto!")
   }
 
   return (
@@ -459,161 +410,74 @@ export default function PublicAccessLanding() {
               <div className="relative flex flex-col gap-8">
                 <div className="flex flex-col gap-3">
                   <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Minijuego</p>
-                  <h2 className="text-2xl font-semibold text-white">
-                    Turbo Pulse: carrera de señal 5G
-                  </h2>
+                  <h2 className="text-2xl font-semibold text-white">Pixel Run: salto urbano</h2>
                   <p className="max-w-2xl text-sm text-slate-300">
-                    Cronometrá el impulso, mantené la energía alta y acumulá combos. Encadená
-                    células de carga para activar el turbo 5G y convertir el teléfono en una
-                    superpotencia de puntos.
+                    Inspirado en los clásicos runners, vos sos quien salta con un solo toque. Cada
+                    obstáculo que superás acelera el ritmo. Ideal para jugar en modo celular: tap,
+                    salto y seguí corriendo.
                   </p>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
                     <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
-                      {levelLabel}
-                    </span>
-                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-100">
-                      Bonus +{Math.min(streak * 2, 20)} pts
+                      {difficultyLabel}
                     </span>
                     <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-sky-100">
-                      Velocidad x{pulseSpeed.toFixed(1)}
+                      Velocidad x{speed.toFixed(1)}
                     </span>
-                    <span className="rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
-                      {deviceMode}
+                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-100">
+                      Toque único
                     </span>
                   </div>
                 </div>
-                <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-                  <div className="space-y-6 rounded-2xl border border-white/10 bg-slate-950/50 p-6 shadow-[0_0_40px_rgba(56,189,248,0.2)]">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2">
+                <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="space-y-5 rounded-2xl border border-white/10 bg-slate-950/60 p-6 shadow-[0_0_40px_rgba(56,189,248,0.2)]">
+                    <div className="flex items-center justify-between">
+                      <div>
                         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                          Energía
+                          Runner móvil
                         </p>
-                        <div className="flex items-center gap-3">
-                          <div className="h-2 w-40 overflow-hidden rounded-full bg-white/10">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-emerald-300 via-sky-400 to-fuchsia-400 transition-all"
-                              style={{ width: `${energy}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-slate-200">{energy}%</span>
-                        </div>
+                        <h3 className="text-lg font-semibold text-white">Zona de juego</h3>
                       </div>
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-200">
+                        <Gamepad2 className="h-5 w-5" />
+                      </div>
+                    </div>
+                    <div className="relative mx-auto h-[420px] w-[240px] overflow-hidden rounded-[32px] border border-white/20 bg-slate-900/80 shadow-[0_0_30px_rgba(56,189,248,0.25)]">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),transparent_55%),radial-gradient(circle_at_bottom,_rgba(16,185,129,0.2),transparent_45%)]" />
+                      <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent" />
+                      <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-slate-200">
+                        {gameActive ? "En carrera" : "En espera"}
+                      </div>
+                      <div className="absolute right-4 top-4 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-100">
+                        {score} pts
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleJump}
+                        className="absolute inset-0 z-10 cursor-pointer"
+                        aria-label="Tocar para saltar"
+                      />
                       <div
-                        className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-200 ${
-                          turboActive ? "animate-pulse shadow-[0_0_20px_rgba(56,189,248,0.7)]" : ""
-                        }`}
-                      >
-                        <Rocket className="h-6 w-6" />
-                      </div>
+                        className="absolute bottom-8 left-[24px] h-8 w-8 rounded-[10px] bg-gradient-to-br from-fuchsia-400 to-sky-300 shadow-[0_0_18px_rgba(56,189,248,0.6)]"
+                        style={{ bottom: `${32 + playerY * 2.2}px` }}
+                      />
+                      <div
+                        className="absolute bottom-8 w-9 rounded-xl bg-gradient-to-t from-emerald-300/80 to-emerald-500/80 shadow-[0_0_18px_rgba(16,185,129,0.6)]"
+                        style={{
+                          left: `${obstacleX * 2}px`,
+                          height: `${obstacleHeight * 2.2}px`,
+                        }}
+                      />
                     </div>
-                    <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                          Señal 5G
-                        </p>
-                        <div className="flex items-end gap-1">
-                          {Array.from({ length: 5 }).map((_, index) => (
-                            <span
-                              key={`signal-${index}`}
-                              className={`w-2 rounded-full transition-all ${
-                                index < signalStrength
-                                  ? "bg-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.7)]"
-                                  : "bg-white/10"
-                              }`}
-                              style={{ height: `${6 + index * 4}px` }}
-                            />
-                          ))}
-                        </div>
-                        <p className="text-xs text-slate-300">Conexión lista para el boost.</p>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                          Temperatura
-                        </p>
-                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-amber-300 to-rose-400 transition-all"
-                            style={{ width: `${heatLevel}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-slate-300">
-                          {heatLevel > 65 ? "Dispositivo exigido. Bajá la presión." : "Zona segura."}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
-                        <span>Combo activo</span>
-                        <span>{streak}x</span>
-                      </div>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 via-sky-400 to-emerald-300 transition-all"
-                          style={{ width: `${comboProgress}%` }}
-                        />
-                      </div>
-                      <p className="mt-2 text-xs text-slate-300">
-                        Sumá 6 combos para encender el modo brillo.
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
-                        <span>Zona de impulso</span>
-                        <span>Nivel {level}</span>
-                      </div>
-                      <div className="relative h-3 w-full rounded-full bg-white/10">
-                        <div
-                          className="absolute top-0 h-full rounded-full bg-emerald-400/40 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                          style={{
-                            left: `${targetZone.start}%`,
-                            width: `${targetZone.end - targetZone.start}%`,
-                          }}
-                        />
-                        <div
-                          className={`absolute -top-1 h-5 w-2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.7)] transition-transform ${
-                            isInZone ? "scale-y-110" : "scale-y-100"
-                          }`}
-                          style={{ left: `${pulsePosition}%` }}
-                        />
-                      </div>
-                      <p className="text-sm text-slate-300">{statusMessage}</p>
-                    </div>
+                    <p className="text-sm text-slate-300">{statusMessage}</p>
                     <div className="flex flex-wrap items-center gap-3">
                       {gameActive ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={handleBoost}
-                            className="inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-5 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/30"
-                          >
-                            <Zap className="h-4 w-4" />
-                            Impulsar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleTurboCharge}
-                            disabled={!powerReady}
-                            className={`inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-semibold transition ${
-                              powerReady
-                                ? "border-fuchsia-300/60 bg-fuchsia-500/20 text-fuchsia-100 hover:bg-fuchsia-500/30"
-                                : "border-white/10 text-slate-400 opacity-60"
-                            }`}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            Turbo 5G
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setGameActive(false)
-                              setStatusMessage("Pausa activa. Tocá reiniciar para volver.")
-                            }}
-                            className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-slate-200 transition hover:border-white/30"
-                          >
-                            Pausar
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          onClick={handleJump}
+                          className="inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-5 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/30"
+                        >
+                          Tocar para saltar
+                        </button>
                       ) : (
                         <>
                           <button
@@ -621,7 +485,6 @@ export default function PublicAccessLanding() {
                             onClick={startGame}
                             className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
                           >
-                            <BatteryCharging className="h-4 w-4" />
                             Iniciar partida
                           </button>
                           <button
@@ -634,38 +497,22 @@ export default function PublicAccessLanding() {
                         </>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-xs text-slate-300">
-                      <span className="inline-flex items-center gap-2">
-                        <Smartphone className="h-4 w-4 text-sky-200" />
-                        Células cargadas: {powerCells}/3
-                      </span>
-                      <span className="inline-flex items-center gap-2">
-                        <BatteryCharging className="h-4 w-4 text-emerald-200" />
-                        {powerReady ? "Turbo listo" : "Cargá para desbloquear turbo"}
-                      </span>
-                    </div>
                   </div>
                   <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
                     <div className="flex items-center justify-between">
                       <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
-                        Stats del reto
+                        Stats del runner
                       </p>
                       <Trophy className="h-5 w-5 text-slate-300" />
                     </div>
-                    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-black p-4">
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),transparent_55%)]" />
-                      <div className="relative flex items-center justify-between">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                            Panel del equipo
-                          </p>
-                          <p className="text-lg font-semibold text-white">{deviceMode}</p>
-                          <p className="text-xs text-slate-300">Ajustá el pulso para evitar sobrecalentamiento.</p>
-                        </div>
-                        <div className="flex h-14 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                          <div className="h-10 w-6 rounded-xl bg-gradient-to-b from-sky-400/60 via-emerald-300/40 to-fuchsia-400/60 shadow-[0_0_20px_rgba(56,189,248,0.4)]" />
-                        </div>
-                      </div>
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-black p-4">
+                      <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                        Modo actual
+                      </p>
+                      <p className="text-lg font-semibold text-white">{difficultyLabel}</p>
+                      <p className="text-xs text-slate-300">
+                        Cada punto acelera el escenario. Tocá rápido para superar la marca.
+                      </p>
                     </div>
                     <div className="grid gap-3">
                       <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-sky-500/10 via-white/5 to-transparent p-4">
@@ -680,7 +527,7 @@ export default function PublicAccessLanding() {
                       <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
                         <div className="flex items-center justify-between">
                           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                            Puntaje
+                            Puntaje actual
                           </p>
                           <Sparkles className="h-4 w-4 text-sky-200" />
                         </div>
@@ -689,40 +536,18 @@ export default function PublicAccessLanding() {
                       <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
                         <div className="flex items-center justify-between">
                           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                            Racha
+                            Velocidad
                           </p>
-                          <Shield className="h-4 w-4 text-emerald-200" />
-                        </div>
-                        <p className="text-3xl font-semibold text-white">x{streak}</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                            Bonus
-                          </p>
-                          <Headphones className="h-4 w-4 text-fuchsia-200" />
+                          <Smartphone className="h-4 w-4 text-emerald-200" />
                         </div>
                         <p className="text-sm text-slate-300">
-                          Bonus activo: +{Math.min(streak * 2, 20)} pts por impulso.
+                          Velocidad actual x{speed.toFixed(1)}. Saltá antes del obstáculo.
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                            Turbos 5G
-                          </p>
-                          <Sparkles className="h-4 w-4 text-fuchsia-200" />
-                        </div>
-                        <p className="text-sm text-slate-300">
-                          {powerReady
-                            ? "Turbo listo para disparar. Potenciá el score."
-                            : `Cargá ${3 - powerCells} células para desbloquear.`}
-                        </p>
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-300">
+                        Tip: tocá dentro del teléfono para saltar. Las barreras se vuelven más altas
+                        con cada punto.
                       </div>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-300">
-                      Ajustá el timing para mantener el combo. Cada nivel acelera el pulso y exige
-                      más precisión en la señal.
                     </div>
                   </div>
                 </div>
