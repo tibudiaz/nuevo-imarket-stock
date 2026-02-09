@@ -317,6 +317,18 @@ const resolveJblCatalogName = (item: JblCatalogItem) => {
   return "Accesorio JBL"
 }
 
+const resolveJblCatalogDisplayName = (item: JblCatalogItem) => {
+  const name = item.name?.trim()
+  const model = item.model?.trim()
+  if (name && model) {
+    const normalizedName = name.toLowerCase()
+    const normalizedModel = model.toLowerCase()
+    if (normalizedName.includes(normalizedModel)) return name
+    return `${name} ${model}`
+  }
+  return resolveJblCatalogName(item)
+}
+
 const formatUsdPrice = (price: number | undefined, usdRate: number) => {
   if (typeof price !== "number" || Number.isNaN(price)) return "Consultar"
   if (usdRate > 0) {
@@ -357,7 +369,7 @@ const buildWhatsAppLinkForNewCatalog = (item: NewCatalogItem, usdRate: number) =
 }
 
 const buildWhatsAppLinkForJbl = (item: JblCatalogItem, usdRate: number) => {
-  const name = resolveJblCatalogName(item)
+  const name = resolveJblCatalogDisplayName(item)
   const usdPrice = formatUsdPrice(item.salePrice, usdRate)
   const arsPrice = formatArsPriceBlue(item.salePrice, usdRate)
   const message = `Hola! Estoy interesado en ${name}. Precio USD: ${usdPrice}. Precio en pesos: ${arsPrice}.`
@@ -993,7 +1005,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     return jblCatalogItems
       .filter((item) => (item.availableQuantity ?? 0) > 0)
       .sort((a, b) =>
-        resolveJblCatalogName(a).localeCompare(resolveJblCatalogName(b), "es", {
+        resolveJblCatalogDisplayName(a).localeCompare(resolveJblCatalogDisplayName(b), "es", {
           sensitivity: "base",
         }),
       )
@@ -1600,7 +1612,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                                     {catalogType.title}
                                   </p>
                                   <h3 className="text-lg font-semibold text-white">
-                                    {resolveJblCatalogName(item)}
+                                    {resolveJblCatalogDisplayName(item)}
                                   </h3>
                                   {item.category && (
                                     <p className="mt-2 text-sm text-slate-300">
