@@ -2,8 +2,6 @@ import { Suspense } from "react"
 
 import PublicStockClient from "./[tipo]/ClientPage"
 
-export const dynamic = "force-dynamic"
-
 type CatalogPageProps = {
   searchParams?: { tipo?: string }
 }
