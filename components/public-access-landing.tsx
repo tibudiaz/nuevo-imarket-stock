@@ -129,32 +129,21 @@ export default function PublicAccessLanding() {
         <PublicTopBar
           marqueeItems={marqueeItems}
           desktopContent={
-            <>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  <Sparkles className="h-4 w-4 text-sky-300" />
-                  Stock actualizado
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  Información segura y resumida
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-                <Link
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
-                  href="/catalogo/contacto"
-                >
-                  Contacto
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-slate-100 transition hover:border-emerald-300/60"
-                  href="/catalogo/nuevos?auth=login"
-                >
-                  Iniciar sesión / Registrarse
-                </Link>
-              </div>
-            </>
+            <div className="ml-auto flex flex-nowrap items-center gap-3 whitespace-nowrap text-sm text-slate-300">
+              <Link
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
+                href="/catalogo/contacto"
+              >
+                Contacto
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-slate-100 transition hover:border-emerald-300/60"
+                href="/catalogo/nuevos?auth=login"
+              >
+                Iniciar sesión / Registrarse
+              </Link>
+            </div>
           }
           mobileContent={
             <div className="space-y-4">

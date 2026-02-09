@@ -1031,7 +1031,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   const topBarDesktopContent = (
     <>
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm text-slate-300">
         <Link
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-white/20"
           href="/"
@@ -1050,15 +1050,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           </Link>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-        <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-          <Globe className="h-4 w-4" />
-          Disponible en tiempo real
-        </span>
-        <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-          <ShieldCheck className="h-4 w-4" />
-          Datos protegidos
-        </span>
+      <div className="flex items-center gap-3 text-sm text-slate-300">
         {currentCustomer ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100">
@@ -1108,17 +1100,6 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               <ArrowRight className="h-4 w-4" />
             </Link>
           ))}
-        </div>
-      </div>
-      <div className="space-y-2 text-sm text-slate-300">
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Estado</p>
-        <div className="grid gap-2">
-          <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-            Disponible en tiempo real
-          </span>
-          <span className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-            Datos protegidos
-          </span>
         </div>
       </div>
       <div className="space-y-2 text-sm text-slate-300">
@@ -1765,6 +1746,19 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
           <CatalogAd config={catalogAd} className="order-last md:order-2 md:mt-12" />
         </div>
       </main>
+
+      <footer className="mx-auto w-full max-w-6xl px-6 pb-12">
+        <div className="pointer-events-none flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400/70">
+          <span className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Disponible en tiempo real
+          </span>
+          <span className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Datos protegidos
+          </span>
+        </div>
+      </footer>
 
       <footer className="mx-auto w-full max-w-6xl px-6 pb-12 text-center text-xs text-slate-400">
         sitio creado por Grupo iMarket. Todos los derechos reservados
