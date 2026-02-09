@@ -11,7 +11,6 @@ import { database } from "@/lib/firebase"
 import { fetchPublicRealtimeValue } from "@/lib/public-realtime"
 import CatalogAd from "@/components/catalog-ad"
 import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
-import DinoRunner from "@/components/dino-runner"
 
 const landingOptions = [
   {
@@ -41,7 +40,6 @@ export default function PublicAccessLanding() {
   const [offers, setOffers] = useState<string[]>([])
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [catalogBottomAd, setCatalogBottomAd] = useState<CatalogAdConfig | null>(null)
-  const [landingGameEnabled, setLandingGameEnabled] = useState(true)
   const [secretClickCount, setSecretClickCount] = useState(0)
   const router = useRouter()
 
@@ -105,41 +103,6 @@ export default function PublicAccessLanding() {
       isMounted = false
       unsubscribeTopAd()
       unsubscribeBottomAd()
-    }
-  }, [])
-
-  useEffect(() => {
-    let isMounted = true
-
-    const syncGameConfig = (value: unknown) => {
-      if (!isMounted) return
-      if (!value) {
-        setLandingGameEnabled(true)
-        return
-      }
-      if (typeof value === "object" && value && "enabled" in value) {
-        setLandingGameEnabled(Boolean((value as { enabled?: boolean }).enabled))
-        return
-      }
-      setLandingGameEnabled(Boolean(value))
-    }
-
-    fetchPublicRealtimeValue<unknown>("config/landingGame").then(syncGameConfig)
-
-    const gameRef = ref(database, "config/landingGame")
-    const unsubscribe = onValue(
-      gameRef,
-      (snapshot) => {
-        syncGameConfig(snapshot.val())
-      },
-      () => {
-        fetchPublicRealtimeValue<unknown>("config/landingGame").then(syncGameConfig)
-      },
-    )
-
-    return () => {
-      isMounted = false
-      unsubscribe()
     }
   }, [])
 
@@ -324,36 +287,6 @@ export default function PublicAccessLanding() {
           </section>
 
         </div>
-
-        {landingGameEnabled && (
-          <section className="mt-8 flex flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-8">
-            <div className="flex flex-col gap-3">
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Zona de juego</p>
-              <h2 className="text-2xl font-semibold text-white">Dino Rex Runner</h2>
-              <p className="max-w-3xl text-sm text-slate-300">
-                Un runner clásico sin copyrights: esquivá obstáculos, acelerá el ritmo y superá
-                tu mejor puntaje.
-              </p>
-            </div>
-            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <DinoRunner />
-              <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/80 via-slate-950/70 to-slate-900/90 p-6">
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-white">¿Cómo se juega?</h3>
-                  <ul className="space-y-2 text-sm text-slate-300">
-                    <li>• Saltá con espacio (o tocando la pantalla).</li>
-                    <li>• Esquivá los cactus y mantené el ritmo.</li>
-                    <li>• Cada metro suma, cada choque reinicia.</li>
-                  </ul>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
-                  Ajustá la dificultad con tu propio tiempo de reacción y buscá el mejor score
-                  diario.
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
 
         <CatalogAd config={catalogBottomAd} className="mt-2" />
 
