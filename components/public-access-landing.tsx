@@ -1,17 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ref, onValue } from "firebase/database"
 import {
   ArrowRight,
   BatteryCharging,
   Headphones,
+  Rocket,
+  Shield,
   ShieldCheck,
   Smartphone,
   Sparkles,
   Speaker,
+  Trophy,
+  Zap,
 } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
@@ -49,7 +53,14 @@ export default function PublicAccessLanding() {
   const [catalogAd, setCatalogAd] = useState<CatalogAdConfig | null>(null)
   const [catalogBottomAd, setCatalogBottomAd] = useState<CatalogAdConfig | null>(null)
   const [secretClickCount, setSecretClickCount] = useState(0)
-  const [chargeScore, setChargeScore] = useState(0)
+  const [gameActive, setGameActive] = useState(false)
+  const [score, setScore] = useState(0)
+  const [streak, setStreak] = useState(0)
+  const [energy, setEnergy] = useState(72)
+  const [pulsePosition, setPulsePosition] = useState(10)
+  const [targetZone, setTargetZone] = useState({ start: 35, end: 55 })
+  const [statusMessage, setStatusMessage] = useState("Listo para despegar.")
+  const directionRef = useRef(1)
   const router = useRouter()
 
   useEffect(() => {
@@ -130,30 +141,81 @@ export default function PublicAccessLanding() {
     })
   }
 
-  const accessoryMilestones = [
-    {
-      points: 5,
-      label: "Funda premium",
-      description: "Protege tu equipo con estilo.",
-    },
-    {
-      points: 12,
-      label: "Power bank",
-      description: "Energía extra para todo el día.",
-    },
-    {
-      points: 20,
-      label: "Auriculares",
-      description: "Música sin cortes en cualquier lugar.",
-    },
-  ]
+  const level = useMemo(() => Math.min(5, Math.floor(score / 80) + 1), [score])
+  const speed = useMemo(() => 0.8 + level * 0.6, [level])
 
-  const unlockedAccessories = accessoryMilestones.filter(
-    (milestone) => chargeScore >= milestone.points,
-  )
-  const nextAccessory = accessoryMilestones.find((milestone) => chargeScore < milestone.points)
-  const progressMax = nextAccessory?.points ?? accessoryMilestones[accessoryMilestones.length - 1].points
-  const progressValue = Math.min(chargeScore, progressMax)
+  useEffect(() => {
+    if (!gameActive) return
+
+    const interval = window.setInterval(() => {
+      setPulsePosition((previous) => {
+        let next = previous + speed * directionRef.current
+        if (next >= 100) {
+          next = 100
+          directionRef.current = -1
+        }
+        if (next <= 0) {
+          next = 0
+          directionRef.current = 1
+        }
+        return next
+      })
+    }, 60)
+
+    return () => window.clearInterval(interval)
+  }, [gameActive, speed])
+
+  useEffect(() => {
+    if (!gameActive) return
+
+    const drain = window.setInterval(() => {
+      setEnergy((previous) => {
+        const next = Math.max(previous - 1, 0)
+        if (next === 0) {
+          setGameActive(false)
+          setStatusMessage("Energía agotada. Reiniciá para volver a jugar.")
+        }
+        return next
+      })
+    }, 1000)
+
+    return () => window.clearInterval(drain)
+  }, [gameActive])
+
+  const resetGame = () => {
+    setScore(0)
+    setStreak(0)
+    setEnergy(72)
+    setPulsePosition(10)
+    setTargetZone({ start: 35, end: 55 })
+    setStatusMessage("Listo para despegar.")
+    directionRef.current = 1
+  }
+
+  const startGame = () => {
+    resetGame()
+    setGameActive(true)
+  }
+
+  const handleBoost = () => {
+    if (!gameActive) return
+
+    const isHit = pulsePosition >= targetZone.start && pulsePosition <= targetZone.end
+    if (isHit) {
+      setScore((previous) => previous + 10 + streak * 2 + level * 3)
+      setStreak((previous) => previous + 1)
+      setEnergy((previous) => Math.min(previous + 8, 100))
+      setStatusMessage("¡Combo perfecto! Seguís sumando energía.")
+    } else {
+      setStreak(0)
+      setEnergy((previous) => Math.max(previous - 12, 0))
+      setStatusMessage("Casi. Ajustá el timing para el próximo impulso.")
+    }
+
+    const zoneSize = 18 - Math.min(level * 2, 8)
+    const zoneStart = Math.floor(Math.random() * (100 - zoneSize))
+    setTargetZone({ start: zoneStart, end: zoneStart + zoneSize })
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
@@ -321,96 +383,142 @@ export default function PublicAccessLanding() {
           </section>
 
           <section className="order-4">
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.28),transparent_45%)]" />
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-8">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),transparent_50%),radial-gradient(circle_at_bottom,_rgba(244,114,182,0.2),transparent_45%)]" />
               <div className="relative flex flex-col gap-8">
                 <div className="flex flex-col gap-3">
                   <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Minijuego</p>
-                  <h2 className="text-2xl font-semibold text-white">
-                    Cargá tu combo móvil
-                  </h2>
+                  <h2 className="text-2xl font-semibold text-white">Turbo Pulse: desafío relámpago</h2>
                   <p className="max-w-2xl text-sm text-slate-300">
-                    Sumá puntos tocando el botón de carga y desbloqueá accesorios para tu celular.
-                    Ideal para pasar el rato mientras elegís tu próximo equipo.
+                    Cronometrá el impulso, mantené la energía alta y acumulá combos. Cuanto más
+                    preciso seas, más puntos y brillo desbloqueás.
                   </p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-                  <div className="space-y-6 rounded-2xl border border-white/10 bg-slate-950/40 p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm text-slate-300">Puntaje actual</p>
-                        <p className="text-4xl font-semibold text-white">{chargeScore}</p>
+                  <div className="space-y-6 rounded-2xl border border-white/10 bg-slate-950/50 p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                          Energía
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 w-40 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-300 via-sky-400 to-fuchsia-400 transition-all"
+                              style={{ width: `${energy}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-slate-200">{energy}%</span>
+                        </div>
                       </div>
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-200">
-                        <BatteryCharging className="h-6 w-6" />
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-200">
+                        <Rocket className="h-6 w-6" />
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
-                        <span>Progreso</span>
-                        <span>{progressValue}/{progressMax}</span>
+                        <span>Zona de impulso</span>
+                        <span>Nivel {level}</span>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                      <div className="relative h-3 w-full rounded-full bg-white/10">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-sky-400 via-emerald-300 to-lime-300 transition-all"
-                          style={{ width: `${(progressValue / progressMax) * 100}%` }}
+                          className="absolute top-0 h-full rounded-full bg-emerald-400/40"
+                          style={{
+                            left: `${targetZone.start}%`,
+                            width: `${targetZone.end - targetZone.start}%`,
+                          }}
+                        />
+                        <div
+                          className="absolute -top-1 h-5 w-2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+                          style={{ left: `${pulsePosition}%` }}
                         />
                       </div>
-                      {nextAccessory ? (
-                        <p className="text-sm text-slate-300">
-                          Próximo desbloqueo:{" "}
-                          <span className="font-semibold text-white">{nextAccessory.label}</span>{" "}
-                          en {nextAccessory.points - chargeScore} puntos.
-                        </p>
-                      ) : (
-                        <p className="text-sm text-emerald-200">
-                          ¡Desbloqueaste todos los accesorios!
-                        </p>
-                      )}
+                      <p className="text-sm text-slate-300">{statusMessage}</p>
                     </div>
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setChargeScore((previous) => previous + 1)}
-                        className="inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-5 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/30"
-                      >
-                        <BatteryCharging className="h-4 w-4" />
-                        Cargar +1
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChargeScore(0)}
-                        className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-slate-200 transition hover:border-white/30"
-                      >
-                        Reiniciar
-                      </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {gameActive ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleBoost}
+                            className="inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-5 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/30"
+                          >
+                            <Zap className="h-4 w-4" />
+                            Impulsar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGameActive(false)
+                              setStatusMessage("Pausa activa. Tocá reiniciar para volver.")
+                            }}
+                            className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-slate-200 transition hover:border-white/30"
+                          >
+                            Pausar
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={startGame}
+                            className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
+                          >
+                            <BatteryCharging className="h-4 w-4" />
+                            Iniciar partida
+                          </button>
+                          <button
+                            type="button"
+                            onClick={resetGame}
+                            className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-slate-200 transition hover:border-white/30"
+                          >
+                            Reiniciar
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6">
                     <div className="flex items-center justify-between">
                       <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
-                        Accesorios desbloqueados
+                        Stats del reto
                       </p>
-                      <Headphones className="h-5 w-5 text-slate-300" />
+                      <Trophy className="h-5 w-5 text-slate-300" />
                     </div>
-                    {unlockedAccessories.length ? (
-                      <div className="space-y-3">
-                        {unlockedAccessories.map((accessory) => (
-                          <div
-                            key={accessory.label}
-                            className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"
-                          >
-                            <p className="text-sm font-semibold text-white">{accessory.label}</p>
-                            <p className="text-xs text-slate-300">{accessory.description}</p>
-                          </div>
-                        ))}
+                    <div className="grid gap-3">
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                            Puntaje
+                          </p>
+                          <Sparkles className="h-4 w-4 text-sky-200" />
+                        </div>
+                        <p className="text-3xl font-semibold text-white">{score}</p>
                       </div>
-                    ) : (
-                      <p className="text-sm text-slate-300">
-                        Tocá el botón de carga para sumar puntos y desbloquear tu primer
-                        accesorio.
-                      </p>
-                    )}
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                            Racha
+                          </p>
+                          <Shield className="h-4 w-4 text-emerald-200" />
+                        </div>
+                        <p className="text-3xl font-semibold text-white">x{streak}</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                            Bonus
+                          </p>
+                          <Headphones className="h-4 w-4 text-fuchsia-200" />
+                        </div>
+                        <p className="text-sm text-slate-300">
+                          Bonus activo: +{Math.min(streak * 2, 20)} pts por impulso.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-300">
+                      Ajustá el timing para mantener el combo. Cada nivel acelera el pulso.
+                    </div>
                   </div>
                 </div>
               </div>
