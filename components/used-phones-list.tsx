@@ -71,6 +71,23 @@ const ensureIphonePrefix = (name: string) => {
   return `iPhone ${trimmed}`;
 };
 
+
+const normalizePhoneNameCasing = (name: string) => {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word, index, allWords) => {
+      if (/^iphone$/i.test(word)) return "iPhone";
+      if (/^se$/i.test(word) && /^iphone$/i.test(allWords[index - 1] ?? "")) {
+        return "SE";
+      }
+      if (/^\d+$/.test(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+};
+
 export default function UsedPhonesList() {
   const { user, loading: authLoading } = useAuth();
   const { selectedStore } = useStore();
@@ -185,8 +202,8 @@ export default function UsedPhonesList() {
       })
       .sort((a, b) =>
         nameCollator.compare(
-          ensureIphonePrefix(resolveProductName(a)),
-          ensureIphonePrefix(resolveProductName(b)),
+          normalizePhoneNameCasing(ensureIphonePrefix(resolveProductName(a))),
+          normalizePhoneNameCasing(ensureIphonePrefix(resolveProductName(b))),
         ),
       );
   }, [products, searchTerm, selectedStore]);
@@ -293,7 +310,7 @@ export default function UsedPhonesList() {
               filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">
-                    {ensureIphonePrefix(resolveProductName(product))}
+                    {normalizePhoneNameCasing(ensureIphonePrefix(resolveProductName(product)))}
                   </TableCell>
                   {visibleColumns.price && (
                     <TableCell className="text-right">

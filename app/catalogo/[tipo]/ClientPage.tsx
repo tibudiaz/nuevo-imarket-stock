@@ -206,6 +206,22 @@ const ensureIphonePrefix = (name: string) => {
   return `iPhone ${trimmed}`
 }
 
+const normalizePhoneNameCasing = (name: string) => {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word, index, allWords) => {
+      if (/^iphone$/i.test(word)) return "iPhone"
+      if (/^se$/i.test(word) && /^iphone$/i.test(allWords[index - 1] ?? "")) {
+        return "SE"
+      }
+      if (/^\d+$/.test(word)) return word
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    })
+    .join(" ")
+}
+
 const WARRANTY_REGEX = /\b(gtia|gar|car)\s*(\d{1,2}\/\d{2}(?:\/\d{2})?)\b/i
 
 const stripImeiSuffix = (name: string) => {
@@ -234,6 +250,9 @@ const COLOR_PHRASES = [
   "rose",
   "dorado",
   "oro",
+  "natural titanium",
+  "titanio natural",
+  "natural",
   "rosa",
   "desert",
   "fucsia",
@@ -298,14 +317,15 @@ const parseUsedPhoneDetails = (name: string) => {
   const memoryMatch = memoryIndex >= 0 ? tokens[memoryIndex].match(/(\d+)\s*gb/i) : null
   const memory = memoryMatch ? memoryMatch[0].replace(/\s+/g, "").toUpperCase() : null
 
-  const color = colorMatch?.value ?? null
+  const color = colorMatch ? normalizePhoneNameCasing(colorMatch.value) : null
 
   const displayTokens = tokens.filter((_, index) => {
     if (index === batteryIndex || index === memoryIndex) return false
     if (colorMatch && index >= colorMatch.start && index < colorMatch.end) return false
     return true
   })
-  const displayName = displayTokens.join(" ").trim() || warrantyTrimmed
+  const normalizedDisplayName = displayTokens.join(" ").trim() || warrantyTrimmed
+  const displayName = normalizePhoneNameCasing(normalizedDisplayName)
 
   return {
     displayName,
