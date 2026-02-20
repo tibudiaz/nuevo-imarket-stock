@@ -5,14 +5,10 @@ import { FormEvent, useEffect, useRef, useState } from "react"
 import { Loader2, MessageCircle, Send, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { resolveLocalAssistant, type AssistantAction } from "@/lib/local-assistant"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-type AssistantAction = {
-  label: string
-  href: string
-}
 
 type AssistantMessage = {
   role: "user" | "assistant"
@@ -56,6 +52,8 @@ export default function LocalAssistantChat() {
     setIsLoading(true)
 
     try {
+      let data: { answer?: string; limited?: boolean; actions?: AssistantAction[] }
+
       const response = await fetch("/api/local-assistant", {
         method: "POST",
         headers: {
@@ -64,11 +62,15 @@ export default function LocalAssistantChat() {
         body: JSON.stringify({ question: trimmedQuestion }),
       })
 
-      if (!response.ok) {
-        throw new Error("No se pudo responder en este momento.")
-      }
+      if (response.status === 404) {
+        data = await resolveLocalAssistant(trimmedQuestion)
+      } else {
+        if (!response.ok) {
+          throw new Error("No se pudo responder en este momento.")
+        }
 
-      const data = (await response.json()) as { answer?: string; limited?: boolean; actions?: AssistantAction[] }
+        data = (await response.json()) as { answer?: string; limited?: boolean; actions?: AssistantAction[] }
+      }
 
       setMessages((prev) => [
         ...prev,
