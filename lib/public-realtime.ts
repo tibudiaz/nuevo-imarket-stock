@@ -10,7 +10,9 @@ export const fetchPublicRealtimeValue = async <T>(path: string): Promise<T | nul
   try {
     const response = await fetch(endpoint, { cache: "no-store" })
     if (!response.ok) {
-      console.warn(`[firebase-public] No se pudo leer ${normalizedPath}.`, response.status)
+      if (response.status !== 401 && response.status !== 403) {
+        console.warn(`[firebase-public] No se pudo leer ${normalizedPath}.`, response.status)
+      }
       return null
     }
     return (await response.json()) as T | null

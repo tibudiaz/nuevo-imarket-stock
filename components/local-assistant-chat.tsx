@@ -52,25 +52,7 @@ export default function LocalAssistantChat() {
     setIsLoading(true)
 
     try {
-      let data: { answer?: string; limited?: boolean; actions?: AssistantAction[] }
-
-      const response = await fetch("/api/local-assistant", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ question: trimmedQuestion }),
-      })
-
-      if (response.status === 404) {
-        data = await resolveLocalAssistant(trimmedQuestion)
-      } else {
-        if (!response.ok) {
-          throw new Error("No se pudo responder en este momento.")
-        }
-
-        data = (await response.json()) as { answer?: string; limited?: boolean; actions?: AssistantAction[] }
-      }
+      const data = await resolveLocalAssistant(trimmedQuestion)
 
       setMessages((prev) => [
         ...prev,
