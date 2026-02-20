@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useRef, useState } from "react"
 import { Loader2, MessageCircle, Send, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { resolveLocalAssistant, type AssistantAction } from "@/lib/local-assistant"
+import { resolveLocalAssistant, type AssistantAction, type AssistantSessionContext } from "@/lib/local-assistant"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -30,6 +30,7 @@ export default function LocalAssistantChat() {
   ])
   const [question, setQuestion] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionContext, setSessionContext] = useState<AssistantSessionContext>({})
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -52,7 +53,8 @@ export default function LocalAssistantChat() {
     setIsLoading(true)
 
     try {
-      const data = await resolveLocalAssistant(trimmedQuestion)
+      const data = await resolveLocalAssistant(trimmedQuestion, sessionContext)
+      setSessionContext(data.sessionContext || {})
 
       setMessages((prev) => [
         ...prev,
