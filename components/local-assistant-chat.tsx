@@ -24,7 +24,7 @@ export default function LocalAssistantChat() {
     {
       role: "assistant",
       content:
-        "¡Hola! Soy el asistente del local. Podés consultarme por horarios, stock (por ejemplo iPhone 13), pagos y cuidado del celular.",
+        "¡Hola! Soy el asistente del local. Podés consultarme por horarios, stock y buscar productos con filtros (modelo, GB, color y precio), además de pagos y cuidado del celular.",
       limited: false,
     },
   ])
@@ -82,7 +82,7 @@ export default function LocalAssistantChat() {
     <div className="fixed bottom-4 right-4 z-50 flex items-end gap-3">
       {showHint && !isOpen ? (
         <div className="max-w-[220px] rounded-2xl border border-white/15 bg-slate-900/95 px-4 py-3 text-xs text-slate-100 shadow-xl">
-          ¿Tenés dudas? Consultame por horarios, stock o cuidados de batería 🔋
+          ¿Tenés dudas? Buscá productos por modelo/GB/precio o preguntá por horarios 🔋
         </div>
       ) : null}
 
@@ -131,7 +131,7 @@ export default function LocalAssistantChat() {
               <Input
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
-                placeholder="Ej: ¿Tienen iPhone 13 de 128GB?"
+                placeholder="Ej: iPhone 13 128GB azul hasta 800000"
                 className="border-white/20 bg-slate-900/70 text-white placeholder:text-slate-400"
                 maxLength={300}
               />
