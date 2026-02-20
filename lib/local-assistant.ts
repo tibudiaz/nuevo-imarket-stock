@@ -28,6 +28,17 @@ type CatalogFilters = {
   maxPrice?: number
 }
 
+type ProductCondition = "nuevo" | "usado"
+
+export type AssistantSessionContext = {
+  catalog?: {
+    model?: string
+    storage?: string
+    color?: string
+    condition?: ProductCondition
+  }
+}
+
 export type AssistantAction = {
   label: string
   href: string
@@ -37,6 +48,7 @@ export type LocalAssistantResult = {
   answer: string
   limited: boolean
   actions?: AssistantAction[]
+  sessionContext?: AssistantSessionContext
 }
 
 const DEFAULT_CONFIG: Required<AssistantConfig> = {
@@ -195,6 +207,21 @@ const parseCatalogFilters = (normalizedQuestion: string): CatalogFilters => {
   return { queryTerms, storage, color, minPrice, maxPrice }
 }
 
+const extractCondition = (normalizedQuestion: string): ProductCondition | undefined => {
+  if (/\b(usado|usada|seminuevo|seminueva|reacondicionado|reacondicionada)\b/.test(normalizedQuestion)) {
+    return "usado"
+  }
+  if (/\b(nuevo|nueva|sellado|0km)\b/.test(normalizedQuestion)) {
+    return "nuevo"
+  }
+  return undefined
+}
+
+const extractModel = (normalizedQuestion: string): string | undefined => {
+  const modelMatch = normalizedQuestion.match(/\biphone\s+\d{1,2}(?:\s+(?:pro\s+max|pro|max|plus|mini))?\b/)
+  return modelMatch?.[0]?.trim()
+}
+
 const hasCatalogIntent = (normalizedQuestion: string) =>
   CATALOG_INTENT_KEYWORDS.some((keyword) => normalizedQuestion.includes(keyword))
 
@@ -232,33 +259,64 @@ const collectAvailableProducts = async (): Promise<ProductCandidate[]> => {
   return Array.from(unique.values()).filter((item) => item.name.trim().length > 0)
 }
 
-const answerCatalogSearch = async (normalizedQuestion: string) => {
+const matchesCondition = (item: ProductCandidate, condition?: ProductCondition) => {
+  if (!condition) return true
+  const combined = normalize(`${item.name} ${item.status || ""}`)
+  const looksUsed = /\b(usad|seminuev|reacondicionad|2da\s+mano)\b/.test(combined)
+  return condition === "usado" ? looksUsed : !looksUsed
+}
+
+const answerCatalogSearch = async (normalizedQuestion: string, sessionContext?: AssistantSessionContext) => {
   const filters = parseCatalogFilters(normalizedQuestion)
+  const modelInQuestion = extractModel(normalizedQuestion)
+  const conditionInQuestion = extractCondition(normalizedQuestion)
+
+  const previousCatalogContext = sessionContext?.catalog
+  const modelChanged = !!(modelInQuestion && previousCatalogContext?.model && modelInQuestion !== previousCatalogContext.model)
+
+  const nextCatalogContext: AssistantSessionContext["catalog"] = modelChanged
+    ? { model: modelInQuestion }
+    : { ...previousCatalogContext }
+
+  if (modelInQuestion) nextCatalogContext.model = modelInQuestion
+  if (filters.storage) nextCatalogContext.storage = filters.storage
+  if (filters.color) nextCatalogContext.color = filters.color
+  if (conditionInQuestion) nextCatalogContext.condition = conditionInQuestion
+
+  const effectiveQueryTerms = filters.queryTerms.length > 0 ? filters.queryTerms : nextCatalogContext?.model?.split(/\s+/).filter(Boolean) || []
+  const effectiveStorage = filters.storage || nextCatalogContext?.storage
+  const effectiveColor = filters.color || nextCatalogContext?.color
+  const effectiveCondition = conditionInQuestion || nextCatalogContext?.condition
+
   const hasSpecificQuery = filters.queryTerms.length > 0 || !!filters.storage || !!filters.color || typeof filters.maxPrice === "number" || typeof filters.minPrice === "number"
-  const asksIphone13 = normalizedQuestion.includes("iphone 13")
-  const shouldAnswerCatalog = asksIphone13 || (hasCatalogIntent(normalizedQuestion) && hasSpecificQuery)
+  const hasContextualFollowUp = !!(nextCatalogContext?.model && (filters.color || filters.storage || conditionInQuestion))
+  const shouldAnswerCatalog = (hasCatalogIntent(normalizedQuestion) && (hasSpecificQuery || !!nextCatalogContext?.model)) || hasContextualFollowUp
 
   if (!shouldAnswerCatalog) return null
+
+  if (nextCatalogContext?.model && !effectiveCondition && modelInQuestion && !conditionInQuestion) {
+    return {
+      answer: `Perfecto, para ${nextCatalogContext.model.toUpperCase()} ${effectiveStorage ? `${effectiveStorage.toUpperCase()} ` : ""}¿lo buscás nuevo o usado?`,
+      sessionContext: { catalog: nextCatalogContext },
+    }
+  }
 
   const products = await collectAvailableProducts()
   const filtered = products
     .filter(stockAvailable)
+    .filter((item) => matchesCondition(item, effectiveCondition))
     .filter((item) => {
       const normalizedName = normalize(item.name)
 
-      if (asksIphone13 && !normalizedName.includes("iphone 13")) {
+      if (effectiveQueryTerms.some((term) => !normalizedName.includes(term))) {
         return false
       }
 
-      if (filters.queryTerms.some((term) => !normalizedName.includes(term))) {
+      if (effectiveStorage && !normalizedName.includes(normalize(effectiveStorage))) {
         return false
       }
 
-      if (filters.storage && !normalizedName.includes(normalize(filters.storage))) {
-        return false
-      }
-
-      if (filters.color && !normalizedName.includes(filters.color)) {
+      if (effectiveColor && !normalizedName.includes(effectiveColor)) {
         return false
       }
 
@@ -275,32 +333,37 @@ const answerCatalogSearch = async (normalizedQuestion: string) => {
 
   if (filtered.length === 0) {
     const activeFilters: string[] = []
-    if (filters.queryTerms.length > 0) activeFilters.push(`modelo: ${filters.queryTerms.join(" ")}`)
-    if (filters.storage) activeFilters.push(`capacidad: ${filters.storage.toUpperCase()}`)
-    if (filters.color) activeFilters.push(`color: ${filters.color}`)
+    if (effectiveQueryTerms.length > 0) activeFilters.push(`modelo: ${effectiveQueryTerms.join(" ")}`)
+    if (effectiveStorage) activeFilters.push(`capacidad: ${effectiveStorage.toUpperCase()}`)
+    if (effectiveColor) activeFilters.push(`color: ${effectiveColor}`)
+    if (effectiveCondition) activeFilters.push(`estado: ${effectiveCondition}`)
     if (typeof filters.maxPrice === "number") activeFilters.push(`tope: ${formatPrice(filters.maxPrice).replace(" · ", "")}`)
     if (typeof filters.minPrice === "number") activeFilters.push(`mínimo: ${formatPrice(filters.minPrice).replace(" · ", "")}`)
 
-    return `No encontré productos disponibles con esos filtros${activeFilters.length ? ` (${activeFilters.join(" · ")})` : ""}. Si querés, probamos ampliando rango de precio o quitando color/capacidad.`
+    return {
+      answer: `No encontré productos disponibles con esos filtros${activeFilters.length ? ` (${activeFilters.join(" · ")})` : ""}. Si querés, probamos ampliando rango de precio o quitando color/capacidad.`,
+      sessionContext: { catalog: nextCatalogContext },
+    }
   }
 
   const top = filtered.slice(0, 6)
   const options = top.map((item) => `• ${item.name}${formatPrice(item.price)}`).join("\n")
   const appliedFilters: string[] = []
-  if (asksIphone13) {
-    appliedFilters.push("modelo: iPhone 13")
-  } else if (filters.queryTerms.length > 0) {
-    appliedFilters.push(`búsqueda: ${filters.queryTerms.join(" ")}`)
-  }
-  if (filters.storage) appliedFilters.push(`capacidad: ${filters.storage.toUpperCase()}`)
-  if (filters.color) appliedFilters.push(`color: ${filters.color}`)
+  if (nextCatalogContext?.model) appliedFilters.push(`modelo: ${nextCatalogContext.model}`)
+  else if (effectiveQueryTerms.length > 0) appliedFilters.push(`búsqueda: ${effectiveQueryTerms.join(" ")}`)
+  if (effectiveStorage) appliedFilters.push(`capacidad: ${effectiveStorage.toUpperCase()}`)
+  if (effectiveColor) appliedFilters.push(`color: ${effectiveColor}`)
+  if (effectiveCondition) appliedFilters.push(`estado: ${effectiveCondition}`)
   if (typeof filters.maxPrice === "number") appliedFilters.push(`hasta ${formatPrice(filters.maxPrice).replace(" · ", "")}`)
   if (typeof filters.minPrice === "number") appliedFilters.push(`desde ${formatPrice(filters.minPrice).replace(" · ", "")}`)
 
-  return `Encontré estas opciones disponibles en catálogo${appliedFilters.length ? ` (${appliedFilters.join(" · ")})` : ""}:\n${options}\n\nSi querés, puedo seguir afinando por modelo, capacidad, color o presupuesto.`
+  return {
+    answer: `Encontré estas opciones disponibles en catálogo${appliedFilters.length ? ` (${appliedFilters.join(" · ")})` : ""}:\n${options}\n\nSi querés, puedo seguir afinando por modelo, capacidad, color o presupuesto.`,
+    sessionContext: { catalog: nextCatalogContext },
+  }
 }
 
-export const resolveLocalAssistant = async (rawQuestion: string): Promise<LocalAssistantResult> => {
+export const resolveLocalAssistant = async (rawQuestion: string, sessionContext?: AssistantSessionContext): Promise<LocalAssistantResult> => {
   const question = rawQuestion.slice(0, MAX_QUESTION_LENGTH)
   if (!question.trim()) {
     return { answer: "Pregunta inválida.", limited: true }
@@ -311,9 +374,9 @@ export const resolveLocalAssistant = async (rawQuestion: string): Promise<LocalA
   const normalizedQuestion = normalize(question)
   const batteryAction: AssistantAction[] = [{ label: "Ver cuidado de batería", href: "/cuidado-iphone" }]
 
-  const catalogAnswer = await answerCatalogSearch(normalizedQuestion)
+  const catalogAnswer = await answerCatalogSearch(normalizedQuestion, sessionContext)
   if (catalogAnswer) {
-    return { answer: catalogAnswer, limited: false }
+    return { answer: catalogAnswer.answer, limited: false, sessionContext: catalogAnswer.sessionContext }
   }
 
   if (["horario", "hora", "abren", "cierran", "abierto"].some((word) => normalizedQuestion.includes(word))) {
