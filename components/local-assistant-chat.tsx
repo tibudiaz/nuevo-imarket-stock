@@ -1,6 +1,7 @@
 "use client"
 
-import { FormEvent, useEffect, useState } from "react"
+import Link from "next/link"
+import { FormEvent, useEffect, useRef, useState } from "react"
 import { Loader2, MessageCircle, Send, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -8,10 +9,16 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
+type AssistantAction = {
+  label: string
+  href: string
+}
+
 type AssistantMessage = {
   role: "user" | "assistant"
   content: string
   limited?: boolean
+  actions?: AssistantAction[]
 }
 
 export default function LocalAssistantChat() {
@@ -27,11 +34,16 @@ export default function LocalAssistantChat() {
   ])
   const [question, setQuestion] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
     setShowHint(false)
   }, [isOpen])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+  }, [messages, isLoading])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -56,7 +68,7 @@ export default function LocalAssistantChat() {
         throw new Error("No se pudo responder en este momento.")
       }
 
-      const data = (await response.json()) as { answer?: string; limited?: boolean }
+      const data = (await response.json()) as { answer?: string; limited?: boolean; actions?: AssistantAction[] }
 
       setMessages((prev) => [
         ...prev,
@@ -64,6 +76,7 @@ export default function LocalAssistantChat() {
           role: "assistant",
           content: data.answer || "No tengo una respuesta en este momento.",
           limited: data.limited,
+          actions: data.actions,
         },
       ])
     } catch (error) {
@@ -112,9 +125,19 @@ export default function LocalAssistantChat() {
                           : "bg-white/10 text-slate-100"
                     }`}
                   >
-                    {message.content}
+                    <p>{message.content}</p>
+                    {message.role === "assistant" && message.actions?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {message.actions.map((action) => (
+                          <Button key={action.href} asChild size="sm" className="h-8 rounded-full bg-sky-500 px-3 text-xs text-white hover:bg-sky-400">
+                            <Link href={action.href}>{action.label}</Link>
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
           </CardContent>

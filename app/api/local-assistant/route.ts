@@ -22,6 +22,11 @@ type ProductCandidate = {
   price?: number
 }
 
+type AssistantAction = {
+  label: string
+  href: string
+}
+
 const DEFAULT_CONFIG: Required<AssistantConfig> = {
   welcomeMessage:
     "¡Hola! Soy el asistente del local. Puedo ayudarte con horarios, ubicación, stock, pagos, service y cuidado de batería.",
@@ -116,41 +121,54 @@ const answerCatalogSearch = async (normalizedQuestion: string) => {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { question?: string } | null
-  const question = (body?.question || "").slice(0, MAX_QUESTION_LENGTH)
+  try {
+    const body = (await request.json().catch(() => null)) as { question?: string } | null
+    const question = (body?.question || "").slice(0, MAX_QUESTION_LENGTH)
 
-  if (!question.trim()) {
-    return NextResponse.json({ error: "Pregunta inválida." }, { status: 400 })
+    if (!question.trim()) {
+      return NextResponse.json({ error: "Pregunta inválida." }, { status: 400 })
+    }
+
+    const config = (await fetchPublicRealtimeValue<AssistantConfig>("config/localAssistant")) || {}
+    const mergedConfig = { ...DEFAULT_CONFIG, ...config }
+    const normalizedQuestion = normalize(question)
+    const batteryAction: AssistantAction[] = [{ label: "Ver cuidado de batería", href: "/cuidado-iphone" }]
+
+    const catalogAnswer = await answerCatalogSearch(normalizedQuestion)
+    if (catalogAnswer) {
+      return NextResponse.json({ answer: catalogAnswer, limited: false })
+    }
+
+    if (["horario", "hora", "abren", "cierran", "abierto"].some((word) => normalizedQuestion.includes(word))) {
+      return NextResponse.json({ answer: mergedConfig.storeHours, limited: false })
+    }
+
+    if (["ubicacion", "direccion", "donde", "local", "sucursal"].some((word) => normalizedQuestion.includes(word))) {
+      return NextResponse.json({ answer: mergedConfig.location, limited: false })
+    }
+
+    if (["pago", "pagos", "tarjeta", "cuotas", "transferencia", "efectivo"].some((word) => normalizedQuestion.includes(word))) {
+      return NextResponse.json({ answer: mergedConfig.payments, limited: false })
+    }
+
+    if (["service", "reparacion", "reparar", "arreglo", "tecnico"].some((word) => normalizedQuestion.includes(word))) {
+      return NextResponse.json({ answer: mergedConfig.technicalService, limited: false })
+    }
+
+    if (["bateria", "cargar", "carga", "cargador", "autonomia", "cuidado del celular"].some((word) => normalizedQuestion.includes(word))) {
+      return NextResponse.json({ answer: mergedConfig.batteryCare, limited: false, actions: batteryAction })
+    }
+
+    return NextResponse.json({ answer: mergedConfig.outOfScopeMessage, limited: true })
+  } catch (error) {
+    console.error("Error en /api/local-assistant:", error)
+    return NextResponse.json(
+      {
+        answer:
+          "Ahora estoy con una demora para responderte. Si querés, podés preguntar por horarios, ubicación, pagos, service o cuidado de batería.",
+        limited: true,
+      },
+      { status: 200 },
+    )
   }
-
-  const config = (await fetchPublicRealtimeValue<AssistantConfig>("config/localAssistant")) || {}
-  const mergedConfig = { ...DEFAULT_CONFIG, ...config }
-  const normalizedQuestion = normalize(question)
-
-  const catalogAnswer = await answerCatalogSearch(normalizedQuestion)
-  if (catalogAnswer) {
-    return NextResponse.json({ answer: catalogAnswer, limited: false })
-  }
-
-  if (["horario", "hora", "abren", "cierran", "abierto"].some((word) => normalizedQuestion.includes(word))) {
-    return NextResponse.json({ answer: mergedConfig.storeHours, limited: false })
-  }
-
-  if (["ubicacion", "direccion", "donde", "local", "sucursal"].some((word) => normalizedQuestion.includes(word))) {
-    return NextResponse.json({ answer: mergedConfig.location, limited: false })
-  }
-
-  if (["pago", "pagos", "tarjeta", "cuotas", "transferencia", "efectivo"].some((word) => normalizedQuestion.includes(word))) {
-    return NextResponse.json({ answer: mergedConfig.payments, limited: false })
-  }
-
-  if (["service", "reparacion", "reparar", "arreglo", "tecnico"].some((word) => normalizedQuestion.includes(word))) {
-    return NextResponse.json({ answer: mergedConfig.technicalService, limited: false })
-  }
-
-  if (["bateria", "cargar", "carga", "cargador", "autonomia", "cuidado del celular"].some((word) => normalizedQuestion.includes(word))) {
-    return NextResponse.json({ answer: mergedConfig.batteryCare, limited: false })
-  }
-
-  return NextResponse.json({ answer: mergedConfig.outOfScopeMessage, limited: true })
 }
