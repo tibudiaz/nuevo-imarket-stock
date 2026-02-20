@@ -104,6 +104,15 @@ interface PublicCatalog {
   createdAt?: string;
 }
 
+interface AssistantDashboardConfig {
+  storeHours: string;
+  location: string;
+  payments: string;
+  technicalService: string;
+  batteryCare: string;
+  outOfScopeMessage: string;
+}
+
 interface Customer {
   id: string;
   name?: string;
@@ -375,6 +384,14 @@ export default function SettingsPage() {
   const [catalogAdUploadOrigin, setCatalogAdUploadOrigin] = useState("");
   const [catalogAdUploadTargetPage, setCatalogAdUploadTargetPage] = useState<CatalogAdPage>("landing");
   const [isCatalogAdUploading, setIsCatalogAdUploading] = useState(false);
+  const [assistantConfig, setAssistantConfig] = useState<AssistantDashboardConfig>({
+    storeHours: "",
+    location: "",
+    payments: "",
+    technicalService: "",
+    batteryCare: "",
+    outOfScopeMessage: "",
+  });
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -424,6 +441,19 @@ export default function SettingsPage() {
     });
 
     const usdAdjustmentRef = ref(database, "config/usdRateAdjustment");
+    const assistantConfigRef = ref(database, 'config/localAssistant');
+    onValue(assistantConfigRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      setAssistantConfig({
+        storeHours: String(data.storeHours || ""),
+        location: String(data.location || ""),
+        payments: String(data.payments || ""),
+        technicalService: String(data.technicalService || ""),
+        batteryCare: String(data.batteryCare || ""),
+        outOfScopeMessage: String(data.outOfScopeMessage || ""),
+      });
+    });
+
     onValue(usdAdjustmentRef, (snapshot) => {
       const value = snapshot.val();
       setUsdRateAdjustment(
@@ -1201,6 +1231,21 @@ export default function SettingsPage() {
       toast.error('No se pudo guardar la configuración de puntos.');
     }
   };
+  const handleSaveAssistantConfig = async () => {
+    try {
+      await set(ref(database, 'config/localAssistant'), {
+        storeHours: assistantConfig.storeHours.trim(),
+        location: assistantConfig.location.trim(),
+        payments: assistantConfig.payments.trim(),
+        technicalService: assistantConfig.technicalService.trim(),
+        batteryCare: assistantConfig.batteryCare.trim(),
+        outOfScopeMessage: assistantConfig.outOfScopeMessage.trim(),
+      });
+      toast.success('Configuración del asistente actualizada.');
+    } catch (error) {
+      toast.error('No se pudo guardar la configuración del asistente.');
+    }
+  };
 
   const handleResetData = async () => {
     const password = window.prompt('Ingrese la contraseña');
@@ -1631,6 +1676,84 @@ export default function SettingsPage() {
                 />
               </div>
               <Button onClick={handleSaveUsdRateAdjustment}>Guardar</Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Asistente IA del catálogo</CardTitle>
+              <CardDescription>
+                Personaliza respuestas de horarios, pagos, service, ubicación y cuidado del celular.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="assistant-hours">Respuesta de horarios</Label>
+                <Textarea
+                  id="assistant-hours"
+                  value={assistantConfig.storeHours}
+                  onChange={(event) =>
+                    setAssistantConfig((prev) => ({ ...prev, storeHours: event.target.value }))
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assistant-location">Respuesta de ubicación</Label>
+                <Textarea
+                  id="assistant-location"
+                  value={assistantConfig.location}
+                  onChange={(event) =>
+                    setAssistantConfig((prev) => ({ ...prev, location: event.target.value }))
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assistant-payments">Respuesta de medios de pago</Label>
+                <Textarea
+                  id="assistant-payments"
+                  value={assistantConfig.payments}
+                  onChange={(event) =>
+                    setAssistantConfig((prev) => ({ ...prev, payments: event.target.value }))
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assistant-service">Respuesta de servicio técnico</Label>
+                <Textarea
+                  id="assistant-service"
+                  value={assistantConfig.technicalService}
+                  onChange={(event) =>
+                    setAssistantConfig((prev) => ({ ...prev, technicalService: event.target.value }))
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assistant-battery">Respuesta sobre batería y cuidado</Label>
+                <Textarea
+                  id="assistant-battery"
+                  value={assistantConfig.batteryCare}
+                  onChange={(event) =>
+                    setAssistantConfig((prev) => ({ ...prev, batteryCare: event.target.value }))
+                  }
+                  rows={4}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assistant-out">Respuesta para consultas fuera de alcance</Label>
+                <Textarea
+                  id="assistant-out"
+                  value={assistantConfig.outOfScopeMessage}
+                  onChange={(event) =>
+                    setAssistantConfig((prev) => ({ ...prev, outOfScopeMessage: event.target.value }))
+                  }
+                  rows={3}
+                />
+              </div>
+              <Button onClick={handleSaveAssistantConfig}>Guardar asistente</Button>
             </CardContent>
           </Card>
 
