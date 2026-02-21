@@ -7,7 +7,6 @@ import { ref, onValue } from "firebase/database"
 import { ArrowRight, ShieldCheck, Smartphone, Sparkles, Speaker } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
-import LocalAssistantChat from "@/components/local-assistant-chat"
 import { database } from "@/lib/firebase"
 import { fetchPublicRealtimeValue } from "@/lib/public-realtime"
 import CatalogAd from "@/components/catalog-ad"
@@ -333,7 +332,6 @@ export default function PublicAccessLanding() {
           sitio creado por Grupo iMarket. Todos los derechos reservados
         </footer>
       </div>
-      <LocalAssistantChat />
     </div>
   )
 }
