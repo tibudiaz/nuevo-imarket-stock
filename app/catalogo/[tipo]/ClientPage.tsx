@@ -25,6 +25,7 @@ import {
   LogIn,
   Mail,
   ShieldCheck,
+  Search,
   Smartphone,
   Speaker,
   Sparkles,
@@ -1248,6 +1249,13 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     )
   }, [newCatalogFiltered])
 
+  const newCatalogVisible = useMemo(() => {
+    if (!normalizedSearch) return newCatalogSorted
+    return newCatalogSorted.filter((item) =>
+      resolveNewCatalogName(item).toLowerCase().includes(normalizedSearch),
+    )
+  }, [newCatalogSorted, normalizedSearch])
+
   const jblInStock = useMemo(() => {
     return jblCatalogItems
       .filter((item) => (item.availableQuantity ?? 0) > 0)
@@ -1257,6 +1265,23 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
         }),
       )
   }, [jblCatalogItems])
+
+  const jblVisible = useMemo(() => {
+    if (!normalizedSearch) return jblInStock
+    return jblInStock.filter((item) => {
+      const searchable = [
+        resolveJblCatalogDisplayName(item),
+        item.brand,
+        item.model,
+        item.category,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+
+      return searchable.includes(normalizedSearch)
+    })
+  }, [jblInStock, normalizedSearch])
 
   const isSectionVisible = useMemo(() => {
     if (!catalogType) return false
@@ -1277,9 +1302,9 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   const isUsedCatalog = catalogType?.kind === "used"
   const isGamingAudioCatalog = catalogType?.kind === "gaming"
   const catalogItemsCount = isNewCatalog
-    ? newCatalogSorted.length
+    ? newCatalogVisible.length
     : isGamingAudioCatalog
-      ? jblInStock.length
+      ? jblVisible.length
       : inStock.length
   const catalogItemsLabel = isGamingAudioCatalog ? "productos" : "equipos"
   const catalogIntro = isNewCatalog
@@ -1790,73 +1815,94 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                       {catalogItemsCount} {catalogItemsLabel} disponibles
                     </p>
                   </div>
-                  {isUsedCatalog && (
-                    <div className="grid w-full gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:w-auto md:grid-cols-2 lg:grid-cols-5">
-                      <div className="space-y-1 lg:col-span-2">
-                        <Label htmlFor="public-search" className="text-xs text-slate-300">
-                          Buscar
-                        </Label>
-                        <Input
-                          id="public-search"
-                          value={publicSearch}
-                          onChange={(event) => setPublicSearch(event.target.value)}
-                          placeholder="Modelo, color, memoria..."
-                          className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="public-min-price" className="text-xs text-slate-300">
-                          Precio mín.
-                        </Label>
-                        <Input
-                          id="public-min-price"
-                          type="number"
-                          min={0}
-                          value={minPriceFilter}
-                          onChange={(event) => setMinPriceFilter(event.target.value)}
-                          placeholder="0"
-                          className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="public-max-price" className="text-xs text-slate-300">
-                          Precio máx.
-                        </Label>
-                        <Input
-                          id="public-max-price"
-                          type="number"
-                          min={0}
-                          value={maxPriceFilter}
-                          onChange={(event) => setMaxPriceFilter(event.target.value)}
-                          placeholder="Sin tope"
-                          className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="public-sort" className="text-xs text-slate-300">
-                          Ordenar por
-                        </Label>
-                        <select
-                          id="public-sort"
-                          value={usedSort}
-                          onChange={(event) => setUsedSort(event.target.value as UsedSortOption)}
-                          className="h-9 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 text-sm text-white"
-                        >
-                          <option value="model-asc">Modelo (iPhone 8 → 16)</option>
-                          <option value="name-asc">Nombre (A-Z)</option>
-                          <option value="price-asc">Precio (menor a mayor)</option>
-                          <option value="price-desc">Precio (mayor a menor)</option>
-                          <option value="battery-desc">Batería (mejor primero)</option>
-                          <option value="battery-asc">Batería (menor primero)</option>
-                        </select>
-                      </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 md:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-slate-200">Buscador del catálogo actual</p>
+                    <Search className="h-4 w-4 text-slate-400" />
+                  </div>
+                  <div
+                    className={cn(
+                      "grid gap-3",
+                      isUsedCatalog ? "md:grid-cols-2 lg:grid-cols-5" : "md:grid-cols-2",
+                    )}
+                  >
+                    <div className={cn("space-y-1", isUsedCatalog ? "lg:col-span-2" : "md:col-span-2")}>
+                      <Label htmlFor="public-search" className="text-xs text-slate-300">
+                        Buscar
+                      </Label>
+                      <Input
+                        id="public-search"
+                        value={publicSearch}
+                        onChange={(event) => setPublicSearch(event.target.value)}
+                        placeholder={
+                          isUsedCatalog
+                            ? "Modelo, color, memoria..."
+                            : isGamingAudioCatalog
+                              ? "Nombre, marca o categoría..."
+                              : "Buscar por modelo o nombre..."
+                        }
+                        className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
+                      />
                     </div>
-                  )}
+
+                    {isUsedCatalog && (
+                      <>
+                        <div className="space-y-1">
+                          <Label htmlFor="public-min-price" className="text-xs text-slate-300">
+                            Precio mín.
+                          </Label>
+                          <Input
+                            id="public-min-price"
+                            type="number"
+                            min={0}
+                            value={minPriceFilter}
+                            onChange={(event) => setMinPriceFilter(event.target.value)}
+                            placeholder="0"
+                            className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="public-max-price" className="text-xs text-slate-300">
+                            Precio máx.
+                          </Label>
+                          <Input
+                            id="public-max-price"
+                            type="number"
+                            min={0}
+                            value={maxPriceFilter}
+                            onChange={(event) => setMaxPriceFilter(event.target.value)}
+                            placeholder="Sin tope"
+                            className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="public-sort" className="text-xs text-slate-300">
+                            Ordenar por
+                          </Label>
+                          <select
+                            id="public-sort"
+                            value={usedSort}
+                            onChange={(event) => setUsedSort(event.target.value as UsedSortOption)}
+                            className="h-9 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 text-sm text-white"
+                          >
+                            <option value="model-asc">Modelo (iPhone 8 → 16)</option>
+                            <option value="name-asc">Nombre (A-Z)</option>
+                            <option value="price-asc">Precio (menor a mayor)</option>
+                            <option value="price-desc">Precio (mayor a menor)</option>
+                            <option value="battery-desc">Batería (mejor primero)</option>
+                            <option value="battery-asc">Batería (menor primero)</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {isNewCatalog
-                    ? newCatalogSorted.map((item) => (
+                    ? newCatalogVisible.map((item) => (
                         <div
                           key={item.id}
                           className={cn(
@@ -1914,7 +1960,7 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                         </div>
                       ))
                     : isGamingAudioCatalog
-                      ? jblInStock.map((item) => (
+                      ? jblVisible.map((item) => (
                           <div
                             key={item.id}
                             className={cn(
