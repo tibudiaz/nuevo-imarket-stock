@@ -2,7 +2,6 @@ import Link from "next/link"
 import { ArrowLeft, MapPin, Phone } from "lucide-react"
 
 import PublicTopBar from "@/components/public-top-bar"
-import LocalAssistantChat from "@/components/local-assistant-chat"
 
 const contactDetails = [
   {
@@ -82,7 +81,6 @@ export default function CatalogoContactoPage() {
           })}
         </section>
 
-        <LocalAssistantChat />
 
         <footer className="pt-6 text-center text-xs text-slate-400">
           sitio creado por Grupo iMarket. Todos los derechos reservados

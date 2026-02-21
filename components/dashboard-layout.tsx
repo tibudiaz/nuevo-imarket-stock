@@ -54,7 +54,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import MobileMenu from "@/components/mobile-menu"
 import { useStore } from "@/hooks/use-store"
 import { Reserve } from "@/components/sell-product-modal"
-import ChatWidget from '@/components/ChatWidget' // <<<--- AÑADIDO
 import CashWithdrawalDialog from "@/components/cash-withdrawal-dialog"
 import { toast } from "sonner"
 import { safeLocalStorage } from "@/lib/safe-storage"
@@ -610,8 +609,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </div>
         
-        {/* --- WIDGET DE CHAT AÑADIDO AQUÍ --- */}
-        <ChatWidget />
       </div>
     </TooltipProvider>
   )

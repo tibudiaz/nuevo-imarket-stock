@@ -264,7 +264,9 @@ const COLOR_PHRASES = [
   "cobre",
   "chocolate",
   "midnight",
+  "mid night",
   "starlight",
+  "star light",
   "gold",
   "silver",
   "black",
@@ -278,14 +280,21 @@ const COLOR_PHRASES = [
   "yellow",
 ] as const
 
-const findColorPhrase = (tokens: string[]) => {
-  const lowerTokens = tokens.map((token) => token.toLowerCase())
-  const phrases = COLOR_PHRASES.map((phrase) => phrase.split(" "))
+const normalizeColorToken = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
 
-  for (let index = 0; index < lowerTokens.length; index += 1) {
+const findColorPhrase = (tokens: string[]) => {
+  const normalizedTokens = tokens.map((token) => normalizeColorToken(token))
+  const phrases = COLOR_PHRASES.map((phrase) => phrase.split(" ").map((token) => normalizeColorToken(token))).sort((a, b) => b.length - a.length)
+
+  for (let index = 0; index < normalizedTokens.length; index += 1) {
     for (const phraseTokens of phrases) {
       if (phraseTokens.length === 0) continue
-      const slice = lowerTokens.slice(index, index + phraseTokens.length)
+      const slice = normalizedTokens.slice(index, index + phraseTokens.length)
       if (slice.length !== phraseTokens.length) continue
       if (slice.every((token, sliceIndex) => token === phraseTokens[sliceIndex])) {
         return {
