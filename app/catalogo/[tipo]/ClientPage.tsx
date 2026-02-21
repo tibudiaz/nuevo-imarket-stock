@@ -113,6 +113,7 @@ const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000
 const CATALOG_RATE_REFRESH_MS = 10 * 60 * 1000
 
 type CatalogKind = "new" | "used" | "gaming"
+type UsedSortOption = "model-asc" | "name-asc" | "price-asc" | "price-desc" | "battery-desc" | "battery-asc"
 
 type CatalogType = {
   key: string
@@ -314,7 +315,12 @@ const parseUsedPhoneDetails = (name: string) => {
   const warranty = warrantyMatch?.[2] ?? null
   const warrantyTrimmed = imeiTrimmed.replace(WARRANTY_REGEX, "").replace(/\s+/g, " ").trim()
 
-  const tokens = warrantyTrimmed.split(/\s+/).filter(Boolean)
+  const tokens = warrantyTrimmed
+    .replace(/[()_,;:/|+-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
   const batteryIndex = tokens.findIndex((token) => /(\d+)%/.test(token))
   const memoryIndex = tokens.findIndex((token) => /(\d+)\s*gb/i.test(token))
   const colorMatch = findColorPhrase(tokens)
@@ -342,6 +348,35 @@ const parseUsedPhoneDetails = (name: string) => {
     color,
     memory,
     warranty,
+  }
+}
+
+const parseBatteryHealthValue = (batteryCondition: string | null) => {
+  if (!batteryCondition) return null
+  const match = batteryCondition.match(/(\d{1,3})/)
+  if (!match) return null
+  return Number(match[1])
+}
+
+const getIphoneModelSortKey = (name: string) => {
+  const normalized = name.toLowerCase()
+  const match = normalized.match(/iphone\s+(\d+)(?:\s*(se|mini|plus|pro|pro max))?/)
+  if (!match) return null
+
+  const generation = Number(match[1])
+  const variant = match[2] ?? ""
+  const variantOrder: Record<string, number> = {
+    se: 0,
+    mini: 1,
+    plus: 2,
+    pro: 3,
+    "pro max": 4,
+    "": 5,
+  }
+
+  return {
+    generation,
+    variantOrder: variantOrder[variant] ?? 99,
   }
 }
 
@@ -455,6 +490,10 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     name: "",
     email: "",
   })
+  const [publicSearch, setPublicSearch] = useState("")
+  const [minPriceFilter, setMinPriceFilter] = useState("")
+  const [maxPriceFilter, setMaxPriceFilter] = useState("")
+  const [usedSort, setUsedSort] = useState<UsedSortOption>("model-asc")
 
   const availableCatalogs = useMemo(() => {
     const base = Object.values(BASE_CATALOG_TYPES)
@@ -1088,15 +1127,91 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
     })
   }
 
+  const normalizedSearch = publicSearch.trim().toLowerCase()
+  const minPriceValue = Number(minPriceFilter)
+  const maxPriceValue = Number(maxPriceFilter)
+  const hasMinPriceFilter = minPriceFilter.trim().length > 0 && !Number.isNaN(minPriceValue)
+  const hasMaxPriceFilter = maxPriceFilter.trim().length > 0 && !Number.isNaN(maxPriceValue)
+
   const inStock = useMemo(() => {
+    const matchesSearch = (product: Product) => {
+      if (!normalizedSearch) return true
+      const details = parseUsedPhoneDetails(ensureIphonePrefix(resolveProductName(product)))
+      const searchableParts = [
+        resolveProductName(product),
+        details.displayName,
+        details.color,
+        details.memory,
+        details.batteryCondition,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+      return searchableParts.includes(normalizedSearch)
+    }
+
+    const matchesPrice = (product: Product) => {
+      if (typeof product.price !== "number" || Number.isNaN(product.price)) {
+        return !hasMinPriceFilter && !hasMaxPriceFilter
+      }
+      if (hasMinPriceFilter && product.price < minPriceValue) return false
+      if (hasMaxPriceFilter && product.price > maxPriceValue) return false
+      return true
+    }
+
     return products
       .filter((product) => (product.stock ?? 0) > 0 && product.visibleInCatalog !== false)
-      .sort((a, b) =>
-        resolveProductName(a).localeCompare(resolveProductName(b), "es", {
+      .filter(matchesSearch)
+      .filter(matchesPrice)
+      .sort((a, b) => {
+        const nameA = resolveProductName(a)
+        const nameB = resolveProductName(b)
+        const detailsA = parseUsedPhoneDetails(ensureIphonePrefix(nameA))
+        const detailsB = parseUsedPhoneDetails(ensureIphonePrefix(nameB))
+
+        if (usedSort === "price-asc") {
+          return (a.price ?? Number.MAX_SAFE_INTEGER) - (b.price ?? Number.MAX_SAFE_INTEGER)
+        }
+        if (usedSort === "price-desc") {
+          return (b.price ?? -1) - (a.price ?? -1)
+        }
+        if (usedSort === "battery-desc" || usedSort === "battery-asc") {
+          const batteryA = parseBatteryHealthValue(detailsA.batteryCondition)
+          const batteryB = parseBatteryHealthValue(detailsB.batteryCondition)
+          const normalizedA = batteryA ?? (usedSort === "battery-desc" ? -1 : Number.MAX_SAFE_INTEGER)
+          const normalizedB = batteryB ?? (usedSort === "battery-desc" ? -1 : Number.MAX_SAFE_INTEGER)
+          if (normalizedA !== normalizedB) {
+            return usedSort === "battery-desc" ? normalizedB - normalizedA : normalizedA - normalizedB
+          }
+        }
+
+        if (usedSort === "model-asc") {
+          const modelA = getIphoneModelSortKey(detailsA.displayName)
+          const modelB = getIphoneModelSortKey(detailsB.displayName)
+          if (modelA && modelB) {
+            if (modelA.generation !== modelB.generation) {
+              return modelA.generation - modelB.generation
+            }
+            if (modelA.variantOrder !== modelB.variantOrder) {
+              return modelA.variantOrder - modelB.variantOrder
+            }
+          }
+        }
+
+        return detailsA.displayName.localeCompare(detailsB.displayName, "es", {
           sensitivity: "base",
-        }),
-      )
-  }, [products])
+          numeric: true,
+        })
+      })
+  }, [
+    hasMaxPriceFilter,
+    hasMinPriceFilter,
+    maxPriceValue,
+    minPriceValue,
+    normalizedSearch,
+    products,
+    usedSort,
+  ])
 
   const selectedNewCatalogKey = catalogType?.kind === "new" ? catalogType.key : "nuevos"
   const newCatalogFiltered = useMemo(() => {
@@ -1649,13 +1764,75 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
               </div>
             ) : (
               <section className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                   <div>
                     <h2 className="text-2xl font-semibold">{catalogType.title}</h2>
                     <p className="text-sm text-slate-400">
                       {catalogItemsCount} {catalogItemsLabel} disponibles
                     </p>
                   </div>
+                  {isUsedCatalog && (
+                    <div className="grid w-full gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:w-auto md:grid-cols-2 lg:grid-cols-5">
+                      <div className="space-y-1 lg:col-span-2">
+                        <Label htmlFor="public-search" className="text-xs text-slate-300">
+                          Buscar
+                        </Label>
+                        <Input
+                          id="public-search"
+                          value={publicSearch}
+                          onChange={(event) => setPublicSearch(event.target.value)}
+                          placeholder="Modelo, color, memoria..."
+                          className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="public-min-price" className="text-xs text-slate-300">
+                          Precio mín.
+                        </Label>
+                        <Input
+                          id="public-min-price"
+                          type="number"
+                          min={0}
+                          value={minPriceFilter}
+                          onChange={(event) => setMinPriceFilter(event.target.value)}
+                          placeholder="0"
+                          className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="public-max-price" className="text-xs text-slate-300">
+                          Precio máx.
+                        </Label>
+                        <Input
+                          id="public-max-price"
+                          type="number"
+                          min={0}
+                          value={maxPriceFilter}
+                          onChange={(event) => setMaxPriceFilter(event.target.value)}
+                          placeholder="Sin tope"
+                          className="h-9 border-white/10 bg-slate-950/70 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="public-sort" className="text-xs text-slate-300">
+                          Ordenar por
+                        </Label>
+                        <select
+                          id="public-sort"
+                          value={usedSort}
+                          onChange={(event) => setUsedSort(event.target.value as UsedSortOption)}
+                          className="h-9 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 text-sm text-white"
+                        >
+                          <option value="model-asc">Modelo (iPhone 8 → 16)</option>
+                          <option value="name-asc">Nombre (A-Z)</option>
+                          <option value="price-asc">Precio (menor a mayor)</option>
+                          <option value="price-desc">Precio (mayor a menor)</option>
+                          <option value="battery-desc">Batería (mejor primero)</option>
+                          <option value="battery-asc">Batería (menor primero)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
