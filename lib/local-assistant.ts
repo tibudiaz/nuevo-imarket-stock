@@ -15,9 +15,12 @@ type AssistantConfig = {
 type ProductCandidate = {
   id: string
   name: string
+  brand?: string
+  model?: string
   stock?: number
   status?: string
   price?: number
+  category?: string
 }
 
 type CatalogFilters = {
@@ -130,6 +133,18 @@ const CATALOG_INTENT_KEYWORDS = [
   "gb",
   "tb",
   "precio",
+  "usado",
+  "usados",
+  "nuevo",
+  "nuevos",
+  "jbl",
+  "gaming",
+  "audio",
+  "parlante",
+  "parlantes",
+  "auricular",
+  "auriculares",
+  "joystick",
 ]
 
 const stopWords = new Set([
@@ -154,6 +169,15 @@ const stopWords = new Set([
   "con",
   "para",
   "por",
+  "equipo",
+  "equipos",
+  "usado",
+  "usados",
+  "nueva",
+  "nuevo",
+  "nuevos",
+  "gaming",
+  "audio",
 ])
 
 const extractPrices = (normalizedQuestion: string) => {
@@ -226,29 +250,52 @@ const hasCatalogIntent = (normalizedQuestion: string) =>
   CATALOG_INTENT_KEYWORDS.some((keyword) => normalizedQuestion.includes(keyword))
 
 const collectAvailableProducts = async (): Promise<ProductCandidate[]> => {
-  const [products, newPhones] = await Promise.all([
+  const [products, newPhones, jblProducts] = await Promise.all([
     fetchPublicRealtimeValue<Record<string, any>>("products"),
     fetchPublicRealtimeValue<Record<string, any>>("config/newPhones"),
+    fetchPublicRealtimeValue<Record<string, any>>("jblProducts"),
   ])
 
   const productCandidates: ProductCandidate[] = Object.entries(products || {}).map(([id, value]) => ({
     id,
     name: String(value?.name ?? ""),
+    brand: value?.brand ? String(value.brand) : undefined,
+    model: value?.model ? String(value.model) : undefined,
     stock: typeof value?.stock === "number" ? value.stock : undefined,
     status: value?.status ? String(value.status) : undefined,
     price: typeof value?.price === "number" ? value.price : undefined,
+    category: value?.category ? String(value.category) : undefined,
   }))
 
   const newPhoneCandidates: ProductCandidate[] = Object.entries(newPhones || {}).map(([id, value]) => ({
     id,
     name: String(value?.name ?? ""),
+    brand: value?.brand ? String(value.brand) : undefined,
+    model: value?.model ? String(value.model) : undefined,
     stock: undefined,
     status: value?.status ? String(value.status) : undefined,
     price: typeof value?.price === "number" ? value.price : undefined,
+    category: "Celulares Nuevos",
+  }))
+
+  const jblCandidates: ProductCandidate[] = Object.entries(jblProducts || {}).map(([id, value]) => ({
+    id,
+    name: String(value?.name ?? "").trim() || `${String(value?.brand ?? "").trim()} ${String(value?.model ?? "").trim()}`.trim(),
+    brand: value?.brand ? String(value.brand) : "JBL",
+    model: value?.model ? String(value.model) : undefined,
+    stock: typeof value?.availableQuantity === "number" ? value.availableQuantity : undefined,
+    status: value?.status ? String(value.status) : undefined,
+    price:
+      typeof value?.salePrice === "number"
+        ? value.salePrice
+        : typeof value?.price === "number"
+          ? value.price
+          : undefined,
+    category: value?.category ? String(value.category) : "JBL",
   }))
 
   const unique = new Map<string, ProductCandidate>()
-  ;[...productCandidates, ...newPhoneCandidates].forEach((item) => {
+  ;[...productCandidates, ...newPhoneCandidates, ...jblCandidates].forEach((item) => {
     const key = normalize(item.name)
     if (!key) return
     if (!unique.has(key)) {
@@ -259,9 +306,12 @@ const collectAvailableProducts = async (): Promise<ProductCandidate[]> => {
   return Array.from(unique.values()).filter((item) => item.name.trim().length > 0)
 }
 
+const buildSearchText = (item: ProductCandidate) =>
+  normalize(`${item.name} ${item.brand || ""} ${item.model || ""} ${item.status || ""} ${item.category || ""}`)
+
 const matchesCondition = (item: ProductCandidate, condition?: ProductCondition) => {
   if (!condition) return true
-  const combined = normalize(`${item.name} ${item.status || ""}`)
+  const combined = buildSearchText(item)
   const looksUsed = /\b(usad|seminuev|reacondicionad|2da\s+mano)\b/.test(combined)
   return condition === "usado" ? looksUsed : !looksUsed
 }
@@ -306,17 +356,17 @@ const answerCatalogSearch = async (normalizedQuestion: string, sessionContext?: 
     .filter(stockAvailable)
     .filter((item) => matchesCondition(item, effectiveCondition))
     .filter((item) => {
-      const normalizedName = normalize(item.name)
+      const searchableText = buildSearchText(item)
 
-      if (effectiveQueryTerms.some((term) => !normalizedName.includes(term))) {
+      if (effectiveQueryTerms.some((term) => !searchableText.includes(term))) {
         return false
       }
 
-      if (effectiveStorage && !normalizedName.includes(normalize(effectiveStorage))) {
+      if (effectiveStorage && !searchableText.includes(normalize(effectiveStorage))) {
         return false
       }
 
-      if (effectiveColor && !normalizedName.includes(effectiveColor)) {
+      if (effectiveColor && !searchableText.includes(effectiveColor)) {
         return false
       }
 
