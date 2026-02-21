@@ -230,6 +230,30 @@ const stripImeiSuffix = (name: string) => {
 }
 
 const COLOR_PHRASES = [
+  "space black",
+  "space gray",
+  "space grey",
+  "sierra blue",
+  "alpine green",
+  "pacific blue",
+  "midnight green",
+  "deep purple",
+  "ultramarine",
+  "ultramarino",
+  "desert titanium",
+  "black titanium",
+  "white titanium",
+  "blue titanium",
+  "natural titanium",
+  "titanio desierto",
+  "titanio negro",
+  "titanio blanco",
+  "titanio azul",
+  "titanio natural",
+  "rosa gold",
+  "rose gold",
+  "star light",
+  "mid night",
   "azul medianoche",
   "azul oscuro",
   "azul marino",
@@ -247,12 +271,9 @@ const COLOR_PHRASES = [
   "graphito",
   "plata",
   "plateado",
-  "rose gold",
   "rose",
   "dorado",
   "oro",
-  "natural titanium",
-  "titanio natural",
   "natural",
   "rosa",
   "desert",
@@ -265,9 +286,7 @@ const COLOR_PHRASES = [
   "cobre",
   "chocolate",
   "midnight",
-  "mid night",
   "starlight",
-  "star light",
   "gold",
   "silver",
   "black",
@@ -360,18 +379,18 @@ const parseBatteryHealthValue = (batteryCondition: string | null) => {
 
 const getIphoneModelSortKey = (name: string) => {
   const normalized = name.toLowerCase()
-  const match = normalized.match(/iphone\s+(\d+)(?:\s*(se|mini|plus|pro|pro max))?/)
+  const match = normalized.match(/iphone\s+(\d+)(?:\s*(plus|pro max|pro|mini|se))?/)
   if (!match) return null
 
   const generation = Number(match[1])
   const variant = match[2] ?? ""
   const variantOrder: Record<string, number> = {
-    se: 0,
-    mini: 1,
-    plus: 2,
-    pro: 3,
-    "pro max": 4,
-    "": 5,
+    "": 0,
+    plus: 1,
+    pro: 2,
+    "pro max": 3,
+    mini: 4,
+    se: 5,
   }
 
   return {
