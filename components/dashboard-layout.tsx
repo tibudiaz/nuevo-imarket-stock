@@ -60,6 +60,7 @@ import { safeLocalStorage } from "@/lib/safe-storage"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useMobile } from "@/hooks/use-mobile"
 import { getAppBaseUrl } from "@/lib/base-url"
+import { fetchDolarBlueRate } from "@/lib/dolar-blue"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -166,12 +167,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
-        const response = await fetch("/api/dolar-blue");
-        if (!response.ok) {
-          throw new Error("No se pudo obtener la cotización");
-        }
-        const data = await response.json();
-        setDolarBlueRate(typeof data.venta === "number" ? data.venta : null);
+        const venta = await fetchDolarBlueRate();
+        setDolarBlueRate(venta);
       } catch (error) {
         console.error("Error al obtener dólar blue:", error);
         setDolarBlueRate(null);

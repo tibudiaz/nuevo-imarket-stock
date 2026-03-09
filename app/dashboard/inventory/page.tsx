@@ -74,6 +74,7 @@ import {
 import { useMobile } from "@/hooks/use-mobile";
 import { useStore } from "@/hooks/use-store";
 import { useAuth } from "@/hooks/use-auth";
+import { fetchDolarBlueRate } from "@/lib/dolar-blue";
 
 // --- Interfaces ---
 interface User {
@@ -327,13 +328,8 @@ export default function InventoryPage() {
   useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
-        const response = await fetch("/api/dolar-blue");
-        if (!response.ok) {
-          throw new Error("No se pudo obtener la cotización");
-        }
-        const data = await response.json();
-        const nextRate =
-          typeof data.venta === "number" ? data.venta + usdRateAdjustment : 0;
+        const venta = await fetchDolarBlueRate();
+        const nextRate = venta + usdRateAdjustment;
         setUsdRate(nextRate);
       } catch (error) {
         console.error("Error al obtener dólar blue:", error);
