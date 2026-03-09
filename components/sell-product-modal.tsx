@@ -944,6 +944,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
           provider: sale.customerName,
           createdAt: new Date().toISOString(),
           store: sale.store,
+          visibleInCatalog: false,
         };
         await set(newProductRef, newProductData);
         toast.info("Equipo recibido en parte de pago", { description: `Se agregó ${sale.tradeIn.name} al inventario.` });
