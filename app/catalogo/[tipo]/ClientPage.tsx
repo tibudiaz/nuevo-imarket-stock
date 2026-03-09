@@ -43,6 +43,7 @@ import { convertPriceToUSD, formatCurrency, formatUsdCurrency } from "@/lib/pric
 import { cn } from "@/lib/utils"
 import CatalogAd from "@/components/catalog-ad"
 import { normalizeCatalogAdConfig, type CatalogAdConfig } from "@/lib/catalog-ads"
+import { fetchDolarBlueRate } from "@/lib/dolar-blue"
 
 interface Product {
   id: string
@@ -907,13 +908,8 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
   useEffect(() => {
     const fetchDolarBlue = async () => {
       try {
-        const response = await fetch("/api/dolar-blue")
-        if (!response.ok) {
-          throw new Error("No se pudo obtener la cotización")
-        }
-        const data = await response.json()
-        const nextRate =
-          typeof data.venta === "number" ? data.venta + usdRateAdjustment : 0
+        const venta = await fetchDolarBlueRate()
+        const nextRate = venta + usdRateAdjustment
         setUsdRate(nextRate)
         if (catalogType) {
           writeCatalogCache(cacheKey, { usdRate: nextRate })
