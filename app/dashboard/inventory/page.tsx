@@ -126,6 +126,11 @@ const getStoreFromSelection = (
   store: "all" | "local1" | "local2",
 ): "local1" | "local2" => (store === "local2" ? "local2" : "local1");
 
+const isPhoneInventoryCategory = (category: string) =>
+  category === "Celulares" ||
+  category === "Celulares Usados" ||
+  category === "Celulares Nuevos";
+
 const createEmptyNewProduct = (
   store: "all" | "local1" | "local2",
 ): NewProduct => ({
@@ -607,6 +612,9 @@ export default function InventoryPage() {
       const newProductRef = push(productsRef);
       await set(newProductRef, {
         ...newProduct,
+        ...(isPhoneInventoryCategory(newProduct.category)
+          ? { visibleInCatalog: false }
+          : {}),
         store: selectedStore === "local2" ? "local2" : "local1",
         entryDate: newProduct.entryDate
           ? new Date(newProduct.entryDate).toISOString()
