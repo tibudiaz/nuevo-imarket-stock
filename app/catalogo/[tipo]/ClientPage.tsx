@@ -1891,11 +1891,18 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
-                                <span className="text-xs text-slate-400">Precio en pesos actual</span>
-                                <span className="font-semibold text-emerald-200">
-                                  {formatArsPriceBlue(item.price, usdRate)}
-                                </span>
+                              <div className="space-y-1 border-t border-white/10 pt-3">
+                                <div className="flex items-center justify-between text-sm text-slate-200">
+                                  <span className="text-xs text-slate-400">
+                                    Precio en pesos (pago contado efectivo)
+                                  </span>
+                                  <span className="font-semibold text-emerald-200">
+                                    {formatArsPriceBlue(item.price, usdRate)}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-red-400">
+                                  * Con transferencia o pago con tarjeta se aplica recargo.
+                                </p>
                               </div>
                             </div>
                             <a
@@ -2046,11 +2053,18 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
                                       </p>
                                     </div>
                                   </div>
-                                  <div className="flex items-center justify-between border-t border-white/10 pt-3 text-sm text-slate-200">
-                                    <span className="text-xs text-slate-400">Precio en pesos actual</span>
-                                    <span className="font-semibold text-emerald-200">
-                                      {formatArsPriceBlue(product.price, usdRate)}
-                                    </span>
+                                  <div className="space-y-1 border-t border-white/10 pt-3">
+                                    <div className="flex items-center justify-between text-sm text-slate-200">
+                                      <span className="text-xs text-slate-400">
+                                        Precio en pesos (pago contado efectivo)
+                                      </span>
+                                      <span className="font-semibold text-emerald-200">
+                                        {formatArsPriceBlue(product.price, usdRate)}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-red-400">
+                                      * Con transferencia o pago con tarjeta se aplica recargo.
+                                    </p>
                                   </div>
                                 </div>
                                 <a
