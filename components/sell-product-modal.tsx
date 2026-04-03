@@ -82,6 +82,8 @@ interface Sale {
     cashAmount?: number;
     cashUsdAmount?: number;
     transferAmount?: number;
+    transferUsdRate?: number;
+    transferAmountEquivalent?: number;
     cardAmount?: number;
     totalAmount: number;
     tradeIn: any;
@@ -160,6 +162,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const [cashAmount, setCashAmount] = useState(0)
   const [cashUsdAmount, setCashUsdAmount] = useState(0)
   const [transferAmount, setTransferAmount] = useState(0)
+  const [transferUsdRate, setTransferUsdRate] = useState(0)
   const [cardAmount, setCardAmount] = useState(0)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [completedReserve, setCompletedReserve] = useState<Reserve | null>(null)
@@ -245,6 +248,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
       setCashAmount(0)
       setCashUsdAmount(0)
       setTransferAmount(0)
+      setTransferUsdRate(0)
       setCardAmount(0)
     }
   }, [paymentMethod])
@@ -700,6 +704,11 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
   const pointsToUse = useMemo(() => (pointsPaused ? 0 : discount / pointValue), [discount, pointValue, pointsPaused]);
   const finalTotal = useMemo(() => totalAmountInARS - discount, [totalAmountInARS, discount]);
   const pointsEarned = useMemo(() => (pointsPaused ? 0 : Math.floor(finalTotal / pointEarnRate)), [finalTotal, pointEarnRate, pointsPaused]);
+  const transferAmountEquivalent = useMemo(() => {
+    if (transferAmount <= 0) return 0;
+    if (transferUsdRate <= 0 || usdRate <= 0) return 0;
+    return (transferAmount / transferUsdRate) * usdRate;
+  }, [transferAmount, transferUsdRate, usdRate]);
 
   const startSignatureSession = useCallback(async (sale: Sale) => {
     setSignatureSessionError(null)
@@ -760,9 +769,13 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
         return;
     }
     if (paymentMethod === "multiple") {
+        if (transferAmount > 0 && transferUsdRate <= 0) {
+            toast.error("Debe ingresar la cotización usada para la transferencia");
+            return;
+        }
         const sum =
             cashAmount +
-            transferAmount +
+            transferAmountEquivalent +
             cardAmount +
             cashUsdAmount * usdRate;
         if (Math.abs(sum - finalTotal) > 0.01) {
@@ -833,7 +846,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             })),
             paymentMethod,
             ...(paymentMethod === "multiple"
-                ? { cashAmount, cashUsdAmount, transferAmount, cardAmount }
+                ? { cashAmount, cashUsdAmount, transferAmount, transferUsdRate: transferAmount > 0 ? transferUsdRate : 0, transferAmountEquivalent, cardAmount }
                 : paymentMethod === "transferencia_usdt"
                   ? { usdtAmount: finalTotal / usdRate }
                   : {}),
@@ -1419,7 +1432,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     </Select>
                   </div>
                   {paymentMethod === "multiple" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
                       <div className="space-y-1">
                         <Label>Monto Efectivo</Label>
                         <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value) || 0)} />
@@ -1433,10 +1446,25 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                         <Input type="number" value={transferAmount} onChange={(e) => setTransferAmount(Number(e.target.value) || 0)} />
                       </div>
                       <div className="space-y-1">
+                        <Label>Cotización Transferencia</Label>
+                        <Input
+                          type="number"
+                          value={transferUsdRate}
+                          disabled={transferAmount <= 0}
+                          placeholder="Ej: 1200"
+                          onChange={(e) => setTransferUsdRate(Number(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div className="space-y-1">
                         <Label>Monto Tarjeta</Label>
                         <Input type="number" value={cardAmount} onChange={(e) => setCardAmount(Number(e.target.value) || 0)} />
                       </div>
                     </div>
+                  )}
+                  {paymentMethod === "multiple" && transferAmount > 0 && transferUsdRate > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Transferencia tomada como {formatCurrency(transferAmountEquivalent)} para el cierre (base cotización {transferUsdRate}).
+                    </p>
                   )}
                   {!pointsPaused && availablePoints > 0 && (
                     <div className="flex items-center space-x-2">
