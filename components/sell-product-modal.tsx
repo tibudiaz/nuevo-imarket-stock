@@ -709,6 +709,14 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     if (transferUsdRate <= 0 || usdRate <= 0) return 0;
     return (transferAmount / transferUsdRate) * usdRate;
   }, [transferAmount, transferUsdRate, usdRate]);
+  const multiplePaymentTotal = useMemo(
+    () => cashAmount + transferAmountEquivalent + cardAmount + cashUsdAmount * usdRate,
+    [cashAmount, transferAmountEquivalent, cardAmount, cashUsdAmount, usdRate]
+  );
+  const multiplePaymentDifference = useMemo(
+    () => multiplePaymentTotal - finalTotal,
+    [multiplePaymentTotal, finalTotal]
+  );
 
   const startSignatureSession = useCallback(async (sale: Sale) => {
     setSignatureSessionError(null)
@@ -773,12 +781,7 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
             toast.error("Debe ingresar la cotización usada para la transferencia");
             return;
         }
-        const sum =
-            cashAmount +
-            transferAmountEquivalent +
-            cardAmount +
-            cashUsdAmount * usdRate;
-        if (Math.abs(sum - finalTotal) > 0.01) {
+        if (Math.abs(multiplePaymentTotal - finalTotal) > 0.01) {
             toast.error("La suma de los montos no coincide con el total");
             return;
         }
@@ -1499,6 +1502,18 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                 <div className="text-2xl font-bold">
                   Total: {formatCurrency(finalTotal)}
                 </div>
+                {paymentMethod === "multiple" && (
+                  <p
+                    className={`text-sm ${
+                      Math.abs(multiplePaymentDifference) <= 0.01 ? "text-emerald-600" : "text-amber-600"
+                    }`}
+                  >
+                    Abonando: {formatCurrency(multiplePaymentTotal)}
+                    {Math.abs(multiplePaymentDifference) > 0.01 && (
+                      <> (diferencia: {formatCurrency(multiplePaymentDifference)})</>
+                    )}
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                   <Button variant="outline" onClick={onClose}>Cancelar</Button>
