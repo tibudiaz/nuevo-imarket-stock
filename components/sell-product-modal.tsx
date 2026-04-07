@@ -717,6 +717,16 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
     () => multiplePaymentTotal - finalTotal,
     [multiplePaymentTotal, finalTotal]
   );
+  const remainingAmountWithoutTransfer = useMemo(
+    () => finalTotal - (cashAmount + cardAmount + cashUsdAmount * usdRate),
+    [finalTotal, cashAmount, cardAmount, cashUsdAmount, usdRate]
+  );
+  const suggestedTransferAmount = useMemo(() => {
+    if (transferUsdRate <= 0 || usdRate <= 0) return 0;
+    const remainingToCover = Math.max(0, remainingAmountWithoutTransfer);
+    const transferNeeded = (remainingToCover / usdRate) * transferUsdRate;
+    return Math.round(transferNeeded * 100) / 100;
+  }, [remainingAmountWithoutTransfer, transferUsdRate, usdRate]);
 
   const startSignatureSession = useCallback(async (sale: Sale) => {
     setSignatureSessionError(null)
@@ -1435,33 +1445,54 @@ export default function SellProductModal({ isOpen, onClose, product, onProductSo
                     </Select>
                   </div>
                   {paymentMethod === "multiple" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-                      <div className="space-y-1">
-                        <Label>Monto Efectivo</Label>
-                        <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value) || 0)} />
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                        <div className="space-y-1">
+                          <Label>Monto Efectivo</Label>
+                          <Input type="number" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Monto Efectivo USD</Label>
+                          <Input type="number" value={cashUsdAmount} onChange={(e) => setCashUsdAmount(Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Monto Transferencia</Label>
+                          <Input type="number" value={transferAmount} onChange={(e) => setTransferAmount(Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Cotización Transferencia</Label>
+                          <Input
+                            type="number"
+                            value={transferUsdRate}
+                            placeholder="Ej: 1200"
+                            onChange={(e) => setTransferUsdRate(Number(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Monto Tarjeta</Label>
+                          <Input type="number" value={cardAmount} onChange={(e) => setCardAmount(Number(e.target.value) || 0)} />
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label>Monto Efectivo USD</Label>
-                        <Input type="number" value={cashUsdAmount} onChange={(e) => setCashUsdAmount(Number(e.target.value) || 0)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Monto Transferencia</Label>
-                        <Input type="number" value={transferAmount} onChange={(e) => setTransferAmount(Number(e.target.value) || 0)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Cotización Transferencia</Label>
-                        <Input
-                          type="number"
-                          value={transferUsdRate}
-                          disabled={transferAmount <= 0}
-                          placeholder="Ej: 1200"
-                          onChange={(e) => setTransferUsdRate(Number(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Monto Tarjeta</Label>
-                        <Input type="number" value={cardAmount} onChange={(e) => setCardAmount(Number(e.target.value) || 0)} />
-                      </div>
+                      {transferUsdRate > 0 && usdRate > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setTransferAmount(suggestedTransferAmount)}
+                          >
+                            Calcular restante a transferir
+                          </Button>
+                          <span className="text-xs text-muted-foreground">
+                            Sugerido: {formatCurrency(suggestedTransferAmount)} por transferencia.
+                          </span>
+                        </div>
+                      )}
+                      {remainingAmountWithoutTransfer <= 0 && (
+                        <p className="text-xs text-emerald-600">
+                          Ya se cubrió el total sin transferencia.
+                        </p>
+                      )}
                     </div>
                   )}
                   {paymentMethod === "multiple" && transferAmount > 0 && transferUsdRate > 0 && (
