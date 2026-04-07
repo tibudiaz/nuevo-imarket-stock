@@ -791,17 +791,22 @@ export default function InventoryPage() {
   const handleTransferProduct = async (product: Product, quantity: number) => {
     const targetStore = product.store === "local1" ? "local2" : "local1";
     const currentStock = product.stock || 0;
+    const isIndividualPhone =
+      product.category === "Celulares Nuevos" ||
+      product.category === "Celulares Usados";
 
     try {
       const productRef = ref(database, `products/${product.id}`);
-      const existing = products.find(
-        (p) =>
-          p.store === targetStore &&
-          p.name === product.name &&
-          p.brand === product.brand &&
-          p.model === product.model &&
-          p.category === product.category
-      );
+      const existing = isIndividualPhone
+        ? undefined
+        : products.find(
+            (p) =>
+              p.store === targetStore &&
+              p.name === product.name &&
+              p.brand === product.brand &&
+              p.model === product.model &&
+              p.category === product.category,
+          );
 
       const shouldDeleteRecord = shouldRemoveProductFromInventory(
         product.category,
