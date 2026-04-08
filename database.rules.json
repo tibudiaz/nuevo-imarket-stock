@@ -1,0 +1,556 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users/' + auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users/' + auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "categories": {
+      ".read": true,
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "catalog": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+    },
+    "catalogVisibility": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+    },
+    "products": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+    },
+    "jblProducts": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+    },
+    "locales": {
+      ".read": "true",
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator' || auth.token.admin === true || auth.token.service_account === true)",
+      "$localId": {
+        "qr_pendiente": {
+          ".read": "true",
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator' || auth.token.admin === true || auth.token.service_account === true)",
+          ".validate": "newData.isString()"
+        }
+      }
+    },
+    "sales": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+      "$saleId": {
+        "signatureSession": {
+          ".read": "auth != null || (data.exists() && root.child('config/allowAnonymousSignatureUploads').val() !== false)",
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (data.exists() && root.child('config/allowAnonymousSignatureUploads').val() !== false)",
+          ".validate": "newData.hasChildren(['createdAt', 'status', 'pendingSignature'])",
+          "createdAt": {
+            ".validate": "newData.isString()"
+          },
+          "createdBy": {
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "status": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed' && (newData.val() === 'signed' || newData.val() === 'cancel_requested'))",
+            ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'signed' || newData.val() === 'closed' || newData.val() === 'cancel_requested' || newData.val() === 'cancelled')"
+          },
+          "pendingSignature": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "newData.isBoolean()"
+          },
+          "saleId": {
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "receiptNumber": {
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "store": {
+            ".validate": "!newData.exists() || newData.isString() || newData.val() == null"
+          },
+          "signature": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "newData.hasChildren(['url', 'path', 'signedAt', 'uploadedBy']) && newData.child('url').isString() && newData.child('path').isString() && newData.child('signedAt').isString() && (newData.child('uploadedBy').val() === 'mobile' || newData.child('uploadedBy').val() === 'desktop')"
+          },
+          "lastOpenedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists())",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "lastSignedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "closedAt": {
+            ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "disclaimerAcceptedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "disclaimerType": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.val() === null || newData.val() === 'new' || newData.val() === 'used'"
+          },
+          "cancelRequestedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "cancelRequestedBy": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "cancelResolvedAt": {
+            ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "cancelResolution": {
+            ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+            ".validate": "!newData.exists() || (newData.isString() && (newData.val() === 'continue' || newData.val() === 'cancel'))"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "signature": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && root.child('saleSignatureSessions/' + newData.child('sessionId').val()).child('saleId').val() === $saleId && root.child('saleSignatureSessions/' + newData.child('sessionId').val()).child('status').val() !== 'closed')",
+          ".validate": "newData.hasChildren(['url', 'path', 'signedAt', 'sessionId']) && newData.child('url').isString() && newData.child('path').isString() && newData.child('signedAt').isString() && newData.child('sessionId').isString()"
+        }
+      }
+    },
+    "reserves": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+    },
+    "customers": {
+      ".indexOn": [
+        "dni",
+        "email"
+      ],
+      ".read": "auth != null || ((query.orderByChild == 'dni' || query.orderByChild == 'email') && query.equalTo != null)",
+      ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (auth == null && newData.exists() && newData.child('publicAccess').val() === true && (!data.exists() ? newData.hasChildren(['name', 'email', 'password', 'createdAt', 'passwordUpdatedAt', 'publicAccess', 'hasPurchased']) : (data.exists() && newData.child('dni').val() == data.child('dni').val() && newData.child('name').val() == data.child('name').val() && newData.child('createdAt').val() == data.child('createdAt').val() && newData.child('hasPurchased').val() == data.child('hasPurchased').val())))"
+    },
+    "providers": {
+      ".read": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "providerTransactions": {
+      ".read": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "repairs": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+      "$repairId": {
+        "signatureSession": {
+          ".read": "auth != null || (data.exists() && root.child('config/allowAnonymousRepairSignatureUploads').val() !== false)",
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (data.exists() && root.child('config/allowAnonymousRepairSignatureUploads').val() !== false)",
+          ".validate": "newData.hasChildren(['createdAt', 'status', 'pendingSignature'])",
+          "createdAt": {
+            ".validate": "newData.isString()"
+          },
+          "createdBy": {
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "status": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed' && (newData.val() === 'signed' || newData.val() === 'closed'))",
+            ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'signed' || newData.val() === 'closed')"
+          },
+          "pendingSignature": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "newData.isBoolean()"
+          },
+          "repairId": {
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "receiptNumber": {
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "store": {
+            ".validate": "!newData.exists() || newData.isString() || newData.val() == null"
+          },
+          "signatureType": {
+            ".validate": "!newData.exists() || newData.val() === 'estimate' || newData.val() === 'delivery'"
+          },
+          "signature": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "newData.hasChildren(['url', 'path', 'signedAt', 'uploadedBy', 'signerName', 'signerDni']) && newData.child('url').isString() && newData.child('path').isString() && newData.child('signedAt').isString() && newData.child('signerName').isString() && newData.child('signerDni').isString() && (newData.child('uploadedBy').val() === 'mobile' || newData.child('uploadedBy').val() === 'desktop')"
+          },
+          "lastOpenedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists())",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "lastSignedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "disclaimerAcceptedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "disclaimerType": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.val() === null || newData.val() === 'estimate' || newData.val() === 'delivery'"
+          },
+          "closedAt": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "closedBy": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "signature": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && root.child('repairSignatureSessions/' + newData.child('sessionId').val()).child('repairId').val() === $repairId && root.child('repairSignatureSessions/' + newData.child('sessionId').val()).child('status').val() !== 'closed')",
+          ".validate": "newData.hasChildren(['url', 'path', 'signedAt', 'sessionId', 'signerName', 'signerDni']) && newData.child('url').isString() && newData.child('path').isString() && newData.child('signedAt').isString() && newData.child('sessionId').isString() && newData.child('signerName').isString() && newData.child('signerDni').isString()"
+        }
+      }
+    },
+    "repairUploadSessions": {
+      ".indexOn": [
+        "createdBy"
+      ],
+      ".read": "auth != null || root.child('config/allowAnonymousRepairUploads').val() !== false",
+      ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || root.child('config/allowAnonymousRepairUploads').val() !== false",
+      "$sessionId": {
+        ".read": "auth != null || (data.exists() && root.child('config/allowAnonymousRepairUploads').val() !== false)",
+        ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (data.exists() && root.child('config/allowAnonymousRepairUploads').val() !== false)",
+        ".validate": "newData.hasChildren(['createdAt', 'status', 'pendingUpload'])",
+        "createdAt": {
+          ".validate": "newData.isString()"
+        },
+        "createdBy": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "status": {
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+          ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'linked' || newData.val() === 'locked' || newData.val() === 'closed')"
+        },
+        "pendingUpload": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (auth != null && data.parent().child('createdBy').val() === root.child('users/' + auth.uid).child('username').val()) || (root.child('config/allowAnonymousRepairUploads').val() !== false && data.parent().exists() && root.child('repairUploadSessions/' + $sessionId).child('allowUploads').val() !== false && root.child('repairUploadSessions/' + $sessionId).child('status').val() !== 'locked' && root.child('repairUploadSessions/' + $sessionId).child('status').val() !== 'closed')",
+          ".validate": "newData.isBoolean()"
+        },
+        "repairId": {
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "linkedAt": {
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "allowUploads": {
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+          ".validate": "!newData.exists() || newData.isBoolean()"
+        },
+        "lastOpenedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairUploads').val() !== false && data.parent().exists())",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "lastUploadedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairUploads').val() !== false && data.parent().exists())",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "lastUploadedFrom": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairUploads').val() !== false && data.parent().exists())",
+          ".validate": "!newData.exists() || (newData.isString() && (newData.val() === 'mobile' || newData.val() === 'desktop'))"
+        },
+        "dismissedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (auth != null && data.parent().child('createdBy').val() === root.child('users/' + auth.uid).child('username').val())",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "photos": {
+          ".read": "auth != null || data.parent().parent().exists()",
+          "$photoId": {
+            ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairUploads').val() !== false && root.child('repairUploadSessions/' + $sessionId).child('status').val() !== 'locked' && root.child('repairUploadSessions/' + $sessionId).child('status').val() !== 'closed' && root.child('repairUploadSessions/' + $sessionId).child('allowUploads').val() !== false)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['url', 'uploadedAt', 'uploadedBy', 'name']) && newData.child('url').isString() && newData.child('uploadedAt').isString() && newData.child('name').isString() && (newData.child('uploadedBy').val() === 'mobile' || newData.child('uploadedBy').val() === 'desktop'))"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "saleSignatureSessions": {
+      ".indexOn": [
+        "saleId",
+        "createdBy"
+      ],
+      ".read": "auth != null || root.child('config/allowAnonymousSignatureUploads').val() !== false",
+      ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || root.child('config/allowAnonymousSignatureUploads').val() !== false",
+      "$sessionId": {
+        ".read": "auth != null || (data.exists() && root.child('config/allowAnonymousSignatureUploads').val() !== false)",
+        ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (data.exists() && root.child('config/allowAnonymousSignatureUploads').val() !== false)",
+        ".validate": "newData.hasChildren(['createdAt', 'status', 'pendingSignature'])",
+        "createdAt": {
+          ".validate": "newData.isString()"
+        },
+        "createdBy": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "saleId": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "receiptNumber": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "store": {
+          ".validate": "!newData.exists() || newData.isString() || newData.val() == null"
+        },
+        "status": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed' && (newData.val() === 'signed' || newData.val() === 'cancel_requested'))",
+          ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'signed' || newData.val() === 'closed' || newData.val() === 'cancel_requested' || newData.val() === 'cancelled')"
+        },
+        "pendingSignature": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "newData.isBoolean()"
+        },
+        "signature": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "newData.hasChildren(['url', 'path', 'signedAt', 'uploadedBy']) && newData.child('url').isString() && newData.child('path').isString() && newData.child('signedAt').isString() && (newData.child('uploadedBy').val() === 'mobile' || newData.child('uploadedBy').val() === 'desktop')"
+        },
+        "lastOpenedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists())",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "lastSignedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "closedAt": {
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "disclaimerAcceptedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "disclaimerType": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.val() === null || newData.val() === 'new' || newData.val() === 'used'"
+        },
+        "cancelRequestedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "cancelRequestedBy": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "cancelResolvedAt": {
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "cancelResolution": {
+          ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+          ".validate": "!newData.exists() || (newData.isString() && (newData.val() === 'continue' || newData.val() === 'cancel'))"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "repairSignatureSessions": {
+      ".indexOn": [
+        "repairId",
+        "createdBy"
+      ],
+      ".read": "auth != null || root.child('config/allowAnonymousRepairSignatureUploads').val() !== false",
+      ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || root.child('config/allowAnonymousRepairSignatureUploads').val() !== false",
+      "$sessionId": {
+        ".read": "auth != null || (data.exists() && root.child('config/allowAnonymousRepairSignatureUploads').val() !== false)",
+        ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (data.exists() && root.child('config/allowAnonymousRepairSignatureUploads').val() !== false)",
+        ".validate": "newData.hasChildren(['createdAt', 'status', 'pendingSignature'])",
+        "createdAt": {
+          ".validate": "newData.isString()"
+        },
+        "createdBy": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "repairId": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "receiptNumber": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "store": {
+          ".validate": "!newData.exists() || newData.isString() || newData.val() == null"
+        },
+        "signatureType": {
+          ".validate": "!newData.exists() || newData.val() === 'estimate' || newData.val() === 'delivery'"
+        },
+        "status": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed' && (newData.val() === 'signed' || newData.val() === 'closed'))",
+          ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'signed' || newData.val() === 'closed')"
+        },
+        "pendingSignature": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "newData.isBoolean()"
+        },
+        "signature": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "newData.hasChildren(['url', 'path', 'signedAt', 'uploadedBy', 'signerName', 'signerDni']) && newData.child('url').isString() && newData.child('path').isString() && newData.child('signedAt').isString() && newData.child('signerName').isString() && newData.child('signerDni').isString() && (newData.child('uploadedBy').val() === 'mobile' || newData.child('uploadedBy').val() === 'desktop')"
+        },
+        "lastOpenedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists())",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "lastSignedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "disclaimerAcceptedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "disclaimerType": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.val() === null || newData.val() === 'estimate' || newData.val() === 'delivery'"
+        },
+        "closedAt": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "closedBy": {
+          ".write": "(auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')) || (root.child('config/allowAnonymousRepairSignatureUploads').val() !== false && data.parent().exists() && data.parent().child('status').val() !== 'closed')",
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "notifications": {
+      ".read": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "backups": {
+      ".read": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "counters": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "cashClosures": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "cashWithdrawals": {
+      ".read": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+      ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+    },
+    "config": {
+      ".read": "auth != null",
+      "localAssistant": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+      },
+      "offers": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+      },
+      "points": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+      },
+      "catalogAds": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+      },
+      "visits": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "newPhones": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')"
+      },
+      "$configId": {
+        ".write": "auth != null && (root.child('users/' + auth.uid).child('role').val() === 'admin' || root.child('users/' + auth.uid).child('role').val() === 'moderator')",
+        ".validate": true
+      }
+    },
+    "systemChangeHistory": {
+      ".read": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "inventory": {
+      ".read": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "finances": {
+      ".read": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users/' + auth.uid).child('role').val() === 'admin'"
+    },
+    "chat": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "messages": {
+        ".indexOn": [
+          "timestamp",
+          "type",
+          "username",
+          "senderUid"
+        ],
+        "$messageId": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['username','timestamp','type']) && ((newData.child('type').val() === 'text' && newData.child('text').isString() && newData.child('text').val().length > 0 && !newData.child('audioUrl').exists()) || (newData.child('type').val() === 'audio' && newData.child('audioUrl').isString() && newData.child('audioUrl').val().length > 0 && !newData.child('text').exists()))",
+          "username": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "senderUid": {
+            ".validate": "!newData.exists() || (newData.isString() && auth != null && newData.val() === auth.uid)"
+          },
+          "timestamp": {
+            ".validate": "(newData.isNumber() && newData.val() <= now) || (newData.hasChildren(['.sv']) && newData.child('.sv').val() === 'timestamp')"
+          },
+          "type": {
+            ".validate": "newData.val() === 'text' || newData.val() === 'audio'"
+          },
+          "text": {
+            ".validate": "!newData.exists() || (newData.parent().child('type').val() === 'text' && newData.isString() && newData.val().length > 0)"
+          },
+          "audioUrl": {
+            ".validate": "!newData.exists() || (newData.parent().child('type').val() === 'audio' && newData.isString() && newData.val().length > 0)"
+          },
+          "readBy": {
+            "$uid": {
+              ".read": "auth != null",
+              ".write": "auth != null && auth.uid === $uid",
+              ".validate": "newData.isNumber() && newData.val() <= now"
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "typing": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "!newData.exists() || (newData.hasChildren(['isTyping','updatedAt']) && newData.child('isTyping').isBoolean() && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() <= now)"
+        }
+      },
+      "presence": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "!newData.exists() || (newData.hasChildren(['online','lastSeen']) && newData.child('online').isBoolean() && newData.child('lastSeen').isNumber() && newData.child('lastSeen').val() <= now)"
+        }
+      },
+      "lastRead": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isNumber() && newData.val() <= now"
+        }
+      }
+    }
+  }
+}
