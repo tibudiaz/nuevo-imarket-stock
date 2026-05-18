@@ -157,6 +157,22 @@ body {
   }
 }
 
+@keyframes top-marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@layer utilities {
+  .top-marquee-track {
+    animation: top-marquee-scroll 28s linear infinite;
+    will-change: transform;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
