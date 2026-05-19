@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Check, ChevronsUpDown, Copy, Loader2, PlusCircle, Smartphone, Trash, UploadCloud, X } from "lucide-react"
+import { Check, ChevronsUpDown, Copy, ExternalLink, Loader2, PlusCircle, Smartphone, Trash, UploadCloud, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ref, onValue, set, push, remove, get, update } from "firebase/database"
@@ -1435,6 +1435,9 @@ export default function SettingsPage() {
   const catalogOptionsByKey = new Map(
     catalogOptions.map((option) => [option.key, option.label])
   );
+  const androidCatalogItems = newCatalogItems.filter(
+    (item) => (item.catalogKey ?? "nuevos") === "dispositivos-android"
+  );
   const catalogAdLocations = [
     { key: "landing", label: "Selección de catálogo (superior)" },
     { key: "landingBottom", label: "Selección de catálogo (inferior)" },
@@ -2231,6 +2234,56 @@ export default function SettingsPage() {
                         >
                           <Trash className="h-4 w-4" />
                         </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Equipos Android cargados</CardTitle>
+              <CardDescription>
+                Accedé rápido a los equipos que cargaste en el catálogo de dispositivos Android.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total de equipos Android cargados</p>
+                  <p className="text-2xl font-semibold">{androidCatalogItems.length}</p>
+                </div>
+                <a
+                  href="/catalogo/dispositivos-android"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto"
+                >
+                  <Button type="button" variant="outline" className="w-full sm:w-auto">
+                    Ver catálogo Android
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Button>
+                </a>
+              </div>
+              <Separator />
+              <ScrollArea className="h-56">
+                <div className="space-y-2">
+                  {androidCatalogItems.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      No hay equipos Android cargados todavía.
+                    </p>
+                  ) : (
+                    androidCatalogItems.map((item) => (
+                      <div key={item.id} className="rounded-md border p-3">
+                        <p className="font-medium">{item.name}</p>
+                        <div className="text-xs text-muted-foreground">
+                          {typeof item.price === "number"
+                            ? `Precio: ${item.price}`
+                            : "Precio: sin definir"}
+                          {item.status ? ` · ${item.status}` : ""}
+                        </div>
                       </div>
                     ))
                   )}
