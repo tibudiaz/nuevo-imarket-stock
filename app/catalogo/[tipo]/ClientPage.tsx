@@ -1285,10 +1285,10 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
       : inStock.length
   const catalogItemsLabel = isGamingAudioCatalog ? "productos" : "equipos"
   const catalogIntro = isNewCatalog
-    ? "Expertos en tecnología a tu alcance. 🏠 Te damos la bienvenida a nuestra selección de equipos nuevos. Mostramos solo la información técnica esencial para garantizar la transparencia y la seguridad de cada dispositivo."
+    ? "Descubrí tu próximo equipo ideal ✨ Modelos que enamoran, promos irresistibles y toda la onda tech para que elijas el que va con tu estilo."
     : isGamingAudioCatalog
-      ? "Potenciá tu experiencia gamer y musical. 🎧 Descubrí parlantes, auriculares y accesorios JBL con disponibilidad en tiempo real."
-      : "La mejor tecnología a un precio increíble. 📱 Explorá nuestros usados seleccionados, ideales para quienes buscan rendimiento y ahorro. Resguardamos los datos sensibles de cada equipo para ofrecerte una compra protegida y confiable."
+      ? "Subí el volumen de tu experiencia 🎧 Parlantes, auriculares y accesorios que transforman cada partida y cada canción en otro nivel."
+      : "Renová tu celu gastando menos 🔥 Encontrá usados seleccionados con gran rendimiento, excelente precio y oportunidades que vuelan."
 
   const topBarDesktopContent = (
     <>
