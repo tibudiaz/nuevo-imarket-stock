@@ -29,7 +29,7 @@ const baseLandingOptions = [
   },
   {
     title: "Dispositivos Android",
-    description: "Mirá equipos Android cargados desde configuración, sin impacto en el stock.",
+    description: "Descubrí equipos Android que te van a encantar: diseño, potencia y ofertas para elegir el tuyo hoy.",
     href: "/catalogo/dispositivos-android",
     accent: "from-amber-500/20 via-orange-400/5 to-transparent",
     icon: Smartphone,
