@@ -843,7 +843,12 @@ export default function SettingsPage() {
       toast.error("Ingresá un nombre válido para generar el enlace.");
       return;
     }
-    if (key === "nuevos" || key === "usados" || key === "gaming-audio") {
+    if (
+      key === "nuevos" ||
+      key === "dispositivos-android" ||
+      key === "usados" ||
+      key === "gaming-audio"
+    ) {
       toast.error("Ese nombre ya está reservado para un catálogo existente.");
       return;
     }
@@ -1421,6 +1426,7 @@ export default function SettingsPage() {
   const catalogAdAllowMultiple = catalogAdType !== "video";
   const catalogOptions = [
     { key: "nuevos", label: "Catálogo de nuevos" },
+    { key: "dispositivos-android", label: "Dispositivos Android" },
     ...publicCatalogs.map((catalog) => ({
       key: catalog.key,
       label: catalog.name,
@@ -1433,6 +1439,7 @@ export default function SettingsPage() {
     { key: "landing", label: "Selección de catálogo (superior)" },
     { key: "landingBottom", label: "Selección de catálogo (inferior)" },
     { key: "nuevos", label: "Catálogo de nuevos" },
+    { key: "dispositivos-android", label: "Catálogo de dispositivos Android" },
     { key: "usados", label: "Catálogo de usados" },
     { key: "gaming-audio", label: "Catálogo de gaming y audio" },
     ...publicCatalogs.map((catalog) => ({

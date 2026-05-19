@@ -5,7 +5,12 @@ import PublicStockClient from "./ClientPage"
 export const dynamicParams = true
 
 export function generateStaticParams() {
-  return [{ tipo: "nuevos" }, { tipo: "usados" }, { tipo: "gaming-audio" }]
+  return [
+    { tipo: "nuevos" },
+    { tipo: "dispositivos-android" },
+    { tipo: "usados" },
+    { tipo: "gaming-audio" },
+  ]
 }
 
 export default function PublicStockPage({ params }: { params: { tipo: string } }) {

@@ -28,6 +28,13 @@ const baseLandingOptions = [
     icon: Sparkles,
   },
   {
+    title: "Dispositivos Android",
+    description: "Mirá equipos Android cargados desde configuración, sin impacto en el stock.",
+    href: "/catalogo/dispositivos-android",
+    accent: "from-amber-500/20 via-orange-400/5 to-transparent",
+    icon: Smartphone,
+  },
+  {
     title: "Celulares usados",
     description: "Revisá el stock de equipos usados certificados y listos para entrega.",
     href: "/catalogo/usados",
