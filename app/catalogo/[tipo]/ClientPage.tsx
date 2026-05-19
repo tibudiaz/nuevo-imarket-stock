@@ -132,6 +132,12 @@ const BASE_CATALOG_TYPES: Record<string, CatalogType> = {
     accent: "from-sky-500/20 to-blue-500/5",
     kind: "new",
   },
+  "dispositivos-android": {
+    key: "dispositivos-android",
+    title: "Dispositivos Android",
+    accent: "from-amber-500/20 to-orange-500/10",
+    kind: "new",
+  },
   usados: {
     key: "usados",
     title: "Celulares Usados",
