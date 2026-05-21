@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Check, ChevronsUpDown, Copy, ExternalLink, Loader2, PlusCircle, Smartphone, Trash, UploadCloud, X } from "lucide-react"
+import { Check, ChevronsUpDown, Copy, Loader2, PlusCircle, Smartphone, Trash, UploadCloud, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ref, onValue, set, push, remove, get, update } from "firebase/database"
@@ -2262,12 +2262,6 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <a href="/catalogo/dispositivos-android" target="_blank" rel="noopener noreferrer">
-                  <Button type="button" variant="outline">
-                    Ver catálogo Android
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Button>
-                </a>
                 <Button
                   onClick={() =>
                     handleAddNewCatalogItem("dispositivos-android", {
