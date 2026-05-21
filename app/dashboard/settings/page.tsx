@@ -365,10 +365,12 @@ export default function SettingsPage() {
   const [newCatalogItems, setNewCatalogItems] = useState<NewCatalogItem[]>([]);
   const [publicCatalogs, setPublicCatalogs] = useState<PublicCatalog[]>([]);
   const [newPublicCatalogName, setNewPublicCatalogName] = useState("");
-  const [selectedNewCatalogKey, setSelectedNewCatalogKey] = useState("nuevos");
-  const [newCatalogName, setNewCatalogName] = useState("");
-  const [newCatalogPrice, setNewCatalogPrice] = useState("");
-  const [newCatalogStatus, setNewCatalogStatus] = useState("");
+  const [newIphoneCatalogName, setNewIphoneCatalogName] = useState("");
+  const [newIphoneCatalogPrice, setNewIphoneCatalogPrice] = useState("");
+  const [newIphoneCatalogStatus, setNewIphoneCatalogStatus] = useState("");
+  const [newAndroidCatalogName, setNewAndroidCatalogName] = useState("");
+  const [newAndroidCatalogPrice, setNewAndroidCatalogPrice] = useState("");
+  const [newAndroidCatalogStatus, setNewAndroidCatalogStatus] = useState("");
   const [catalogVisitCount, setCatalogVisitCount] = useState(0);
   const [usdRateAdjustment, setUsdRateAdjustment] = useState(0);
   const [catalogAds, setCatalogAds] = useState<Record<string, CatalogAdConfig>>({});
@@ -556,15 +558,6 @@ export default function SettingsPage() {
       unsubscribeNewCatalog();
     };
   }, []);
-
-  useEffect(() => {
-    if (
-      selectedNewCatalogKey !== "nuevos" &&
-      !publicCatalogs.some((catalog) => catalog.key === selectedNewCatalogKey)
-    ) {
-      setSelectedNewCatalogKey("nuevos");
-    }
-  }, [publicCatalogs, selectedNewCatalogKey]);
 
   useEffect(() => {
     const current = catalogAds[selectedCatalogAdPage];
@@ -882,15 +875,18 @@ export default function SettingsPage() {
     }
   };
 
-  const handleAddNewCatalogItem = async () => {
-    const trimmedName = newCatalogName.trim();
-    const trimmedStatus = newCatalogStatus.trim();
+  const handleAddNewCatalogItem = async (
+    catalogKey: "nuevos" | "dispositivos-android",
+    values: { name: string; price: string; status: string }
+  ) => {
+    const trimmedName = values.name.trim();
+    const trimmedStatus = values.status.trim();
     if (!trimmedName) {
       toast.error("El nombre del equipo es obligatorio.");
       return;
     }
 
-    const trimmedPrice = newCatalogPrice.trim();
+    const trimmedPrice = values.price.trim();
     const price =
       trimmedPrice.length > 0 ? Number(trimmedPrice.replace(",", ".")) : undefined;
     if (trimmedPrice.length > 0 && !Number.isFinite(price)) {
@@ -907,7 +903,7 @@ export default function SettingsPage() {
     try {
       const payload: Record<string, string | number> = {
         name: trimmedName,
-        catalogKey: selectedNewCatalogKey,
+        catalogKey,
         createdAt: new Date().toISOString(),
       };
       if (typeof price === "number") {
@@ -917,10 +913,17 @@ export default function SettingsPage() {
         payload.status = trimmedStatus;
       }
       await set(catalogRef, payload);
-      setNewCatalogName("");
-      setNewCatalogPrice("");
-      setNewCatalogStatus("");
-      toast.success("Equipo agregado al catálogo de nuevos.");
+      if (catalogKey === "nuevos") {
+        setNewIphoneCatalogName("");
+        setNewIphoneCatalogPrice("");
+        setNewIphoneCatalogStatus("");
+        toast.success("Equipo iPhone agregado al catálogo de nuevos.");
+      } else {
+        setNewAndroidCatalogName("");
+        setNewAndroidCatalogPrice("");
+        setNewAndroidCatalogStatus("");
+        toast.success("Equipo Android agregado al catálogo.");
+      }
     } catch (error) {
       console.error("Error al agregar equipo nuevo:", error);
       toast.error("No se pudo agregar el equipo.");
@@ -1424,16 +1427,8 @@ export default function SettingsPage() {
 
   const catalogAdFileAccept = catalogAdType === "video" ? "video/*" : "image/*";
   const catalogAdAllowMultiple = catalogAdType !== "video";
-  const catalogOptions = [
-    { key: "nuevos", label: "Catálogo de nuevos" },
-    { key: "dispositivos-android", label: "Dispositivos Android" },
-    ...publicCatalogs.map((catalog) => ({
-      key: catalog.key,
-      label: catalog.name,
-    })),
-  ];
-  const catalogOptionsByKey = new Map(
-    catalogOptions.map((option) => [option.key, option.label])
+  const iphoneCatalogItems = newCatalogItems.filter(
+    (item) => (item.catalogKey ?? "nuevos") === "nuevos"
   );
   const androidCatalogItems = newCatalogItems.filter(
     (item) => (item.catalogKey ?? "nuevos") === "dispositivos-android"
@@ -2139,68 +2134,30 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Catálogo de equipos nuevos</CardTitle>
+              <CardTitle>Catálogo de equipos nuevos (iPhone)</CardTitle>
               <CardDescription>
                 Cargá modelos nuevos que no se descuentan del stock. Podés incluir precio y/o una
                 nota para equipos por ingresar.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="space-y-2 md:col-span-1">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
                   <Label htmlFor="new-catalog-name">Nombre del equipo</Label>
                   <Input
                     id="new-catalog-name"
-                    value={newCatalogName}
-                    onChange={(e) => setNewCatalogName(e.target.value)}
+                    value={newIphoneCatalogName}
+                    onChange={(e) => setNewIphoneCatalogName(e.target.value)}
                     placeholder="Ej. iPhone 15 Pro"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>Catálogo</Label>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant={selectedNewCatalogKey === "nuevos" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedNewCatalogKey("nuevos")}
-                      >
-                        Catálogo de nuevos
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={selectedNewCatalogKey === "dispositivos-android" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedNewCatalogKey("dispositivos-android")}
-                      >
-                        Dispositivos Android
-                      </Button>
-                    </div>
-                    <Select
-                      value={selectedNewCatalogKey}
-                      onValueChange={(value) => setSelectedNewCatalogKey(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Elegí el catálogo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catalogOptions.map((option) => (
-                          <SelectItem key={option.key} value={option.key}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-catalog-price">Precio</Label>
                   <Input
                     id="new-catalog-price"
                     type="number"
-                    value={newCatalogPrice}
-                    onChange={(e) => setNewCatalogPrice(e.target.value)}
+                    value={newIphoneCatalogPrice}
+                    onChange={(e) => setNewIphoneCatalogPrice(e.target.value)}
                     placeholder="Ej. 1200"
                   />
                 </div>
@@ -2208,37 +2165,41 @@ export default function SettingsPage() {
                   <Label htmlFor="new-catalog-status">Estado / ingreso</Label>
                   <Input
                     id="new-catalog-status"
-                    value={newCatalogStatus}
-                    onChange={(e) => setNewCatalogStatus(e.target.value)}
+                    value={newIphoneCatalogStatus}
+                    onChange={(e) => setNewIphoneCatalogStatus(e.target.value)}
                     placeholder="Ej. Ingresan la semana próxima"
                   />
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button onClick={handleAddNewCatalogItem}>
+                <Button
+                  onClick={() =>
+                    handleAddNewCatalogItem("nuevos", {
+                      name: newIphoneCatalogName,
+                      price: newIphoneCatalogPrice,
+                      status: newIphoneCatalogStatus,
+                    })
+                  }
+                >
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Agregar equipo nuevo
+                  Agregar iPhone al catálogo
                 </Button>
               </div>
               <Separator />
               <ScrollArea className="h-64">
                 <div className="space-y-2">
-                  {newCatalogItems.length === 0 ? (
+                  {iphoneCatalogItems.length === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
-                      No hay equipos nuevos cargados.
+                      No hay iPhones cargados.
                     </p>
                   ) : (
-                    newCatalogItems.map((item) => (
+                    iphoneCatalogItems.map((item) => (
                       <div
                         key={item.id}
                         className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div>
                           <p className="font-medium">{item.name}</p>
-                          <Badge variant="secondary" className="mt-1 w-fit">
-                            {catalogOptionsByKey.get(item.catalogKey ?? "nuevos") ??
-                              "Catálogo de nuevos"}
-                          </Badge>
                           <div className="text-xs text-muted-foreground">
                             {typeof item.price === "number"
                               ? `Precio: ${item.price}`
@@ -2264,28 +2225,61 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Equipos Android cargados</CardTitle>
+              <CardTitle>Catálogo de equipos Android</CardTitle>
               <CardDescription>
-                Accedé rápido a los equipos que cargaste en el catálogo de dispositivos Android.
+                Cargá equipos Android para catálogo sin afectar stock ni dinero invertido.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total de equipos Android cargados</p>
-                  <p className="text-2xl font-semibold">{androidCatalogItems.length}</p>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="new-android-catalog-name">Nombre del equipo</Label>
+                  <Input
+                    id="new-android-catalog-name"
+                    value={newAndroidCatalogName}
+                    onChange={(e) => setNewAndroidCatalogName(e.target.value)}
+                    placeholder="Ej. Samsung S24 Ultra"
+                  />
                 </div>
-                <a
-                  href="/catalogo/dispositivos-android"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto"
-                >
-                  <Button type="button" variant="outline" className="w-full sm:w-auto">
+                <div className="space-y-2">
+                  <Label htmlFor="new-android-catalog-price">Precio</Label>
+                  <Input
+                    id="new-android-catalog-price"
+                    type="number"
+                    value={newAndroidCatalogPrice}
+                    onChange={(e) => setNewAndroidCatalogPrice(e.target.value)}
+                    placeholder="Ej. 980"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-android-catalog-status">Estado / ingreso</Label>
+                  <Input
+                    id="new-android-catalog-status"
+                    value={newAndroidCatalogStatus}
+                    onChange={(e) => setNewAndroidCatalogStatus(e.target.value)}
+                    placeholder="Ej. Ingreso estimado en 7 días"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <a href="/catalogo/dispositivos-android" target="_blank" rel="noopener noreferrer">
+                  <Button type="button" variant="outline">
                     Ver catálogo Android
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </Button>
                 </a>
+                <Button
+                  onClick={() =>
+                    handleAddNewCatalogItem("dispositivos-android", {
+                      name: newAndroidCatalogName,
+                      price: newAndroidCatalogPrice,
+                      status: newAndroidCatalogStatus,
+                    })
+                  }
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Agregar Android al catálogo
+                </Button>
               </div>
               <Separator />
               <ScrollArea className="h-56">
