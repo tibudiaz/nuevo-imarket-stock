@@ -2158,21 +2158,41 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Catálogo</Label>
-                  <Select
-                    value={selectedNewCatalogKey}
-                    onValueChange={(value) => setSelectedNewCatalogKey(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Elegí el catálogo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {catalogOptions.map((option) => (
-                        <SelectItem key={option.key} value={option.key}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant={selectedNewCatalogKey === "nuevos" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedNewCatalogKey("nuevos")}
+                      >
+                        Catálogo de nuevos
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={selectedNewCatalogKey === "dispositivos-android" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedNewCatalogKey("dispositivos-android")}
+                      >
+                        Dispositivos Android
+                      </Button>
+                    </div>
+                    <Select
+                      value={selectedNewCatalogKey}
+                      onValueChange={(value) => setSelectedNewCatalogKey(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Elegí el catálogo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {catalogOptions.map((option) => (
+                          <SelectItem key={option.key} value={option.key}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-catalog-price">Precio</Label>
