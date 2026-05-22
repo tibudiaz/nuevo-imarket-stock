@@ -2284,14 +2284,27 @@ export default function SettingsPage() {
                     </p>
                   ) : (
                     androidCatalogItems.map((item) => (
-                      <div key={item.id} className="rounded-md border p-3">
-                        <p className="font-medium">{item.name}</p>
-                        <div className="text-xs text-muted-foreground">
-                          {typeof item.price === "number"
-                            ? `Precio: ${item.price}`
-                            : "Precio: sin definir"}
-                          {item.status ? ` · ${item.status}` : ""}
+                      <div
+                        key={item.id}
+                        className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          <div className="text-xs text-muted-foreground">
+                            {typeof item.price === "number"
+                              ? `Precio: ${item.price}`
+                              : "Precio: sin definir"}
+                            {item.status ? ` · ${item.status}` : ""}
+                          </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleRemoveNewCatalogItem(item.id)}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))
                   )}
