@@ -6,7 +6,7 @@ import PublicTopBar from "@/components/public-top-bar"
 const contactDetails = [
   {
     title: "Dirección",
-    description: "Constitucion 981, Río Cuarto, Córdoba.--Cabrera 1095, Río Cuarto, Córdoba.",
+    description: "Constitucion 981, Río Cuarto, Córdoba.",
     icon: MapPin,
   },
   {

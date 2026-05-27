@@ -903,10 +903,24 @@ export default function PublicStockClient({ params }: { params: { tipo: string }
 
   useEffect(() => {
     const adjustmentRef = ref(database, "config/usdRateAdjustment")
-    const unsubscribeAdjustment = onValue(adjustmentRef, (snapshot) => {
-      const value = snapshot.val()
+
+    const syncAdjustment = (value: unknown) => {
       setUsdRateAdjustment(typeof value === "number" && Number.isFinite(value) ? value : 0)
-    })
+    }
+
+    const unsubscribeAdjustment = onValue(
+      adjustmentRef,
+      (snapshot) => {
+        syncAdjustment(snapshot.val())
+      },
+      async (error) => {
+        console.warn("No se pudo leer config/usdRateAdjustment por Firebase SDK:", error)
+        const publicAdjustment = await fetchPublicRealtimeValue<unknown>("config/usdRateAdjustment")
+        syncAdjustment(publicAdjustment)
+      },
+    )
+
+    fetchPublicRealtimeValue<unknown>("config/usdRateAdjustment").then(syncAdjustment)
 
     return () => unsubscribeAdjustment()
   }, [])
