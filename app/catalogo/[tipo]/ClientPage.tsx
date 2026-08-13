@@ -460,7 +460,7 @@ const buildWhatsAppLink = (product: Product, usdRate: number) => {
   const arsPrice = formatArsPriceBlue(product.price, usdRate)
   const message = `Hola estoy interesado en el siguiente celular: ${name}. Precio USD: ${usdPrice}. Precio en pesos: ${arsPrice}.`
   const encodedMessage = encodeURIComponent(message)
-  return `https://wa.me/5493584224464?text=${encodedMessage}`
+  return `https://wa.me/5493585625881?text=${encodedMessage}`
 }
 
 const buildWhatsAppLinkForNewCatalog = (item: NewCatalogItem, usdRate: number) => {
@@ -475,7 +475,7 @@ const buildWhatsAppLinkForNewCatalog = (item: NewCatalogItem, usdRate: number) =
     item.status?.trim() ? `Estado: ${status}.` : null,
   ].filter(Boolean)
   const encodedMessage = encodeURIComponent(messageParts.join(" "))
-  return `https://wa.me/5493584224464?text=${encodedMessage}`
+  return `https://wa.me/5493585625881?text=${encodedMessage}`
 }
 
 const buildWhatsAppLinkForJbl = (item: JblCatalogItem, usdRate: number) => {
@@ -484,7 +484,7 @@ const buildWhatsAppLinkForJbl = (item: JblCatalogItem, usdRate: number) => {
   const arsPrice = formatArsPriceBlue(item.salePrice, usdRate)
   const message = `Hola! Estoy interesado en ${name}. Precio USD: ${usdPrice}. Precio en pesos: ${arsPrice}.`
   const encodedMessage = encodeURIComponent(message)
-  return `https://wa.me/5493584224464?text=${encodedMessage}`
+  return `https://wa.me/5493585625881?text=${encodedMessage}`
 }
 
 export default function PublicStockClient({ params }: { params: { tipo: string } }) {
